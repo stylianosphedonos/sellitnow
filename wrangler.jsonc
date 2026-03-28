@@ -1,0 +1,16 @@
+{
+  // Deploy: npx wrangler deploy
+  // Set secret API_ORIGIN to your Node HTTPS origin (e.g. https://app.onrender.com), no trailing slash.
+  // Local: copy .dev.vars.example to .dev.vars, run npm start && npx wrangler dev
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sellitnow",
+  "main": "cloudflare/proxy-worker.js",
+  "compatibility_date": "2025-09-27",
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
