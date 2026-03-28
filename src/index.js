@@ -15,6 +15,12 @@ const PaymentService = require('./services/PaymentService');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 // CORS
 app.use(cors({ origin: true, credentials: true }));
 

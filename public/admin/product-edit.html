@@ -23,6 +23,7 @@
       <div id="formContainer"></div>
     </main>
   </div>
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html';
@@ -216,7 +217,7 @@
           for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('images', fileInput.files[i]);
           }
-          const imgRes = await fetch('/api/v1/admin/products/' + id + '/images', {
+          const imgRes = await fetch(sellitnowApiUrl('/admin/products/' + id + '/images'), {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + getToken() },
             body: formData

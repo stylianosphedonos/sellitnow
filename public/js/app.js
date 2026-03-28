@@ -1,4 +1,12 @@
-const API_BASE = '/api/v1';
+function apiPrefix() {
+  if (typeof sellitnowGetApiBase === 'function') return sellitnowGetApiBase();
+  return '/api/v1';
+}
+
+function mediaUrl(u) {
+  if (typeof sellitnowResolveMediaUrl === 'function') return sellitnowResolveMediaUrl(u);
+  return u;
+}
 
 function getToken() {
   return localStorage.getItem('token');
@@ -40,7 +48,7 @@ async function callApi(path, options = {}) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   headers['X-Cart-Session'] = getCartSession();
 
-  const res = await fetch(API_BASE + path, { ...options, headers });
+  const res = await fetch(apiPrefix() + path, { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
@@ -62,7 +70,7 @@ function formatStoreMoney(amount, currencyCode) {
 
 async function loadBrandSettings() {
   try {
-    const res = await fetch(API_BASE + '/brand');
+    const res = await fetch(apiPrefix() + '/brand');
     if (!res.ok) return;
     const data = await res.json();
     if (typeof window !== 'undefined') {
@@ -76,7 +84,8 @@ async function loadBrandSettings() {
     const hero = document.querySelector('.hero');
     if (hero) {
       if (data.banner) {
-        hero.style.backgroundImage = `linear-gradient(135deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url(${data.banner})`;
+        const b = mediaUrl(data.banner);
+        hero.style.backgroundImage = `linear-gradient(135deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url(${b})`;
         hero.style.backgroundSize = 'cover';
         hero.style.backgroundPosition = 'center';
       } else {
@@ -90,7 +99,7 @@ async function loadBrandSettings() {
       if (data.logo) {
         el.innerHTML = '';
         const img = document.createElement('img');
-        img.src = data.logo;
+        img.src = mediaUrl(data.logo);
         img.alt = 'Sellitnow';
         el.appendChild(img);
       } else {
@@ -193,7 +202,7 @@ function renderProductCardMarkup(p) {
     <article class="product-card product-card--compact" data-product-id="${p.id}">
       <a href="/product.html?id=${p.id}" class="product-card__link">
         <div class="product-image">
-          ${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.title)}">` : '📦'}
+          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}">` : '📦'}
         </div>
         <div class="product-info">
           <div class="product-title">${escapeHtml(p.title)}</div>

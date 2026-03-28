@@ -47,6 +47,7 @@
       <div id="categories"></div>
     </main>
   </div>
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/categories.html');
@@ -90,7 +91,7 @@
         if (fileInput && fileInput.files && fileInput.files.length > 0) {
           const formData = new FormData();
           formData.append('image', fileInput.files[0]);
-          const imgRes = await fetch('/api/v1/admin/categories/' + category.id + '/image', {
+          const imgRes = await fetch(sellitnowApiUrl('/admin/categories/' + category.id + '/image'), {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + getToken() },
             body: formData

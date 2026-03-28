@@ -76,6 +76,7 @@
     </div>
   </main>
 
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/order-review.js"></script>
   <script>
@@ -152,7 +153,7 @@
       if (!createdOrder) return;
 
       try {
-        const configRes = await fetch('/api/v1/payments/config');
+        const configRes = await fetch(sellitnowApiUrl('/payments/config'));
         if (!configRes.ok) throw new Error('Payment is not configured');
         const { publishableKey } = await configRes.json();
         if (!publishableKey) throw new Error('Payment is not configured');

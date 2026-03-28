@@ -18,6 +18,12 @@
     return d.innerHTML;
   }
 
+  function imgSrc(u) {
+    return typeof global.sellitnowResolveMediaUrl === 'function'
+      ? global.sellitnowResolveMediaUrl(u)
+      : u;
+  }
+
   function variantsHtml(color, size) {
     const hasC = color && String(color).trim();
     const hasS = size && String(size).trim();
@@ -35,7 +41,7 @@
 
   function reviewLine(item) {
     const thumb = item.image_url
-      ? `<img class="line-item__img" src="${escapeHtml(item.image_url)}" alt="">`
+      ? `<img class="line-item__img" src="${escapeHtml(imgSrc(item.image_url))}" alt="">`
       : '<div class="line-item__img line-item__img--placeholder">📦</div>';
     const unit = parseFloat(item.price);
     const lineTotal = parseFloat(item.line_total);

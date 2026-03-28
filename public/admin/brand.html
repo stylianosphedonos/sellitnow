@@ -132,6 +132,7 @@
       </div>
     </main>
   </div>
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
     if (!getToken() || getUser()?.role !== 'admin') {
@@ -288,7 +289,7 @@
       try {
         const formData = new FormData();
         formData.append('banner', bannerFile.files[0]);
-        const res = await fetch('/api/v1/admin/brand/banner', {
+        const res = await fetch(sellitnowApiUrl('/admin/brand/banner'), {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + getToken() },
           body: formData
@@ -330,7 +331,7 @@
       try {
         const formData = new FormData();
         formData.append('logo', logoFile.files[0]);
-        const res = await fetch('/api/v1/admin/brand/logo', {
+        const res = await fetch(sellitnowApiUrl('/admin/brand/logo'), {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + getToken() },
           body: formData

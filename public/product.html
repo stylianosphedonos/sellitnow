@@ -39,6 +39,7 @@
     </div>
   </main>
 
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
@@ -122,7 +123,9 @@
         if (product.image_url) {
           img.innerHTML = '';
           const el = document.createElement('img');
-          el.src = product.image_url;
+          el.src = typeof sellitnowResolveMediaUrl === 'function'
+            ? sellitnowResolveMediaUrl(product.image_url)
+            : product.image_url;
           el.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:12px';
           img.appendChild(el);
         }

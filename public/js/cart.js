@@ -5,6 +5,10 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+function imgSrc(u) {
+  return typeof sellitnowResolveMediaUrl === 'function' ? sellitnowResolveMediaUrl(u) : u;
+}
+
 function formatVariantsHtml(color, size) {
   const hasColor = color && String(color).trim();
   const hasSize = size && String(size).trim();
@@ -22,7 +26,7 @@ function formatVariantsHtml(color, size) {
 
 function renderCartLine(item) {
   const thumb = item.image_url
-    ? `<img class="line-item__img" src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.title)}">`
+    ? `<img class="line-item__img" src="${escapeHtml(imgSrc(item.image_url))}" alt="${escapeHtml(item.title)}">`
     : '<div class="line-item__img line-item__img--placeholder" aria-hidden="true">📦</div>';
   const unit = parseFloat(item.price);
   const lineTotal = parseFloat(item.line_total);

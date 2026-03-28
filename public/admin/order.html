@@ -18,6 +18,7 @@
       <div id="order"></div>
     </main>
   </div>
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html';
@@ -78,7 +79,7 @@
     }
 
     async function downloadInvoice() {
-      const res = await fetch('/api/v1/admin/orders/' + id + '/invoice', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+      const res = await fetch(sellitnowApiUrl('/admin/orders/' + id + '/invoice'), { headers: { 'Authorization': 'Bearer ' + getToken() } });
       const blob = await res.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

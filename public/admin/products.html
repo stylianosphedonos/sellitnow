@@ -58,6 +58,7 @@
       <div id="products"></div>
     </main>
   </div>
+  <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/products.html');
