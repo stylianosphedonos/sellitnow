@@ -15,7 +15,18 @@ const PaymentService = require('./services/PaymentService');
 
 const app = express();
 
-app.set('trust proxy', 1);
+function parseTrustProxy() {
+  const v = process.env.TRUST_PROXY;
+  if (v === 'false' || v === '0') return false;
+  if (v === 'true' || v === 'all') return true;
+  if (v != null && String(v).trim() !== '') {
+    const n = parseInt(v, 10);
+    if (!Number.isNaN(n)) return n;
+  }
+  return 1;
+}
+
+app.set('trust proxy', parseTrustProxy());
 
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();

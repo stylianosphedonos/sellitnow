@@ -1,10 +1,9 @@
 /**
  * Cloudflare Worker: static assets from `public` + reverse-proxy API/uploads/health to your Node server.
+ * Bindings: env.ASSETS (assets), env.API_ORIGIN or env.UPSTREAM_ORIGIN (Express HTTPS origin, dashboard/secret).
+ * Forwards CF-Connecting-IP as X-Forwarded-For / X-Real-IP for rate limits on the origin.
  *
- * Set env API_ORIGIN to your Express host ONLY (e.g. https://sellitnow.onrender.com).
- * Do NOT use this Workers *.workers.dev URL — that loops the proxy and fails.
- *
- * Configure: Dashboard → Worker → Settings → Variables (or `wrangler secret put API_ORIGIN`).
+ * Do not set API_ORIGIN to this Worker’s *.workers.dev host (proxy loop).
  */
 
 const HOP_BY_HOP = new Set([
@@ -82,6 +81,15 @@ async function proxyToOrigin(request, env) {
   headers.set('Host', upstreamHost);
   headers.set('X-Forwarded-Host', url.host);
   headers.set('X-Forwarded-Proto', url.protocol.replace(':', ''));
+
+  const cfConnecting = request.headers.get('cf-connecting-ip');
+  const trueClient = request.headers.get('true-client-ip');
+  const xffFirst = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim();
+  const clientIp = cfConnecting || trueClient || xffFirst;
+  if (clientIp) {
+    headers.set('X-Forwarded-For', clientIp);
+    headers.set('X-Real-IP', clientIp);
+  }
 
   /** @type {RequestInit} */
   const init = {

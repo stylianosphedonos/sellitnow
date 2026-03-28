@@ -1,8 +1,6 @@
 {
-  // Deploy: npx wrangler deploy
-  // Required: variable API_ORIGIN = where Express runs (https://….onrender.com etc.). NOT *.workers.dev.
-  // Set in Dashboard → Worker → Variables, or: npx wrangler secret put API_ORIGIN
-  // Local: .dev.vars with API_ORIGIN=http://127.0.0.1:3000 then npm start & npx wrangler dev
+  // Cloudflare Workers: static files from ./public + proxy /api, /uploads, /health → API_ORIGIN (your Node host).
+  // Deploy: npm run deploy:cf  |  Dev: npm run dev:cf (needs .dev.vars + npm start)
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sellitnow",
   "main": "cloudflare/proxy-worker.js",

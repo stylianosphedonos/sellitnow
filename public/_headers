@@ -1,0 +1,5 @@
+# Cloudflare Workers static assets (see https://developers.cloudflare.com/workers/static-assets/headers/)
+/js/*
+  Cache-Control: public, max-age=86400
+/css/*
+  Cache-Control: public, max-age=86400
