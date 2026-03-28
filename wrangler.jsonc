@@ -1,7 +1,8 @@
 {
   // Deploy: npx wrangler deploy
-  // Set secret API_ORIGIN to your Node HTTPS origin (e.g. https://app.onrender.com), no trailing slash.
-  // Local: copy .dev.vars.example to .dev.vars, run npm start && npx wrangler dev
+  // Required: variable API_ORIGIN = where Express runs (https://….onrender.com etc.). NOT *.workers.dev.
+  // Set in Dashboard → Worker → Variables, or: npx wrangler secret put API_ORIGIN
+  // Local: .dev.vars with API_ORIGIN=http://127.0.0.1:3000 then npm start & npx wrangler dev
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sellitnow",
   "main": "cloudflare/proxy-worker.js",

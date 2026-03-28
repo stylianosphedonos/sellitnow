@@ -1,6 +1,10 @@
 /**
  * Cloudflare Worker: static assets from `public` + reverse-proxy API/uploads/health to your Node server.
- * Set secret API_ORIGIN (e.g. https://sellitnow-api.onrender.com) — no trailing slash.
+ *
+ * Set env API_ORIGIN to your Express host ONLY (e.g. https://sellitnow.onrender.com).
+ * Do NOT use this Workers *.workers.dev URL — that loops the proxy and fails.
+ *
+ * Configure: Dashboard → Worker → Settings → Variables (or `wrangler secret put API_ORIGIN`).
  */
 
 const HOP_BY_HOP = new Set([
@@ -23,28 +27,51 @@ function shouldProxy(pathname) {
   );
 }
 
+function resolveApiOrigin(env) {
+  const raw = env.API_ORIGIN || env.UPSTREAM_ORIGIN || '';
+  return String(raw).trim().replace(/\/$/, '');
+}
+
 async function proxyToOrigin(request, env) {
-  const origin = String(env.API_ORIGIN || '')
-    .trim()
-    .replace(/\/$/, '');
+  const origin = resolveApiOrigin(env);
   if (!origin) {
     return Response.json(
       {
+        code: 'API_ORIGIN_MISSING',
         error:
-          'Set Workers secret API_ORIGIN to your Node app HTTPS origin (no path, no trailing slash). wrangler secret put API_ORIGIN',
+          'Set variable API_ORIGIN to your Node/Express HTTPS origin (example: https://sellitnow.onrender.com). Not this workers.dev URL. Cloudflare Dashboard → Workers → your worker → Settings → Variables → Add API_ORIGIN, or run: npx wrangler secret put API_ORIGIN',
       },
-      { status: 503 }
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 
+  let upstreamUrl;
   let upstreamHost;
   try {
-    upstreamHost = new URL(origin).host;
+    upstreamUrl = new URL(origin);
+    if (upstreamUrl.protocol !== 'https:' && upstreamUrl.protocol !== 'http:') {
+      throw new Error('bad protocol');
+    }
+    upstreamHost = upstreamUrl.host;
   } catch {
-    return Response.json({ error: 'Invalid API_ORIGIN' }, { status: 503 });
+    return Response.json(
+      { code: 'API_ORIGIN_INVALID', error: 'API_ORIGIN must be a full URL like https://api.example.com' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
   const url = new URL(request.url);
+  if (url.host === upstreamHost) {
+    return Response.json(
+      {
+        code: 'API_ORIGIN_LOOP',
+        error:
+          'API_ORIGIN points to this same host as the Worker. Use a different URL where `npm start` (Express) runs — e.g. Render, Railway, Fly.io — not *.workers.dev.',
+      },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+
   const target = origin + url.pathname + url.search;
 
   const headers = new Headers();
@@ -68,7 +95,19 @@ async function proxyToOrigin(request, env) {
     init.duplex = 'half';
   }
 
-  return fetch(target, init);
+  try {
+    const res = await fetch(target, init);
+    return res;
+  } catch (err) {
+    const msg = err && err.message ? String(err.message) : 'Upstream fetch failed';
+    return Response.json(
+      {
+        code: 'UPSTREAM_UNREACHABLE',
+        error: `Cannot reach API_ORIGIN (${upstreamHost}). Is the Node server running and HTTPS reachable? ${msg}`,
+      },
+      { status: 502, headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
 }
 
 export default {
