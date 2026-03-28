@@ -27,20 +27,32 @@ function shouldProxy(pathname) {
 }
 
 function resolveApiOrigin(env) {
-  const raw = env.API_ORIGIN || env.UPSTREAM_ORIGIN || '';
+  const raw = env.API_ORIGIN || env.UPSTREAM_ORIGIN || env.SELLITNOW_API || '';
   return String(raw).trim().replace(/\/$/, '');
+}
+
+function jsonError(code, message, status) {
+  return Response.json(
+    { code, error: message },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store',
+        'X-Sellitnow-Proxy-Error': code,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Expose-Headers': 'X-Sellitnow-Proxy-Error, X-Sellitnow-Upstream-Status',
+      },
+    }
+  );
 }
 
 async function proxyToOrigin(request, env) {
   const origin = resolveApiOrigin(env);
   if (!origin) {
-    return Response.json(
-      {
-        code: 'API_ORIGIN_MISSING',
-        error:
-          'Set variable API_ORIGIN to your Node/Express HTTPS origin (example: https://sellitnow.onrender.com). Not this workers.dev URL. Cloudflare Dashboard → Workers → your worker → Settings → Variables → Add API_ORIGIN, or run: npx wrangler secret put API_ORIGIN',
-      },
-      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    return jsonError(
+      'API_ORIGIN_MISSING',
+      'Worker has no API_ORIGIN. In Cloudflare: Workers → sellitnow → Settings → Variables → add API_ORIGIN = your Express URL (e.g. https://xxx.onrender.com). Open GET /cf-worker-ping on this host to verify.',
+      503
     );
   }
 
@@ -53,21 +65,19 @@ async function proxyToOrigin(request, env) {
     }
     upstreamHost = upstreamUrl.host;
   } catch {
-    return Response.json(
-      { code: 'API_ORIGIN_INVALID', error: 'API_ORIGIN must be a full URL like https://api.example.com' },
-      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    return jsonError(
+      'API_ORIGIN_INVALID',
+      'API_ORIGIN must be a full URL like https://api.example.com (no path, trim trailing slash).',
+      503
     );
   }
 
   const url = new URL(request.url);
   if (url.host === upstreamHost) {
-    return Response.json(
-      {
-        code: 'API_ORIGIN_LOOP',
-        error:
-          'API_ORIGIN points to this same host as the Worker. Use a different URL where `npm start` (Express) runs — e.g. Render, Railway, Fly.io — not *.workers.dev.',
-      },
-      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    return jsonError(
+      'API_ORIGIN_LOOP',
+      'API_ORIGIN must be your Node server (Render/Railway/Fly), not this *.workers.dev URL.',
+      503
     );
   }
 
@@ -105,15 +115,23 @@ async function proxyToOrigin(request, env) {
 
   try {
     const res = await fetch(target, init);
+    if (res.status >= 500) {
+      const headers = new Headers(res.headers);
+      headers.set('X-Sellitnow-Upstream-Status', String(res.status));
+      headers.set('Access-Control-Expose-Headers', 'X-Sellitnow-Upstream-Status');
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers,
+      });
+    }
     return res;
   } catch (err) {
     const msg = err && err.message ? String(err.message) : 'Upstream fetch failed';
-    return Response.json(
-      {
-        code: 'UPSTREAM_UNREACHABLE',
-        error: `Cannot reach API_ORIGIN (${upstreamHost}). Is the Node server running and HTTPS reachable? ${msg}`,
-      },
-      { status: 502, headers: { 'Cache-Control': 'no-store' } }
+    return jsonError(
+      'UPSTREAM_UNREACHABLE',
+      `Cannot reach API_ORIGIN (${upstreamHost}). Open that URL + /health in a browser. ${msg}`,
+      502
     );
   }
 }
@@ -121,6 +139,19 @@ async function proxyToOrigin(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/cf-worker-ping') {
+      const origin = resolveApiOrigin(env);
+      return Response.json(
+        {
+          worker: true,
+          api_origin_configured: Boolean(origin),
+          hint: origin
+            ? 'Proxy is configured. If /api still returns 503, open Response headers for X-Sellitnow-Upstream-Status or hit API_ORIGIN/health directly.'
+            : 'Add API_ORIGIN (HTTPS origin of npm start / Express only).',
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
     if (shouldProxy(url.pathname)) {
       return proxyToOrigin(request, env);
     }

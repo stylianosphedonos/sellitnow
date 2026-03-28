@@ -1,6 +1,7 @@
 {
-  // Cloudflare Workers: static files from ./public + proxy /api, /uploads, /health → API_ORIGIN (your Node host).
-  // Deploy: npm run deploy:cf  |  Dev: npm run dev:cf (needs .dev.vars + npm start)
+  // Cloudflare Workers: static ./public + proxy /api, /uploads, /health → API_ORIGIN.
+  // Debug: GET https://<your-worker>/cf-worker-ping — api_origin_configured should be true.
+  // Deploy: npm run deploy:cf | Dev: npm run dev:cf + .dev.vars + npm start
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sellitnow",
   "main": "cloudflare/proxy-worker.js",
