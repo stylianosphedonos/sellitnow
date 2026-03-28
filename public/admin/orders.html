@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders - Admin - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/products.html">Products</a>
+      <a href="/admin/categories.html">Categories</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html">Brand</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <h1>Orders</h1>
+      <div class="form-group" style="max-width:300px;margin-bottom:16px">
+        <input type="text" id="searchOrders" placeholder="Search by order # or email" style="width:100%">
+      </div>
+      <div id="orders"></div>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+  <script>
+    if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/orders.html');
+
+    async function loadOrders(search = '') {
+      try {
+        await loadBrandSettings();
+        const data = await callApi('/admin/orders?search=' + encodeURIComponent(search));
+        const items = data.items || [];
+        document.getElementById('orders').innerHTML = `
+          <table class="table">
+            <tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr>
+            ${items.map(o => `
+              <tr>
+                <td>${o.order_number}</td>
+                <td>${o.guest_email || o.user_email || '-'}</td>
+                <td>${formatStoreMoney(o.total_amount)}</td>
+                <td>${o.status}</td>
+                <td>${o.payment_status}</td>
+                <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                <td><a href="/admin/order.html?id=${o.id}" style="color:var(--primary)">View</a></td>
+              </tr>
+            `).join('')}
+          </table>
+        `;
+      } catch (err) {
+        document.getElementById('orders').innerHTML = '<p>Failed to load orders.</p>';
+      }
+    }
+
+    document.getElementById('searchOrders')?.addEventListener('input', (e) => {
+      clearTimeout(window.searchTimeout);
+      window.searchTimeout = setTimeout(() => loadOrders(e.target.value), 300);
+    });
+
+    loadOrders();
+  </script>
+</body>
+</html>

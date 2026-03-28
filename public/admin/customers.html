@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers - Admin - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/products.html">Products</a>
+      <a href="/admin/categories.html">Categories</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html">Brand</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <h1>Customers</h1>
+      <div class="form-group" style="max-width:300px;margin-bottom:16px">
+        <input type="text" id="searchCustomers" placeholder="Search by name or email" style="width:100%">
+      </div>
+      <div id="customers"></div>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+  <script>
+    if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/customers.html');
+
+    async function loadCustomers(search = '') {
+      try {
+        const data = await callApi('/admin/customers?search=' + encodeURIComponent(search));
+        const items = data.items || [];
+        document.getElementById('customers').innerHTML = `
+          <table class="table">
+            <tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Registered</th></tr>
+            ${items.map(c => `
+              <tr>
+                <td>${c.id}</td>
+                <td>${c.first_name} ${c.last_name}</td>
+                <td>${c.email}</td>
+                <td>${c.phone || '-'}</td>
+                <td>${new Date(c.created_at).toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </table>
+        `;
+      } catch (err) {
+        document.getElementById('customers').innerHTML = '<p>Failed to load customers.</p>';
+      }
+    }
+
+    document.getElementById('searchCustomers')?.addEventListener('input', (e) => {
+      clearTimeout(window.searchTimeout);
+      window.searchTimeout = setTimeout(() => loadCustomers(e.target.value), 300);
+    });
+
+    loadCustomers();
+  </script>
+</body>
+</html>

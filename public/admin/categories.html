@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categories - Admin - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/products.html">Products</a>
+      <a href="/admin/categories.html">Categories</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html">Brand</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <h1>Categories</h1>
+      <button class="btn" style="max-width:150px;margin-bottom:16px" onclick="document.getElementById('categoryForm').style.display='block'">Add Category</button>
+      <div id="categoryForm" style="display:none;background:white;padding:24px;border-radius:8px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <h3>New Category</h3>
+        <form id="addCategory">
+          <div class="form-group">
+            <label>Name *</label>
+            <input type="text" name="name" required>
+          </div>
+          <div class="form-group">
+            <label>Slug</label>
+            <input type="text" name="slug" placeholder="Optional; auto-generated from name if empty">
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Category image</label>
+            <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
+            <small style="color:#666">JPEG, PNG, WebP or GIF. Max 5MB.</small>
+          </div>
+          <button type="submit" class="btn">Create Category</button>
+        </form>
+      </div>
+      <div id="categories"></div>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+  <script>
+    if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/categories.html');
+
+    async function loadCategories() {
+      try {
+        const { categories } = await callApi('/categories?_=' + Date.now(), { cache: 'no-store' });
+        document.getElementById('categories').innerHTML = `
+          <table class="table">
+            <tr><th>ID</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr>
+            ${(categories || []).map(c => `
+              <tr>
+                <td>${c.id}</td>
+                <td>${c.name}</td>
+                <td>${c.slug}</td>
+                <td>${(c.description || '').slice(0, 50)}</td>
+                <td><button class="btn" style="padding:6px 12px;font-size:12px" onclick="editCategory(${c.id})">Edit</button></td>
+              </tr>
+            `).join('')}
+          </table>
+        `;
+      } catch (err) {
+        document.getElementById('categories').innerHTML = '<p>Failed to load categories. Make sure you are logged in as admin.</p>';
+      }
+    }
+
+    document.getElementById('addCategory')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const name = form.name.value.trim();
+      const slugTrim = form.slug.value.trim();
+      const descTrim = form.description.value.trim();
+      const payload = {
+        name,
+        description: descTrim === '' ? null : form.description.value
+      };
+      if (slugTrim) payload.slug = slugTrim;
+      const fileInput = form.querySelector('input[name="image"]');
+      try {
+        const { category } = await callApi('/admin/categories', { method: 'POST', body: JSON.stringify(payload) });
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          const formData = new FormData();
+          formData.append('image', fileInput.files[0]);
+          const imgRes = await fetch('/api/v1/admin/categories/' + category.id + '/image', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + getToken() },
+            body: formData
+          });
+          const imgData = await imgRes.json().catch(() => ({}));
+          if (!imgRes.ok) throw new Error(imgData.error || 'Failed to upload image');
+        }
+        form.reset();
+        document.getElementById('categoryForm').style.display = 'none';
+        loadCategories();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    function editCategory(id) {
+      window.location.href = '/admin/category-edit.html?id=' + id;
+    }
+
+    loadCategories();
+
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) loadCategories();
+    });
+  </script>
+</body>
+</html>

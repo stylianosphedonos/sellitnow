@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmed - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">Sellitnow</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">Home</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <div style="max-width:500px;margin:60px auto;background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+      <h1 style="color:var(--primary);margin-bottom:16px">Order Confirmed!</h1>
+      <p id="orderNumber" style="font-size:18px;font-weight:600;margin-bottom:24px"></p>
+      <p style="color:#666">Thank you for your order. You will receive a confirmation email shortly.</p>
+      <a href="/" class="btn" style="display:inline-block;margin-top:24px;text-decoration:none">Continue Shopping</a>
+    </div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const redirectStatus = params.get('redirect_status');
+    if (redirectStatus === 'failed') {
+      document.querySelector('h1').textContent = 'Payment failed';
+      document.querySelector('h1').style.color = '#c00';
+      document.getElementById('orderNumber').textContent = 'Your payment could not be completed. Please try again from your cart.';
+      document.querySelector('.btn').href = '/cart.html';
+      document.querySelector('.btn').textContent = 'Back to cart';
+    } else {
+      document.getElementById('orderNumber').textContent = 'Order #' + (params.get('number') || params.get('id') || '');
+    }
+  </script>
+</body>
+</html>

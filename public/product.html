@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">Sellitnow</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/cart.html" class="nav-link cart-link">Cart <span class="cart-count" id="cartCount">0</span></a>
+        <a href="/login.html" class="nav-link" id="loginBtn">Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="product-page__toolbar">
+      <button type="button" class="btn btn-secondary product-page__back" id="productBack">← Back</button>
+    </div>
+    <div id="product" style="display:flex;gap:32px;max-width:900px;margin:0 auto;background:white;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+      <div class="product-image" style="width:400px;aspect-ratio:1;background:#f5f5f5;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:120px;color:#999" id="productImage">📦</div>
+      <div style="flex:1">
+        <h1 id="productTitle" style="font-size:24px;margin-bottom:12px"></h1>
+        <p id="productPrice" style="font-size:28px;font-weight:700;color:var(--primary);margin-bottom:16px"></p>
+        <p id="productStock" style="color:#666;margin-bottom:24px"></p>
+        <p id="productDesc" style="margin-bottom:24px;line-height:1.6;color:#555"></p>
+        <div id="variantSection" style="display:none;margin-bottom:20px"></div>
+        <div class="form-group" style="max-width:120px;margin-bottom:16px">
+          <label>Quantity</label>
+          <input type="number" id="qty" value="1" min="1" style="width:100%">
+        </div>
+        <button class="btn" id="addToCart" style="max-width:200px">Add to Cart</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+    let product;
+
+    document.getElementById('productBack')?.addEventListener('click', () => {
+      try {
+        const ref = document.referrer;
+        if (ref && new URL(ref).origin === location.origin) {
+          history.back();
+          return;
+        }
+      } catch (_) {}
+      window.location.href = '/';
+    });
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function addOptionToSelect(select, raw) {
+      const v = (raw || '').trim();
+      if (!v || !select) return;
+      const exists = [...select.options].some((o) => o.value === v);
+      if (!exists) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      }
+      select.value = v;
+    }
+
+    function renderVariantSection(opts) {
+      const colors = opts.colors || [];
+      const sizes = opts.sizes || [];
+      const wrap = document.getElementById('variantSection');
+      if (!colors.length && !sizes.length) {
+        wrap.style.display = 'none';
+        wrap.innerHTML = '';
+        return;
+      }
+      wrap.style.display = 'block';
+      const colorOpts = colors.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      const sizeOpts = sizes.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      let html = '';
+      if (colors.length) {
+        html += `<div class="form-group" style="max-width:280px"><label>Color</label><select id="selColor" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${colorOpts}</select></div>
+          <div style="display:flex;gap:8px;max-width:280px;margin-bottom:12px"><input type="text" id="newColor" placeholder="Add a color" style="flex:1;padding:10px;border:1px solid #eee;border-radius:8px"><button type="button" class="btn" style="max-width:80px;padding:10px" id="btnAddColor">Add</button></div>`;
+      }
+      if (sizes.length) {
+        html += `<div class="form-group" style="max-width:280px"><label>Size</label><select id="selSize" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${sizeOpts}</select></div>
+          <div style="display:flex;gap:8px;max-width:280px;margin-bottom:12px"><input type="text" id="newSize" placeholder="Add a size" style="flex:1;padding:10px;border:1px solid #eee;border-radius:8px"><button type="button" class="btn" style="max-width:80px;padding:10px" id="btnAddSize">Add</button></div>`;
+      }
+      wrap.innerHTML = html;
+      document.getElementById('btnAddColor')?.addEventListener('click', () => {
+        addOptionToSelect(document.getElementById('selColor'), document.getElementById('newColor').value);
+        document.getElementById('newColor').value = '';
+      });
+      document.getElementById('btnAddSize')?.addEventListener('click', () => {
+        addOptionToSelect(document.getElementById('selSize'), document.getElementById('newSize').value);
+        document.getElementById('newSize').value = '';
+      });
+    }
+
+    async function loadProduct() {
+      if (!id) { document.getElementById('product').innerHTML = '<p>Product not found</p>'; return; }
+      try {
+        const data = await callApi(`/products/${id}`);
+        product = data.product;
+        document.getElementById('productTitle').textContent = product.title;
+        document.getElementById('productPrice').textContent = formatStoreMoney(product.price);
+        document.getElementById('productStock').textContent = product.stock_quantity + ' in stock';
+        document.getElementById('productDesc').textContent = product.description || 'No description.';
+        renderVariantSection(product.options || { colors: [], sizes: [] });
+        const img = document.getElementById('productImage');
+        if (product.image_url) {
+          img.innerHTML = '';
+          const el = document.createElement('img');
+          el.src = product.image_url;
+          el.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:12px';
+          img.appendChild(el);
+        }
+        document.getElementById('qty').max = product.stock_quantity;
+      } catch (err) {
+        document.getElementById('product').innerHTML = '<p>Failed to load product.</p>';
+      }
+    }
+
+    document.getElementById('addToCart')?.addEventListener('click', async () => {
+      const qty = parseInt(document.getElementById('qty').value) || 1;
+      const colorEl = document.getElementById('selColor');
+      const sizeEl = document.getElementById('selSize');
+      const color = colorEl ? colorEl.value : '';
+      const size = sizeEl ? sizeEl.value : '';
+      try {
+        await callApi('/cart/items', {
+          method: 'POST',
+          body: JSON.stringify({ product_id: product.id, quantity: qty, color, size }),
+        });
+        alert('Added to cart!');
+        loadCartCount();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    (async () => {
+      await loadBrandSettings();
+      await loadProduct();
+      loadCartCount();
+    })();
+
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted || typeof loadBrandSettings !== 'function') return;
+      loadBrandSettings().then(() => loadProduct());
+    });
+  </script>
+</body>
+</html>

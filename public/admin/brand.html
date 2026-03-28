@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brand - Admin - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/products.html">Products</a>
+      <a href="/admin/categories.html">Categories</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html" class="active">Brand</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/" style="margin-top:20px">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <h1>Brand</h1>
+      <p style="margin-bottom:24px;color:var(--text-muted)">Customize your store colors, hero banner, currency, and tax rate.</p>
+
+      <div id="alert" class="alert" style="display:none;margin-bottom:24px"></div>
+
+      <div style="display:grid;gap:32px;max-width:800px">
+        <!-- Colors -->
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:20px">Colors</h2>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:20px">
+            <div class="form-group">
+              <label>Primary</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="color" id="primaryColor" value="#ee4d2d" style="width:48px;height:40px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+                <input type="text" id="primaryHex" value="#ee4d2d" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Primary Dark</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="color" id="primaryDarkColor" value="#d4380d" style="width:48px;height:40px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+                <input type="text" id="primaryDarkHex" value="#d4380d" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Secondary</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="color" id="secondaryColor" value="#ff6633" style="width:48px;height:40px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+                <input type="text" id="secondaryHex" value="#ff6633" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Accent</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="color" id="accentColor" value="#ff9000" style="width:48px;height:40px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+                <input type="text" id="accentHex" value="#ff9000" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace">
+              </div>
+            </div>
+          </div>
+          <button type="button" id="saveColors" class="btn" style="margin-top:16px;max-width:150px">Save Colors</button>
+        </section>
+
+        <!-- Currency & tax -->
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:8px">Currency &amp; tax</h2>
+          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;line-height:1.5">Storefront prices and Stripe checkout use this currency. Tax is applied to the cart subtotal before shipping.</p>
+          <div style="display:grid;gap:20px;max-width:420px">
+            <div class="form-group">
+              <label for="storeCurrency">Store currency</label>
+              <select id="storeCurrency" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+                <option value="USD">USD — US dollar</option>
+                <option value="EUR">EUR — Euro</option>
+                <option value="GBP">GBP — British pound</option>
+                <option value="CAD">CAD — Canadian dollar</option>
+                <option value="AUD">AUD — Australian dollar</option>
+                <option value="CHF">CHF — Swiss franc</option>
+                <option value="JPY">JPY — Japanese yen</option>
+                <option value="SEK">SEK — Swedish krona</option>
+                <option value="NOK">NOK — Norwegian krone</option>
+                <option value="DKK">DKK — Danish krone</option>
+                <option value="PLN">PLN — Polish złoty</option>
+                <option value="NZD">NZD — New Zealand dollar</option>
+                <option value="SGD">SGD — Singapore dollar</option>
+                <option value="HKD">HKD — Hong Kong dollar</option>
+                <option value="MXN">MXN — Mexican peso</option>
+                <option value="BRL">BRL — Brazilian real</option>
+                <option value="INR">INR — Indian rupee</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="taxRatePercent">Sales tax / VAT (%)</label>
+              <input type="number" id="taxRatePercent" min="0" max="100" step="0.01" style="width:100%;max-width:200px;padding:10px;border:1px solid var(--border);border-radius:8px">
+              <small style="color:var(--text-muted);display:block;margin-top:6px">Use 0 for no tax on the subtotal. If you never save this section, the app uses <code style="font-size:12px">VAT_RATE</code> from the server environment (default 20%).</small>
+            </div>
+          </div>
+          <p id="currencyPreview" style="margin-top:12px;font-size:14px;color:var(--text-muted)"></p>
+          <button type="button" id="saveCurrencyTax" class="btn" style="margin-top:16px;max-width:240px">Save currency &amp; tax</button>
+        </section>
+
+        <!-- Logo -->
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:20px">Logo</h2>
+          <div id="logoPreview" style="display:flex;align-items:center;gap:16px;margin-bottom:16px;min-height:60px;padding:12px;background:var(--bg);border-radius:8px">
+            <span id="logoPlaceholder" style="color:var(--text-muted)">Current logo or store name</span>
+            <img id="logoImg" src="" alt="Logo" style="display:none;max-height:48px;width:auto;object-fit:contain">
+          </div>
+          <div class="form-group">
+            <label>Upload New Logo</label>
+            <input type="file" id="logoFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
+            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Recommended: transparent PNG, ~200px height.</small>
+          </div>
+          <button type="button" id="uploadLogo" class="btn" style="max-width:160px" disabled>Upload Logo</button>
+          <button type="button" id="removeLogo" class="btn btn-secondary" style="margin-left:8px;max-width:120px">Remove Logo</button>
+        </section>
+
+        <!-- Banner -->
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:20px">Hero Banner</h2>
+          <div id="bannerPreview" style="width:100%;min-height:120px;background:linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);border-radius:8px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;aspect-ratio:1200/400">
+            <span id="bannerPlaceholder" style="color:rgba(255,255,255,0.9);font-size:18px">Current banner or gradient</span>
+            <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0">
+          </div>
+          <div class="form-group">
+            <label>Upload New Banner Image</label>
+            <input type="file" id="bannerFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
+            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Recommended: 1200×400px or wider.</small>
+          </div>
+          <button type="button" id="uploadBanner" class="btn" style="max-width:180px" disabled>Upload Banner</button>
+          <button type="button" id="removeBanner" class="btn btn-secondary" style="margin-left:8px;max-width:140px">Remove Banner</button>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+  <script>
+    if (!getToken() || getUser()?.role !== 'admin') {
+      window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/brand.html');
+    }
+
+    const alertEl = document.getElementById('alert');
+    const saveColorsBtn = document.getElementById('saveColors');
+    const saveCurrencyTaxBtn = document.getElementById('saveCurrencyTax');
+    const uploadBannerBtn = document.getElementById('uploadBanner');
+    const removeBannerBtn = document.getElementById('removeBanner');
+    const bannerFile = document.getElementById('bannerFile');
+    const uploadLogoBtn = document.getElementById('uploadLogo');
+    const removeLogoBtn = document.getElementById('removeLogo');
+    const logoFile = document.getElementById('logoFile');
+
+    function showAlert(msg, isError) {
+      alertEl.textContent = msg;
+      alertEl.className = 'alert ' + (isError ? 'alert-error' : 'alert-success');
+      alertEl.style.display = 'block';
+      setTimeout(() => { alertEl.style.display = 'none'; }, 4000);
+    }
+
+    function syncColorInputs(id) {
+      const colorEl = document.getElementById(id + 'Color');
+      const hexEl = document.getElementById(id + 'Hex');
+      if (!colorEl || !hexEl) return;
+      colorEl.addEventListener('input', () => { hexEl.value = colorEl.value; });
+      hexEl.addEventListener('input', (e) => {
+        const v = e.target.value;
+        if (/^#[0-9A-Fa-f]{6}$/.test(v)) colorEl.value = v;
+      });
+    }
+    ['primary', 'primaryDark', 'secondary', 'accent'].forEach(syncColorInputs);
+
+    function updateCurrencyPreview() {
+      const el = document.getElementById('currencyPreview');
+      const sel = document.getElementById('storeCurrency');
+      if (!el || !sel || typeof formatStoreMoney !== 'function') return;
+      el.textContent = 'Preview: ' + formatStoreMoney(19.99, sel.value);
+    }
+
+    document.getElementById('storeCurrency')?.addEventListener('change', updateCurrencyPreview);
+
+    async function loadBrand() {
+      try {
+        const data = await callApi('/admin/brand');
+        document.getElementById('primaryColor').value = data.primary || '#ee4d2d';
+        document.getElementById('primaryHex').value = data.primary || '#ee4d2d';
+        document.getElementById('primaryDarkColor').value = data.primaryDark || '#d4380d';
+        document.getElementById('primaryDarkHex').value = data.primaryDark || '#d4380d';
+        document.getElementById('secondaryColor').value = data.secondary || '#ff6633';
+        document.getElementById('secondaryHex').value = data.secondary || '#ff6633';
+        document.getElementById('accentColor').value = data.accent || '#ff9000';
+        document.getElementById('accentHex').value = data.accent || '#ff9000';
+
+        const logoImg = document.getElementById('logoImg');
+        const logoPlaceholder = document.getElementById('logoPlaceholder');
+        if (data.logo) {
+          logoImg.src = data.logo;
+          logoImg.style.display = 'block';
+          logoPlaceholder.style.display = 'none';
+        } else {
+          logoImg.src = '';
+          logoImg.style.display = 'none';
+          logoPlaceholder.style.display = 'block';
+        }
+
+        const bannerImg = document.getElementById('bannerImg');
+        const placeholder = document.getElementById('bannerPlaceholder');
+        if (data.banner) {
+          bannerImg.src = data.banner;
+          bannerImg.style.display = 'block';
+          placeholder.style.display = 'none';
+        } else {
+          bannerImg.src = '';
+          bannerImg.style.display = 'none';
+          placeholder.style.display = 'block';
+        }
+
+        const curSel = document.getElementById('storeCurrency');
+        if (curSel) {
+          const cur = String(data.currency || 'usd').toUpperCase();
+          let hasOpt = [...curSel.options].some((o) => o.value === cur);
+          if (!hasOpt && /^[A-Z]{3}$/.test(cur)) {
+            const opt = document.createElement('option');
+            opt.value = cur;
+            opt.textContent = cur + ' (custom)';
+            curSel.appendChild(opt);
+            hasOpt = true;
+          }
+          curSel.value = hasOpt ? cur : 'USD';
+        }
+        const taxEl = document.getElementById('taxRatePercent');
+        if (taxEl && data.taxRatePercent != null && data.taxRatePercent !== '') {
+          taxEl.value = data.taxRatePercent;
+        }
+        updateCurrencyPreview();
+      } catch (err) {
+        showAlert('Failed to load brand settings.', true);
+      }
+    }
+
+    saveColorsBtn.addEventListener('click', async () => {
+      saveColorsBtn.disabled = true;
+      saveColorsBtn.textContent = 'Saving...';
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({
+            primary: document.getElementById('primaryHex').value,
+            primaryDark: document.getElementById('primaryDarkHex').value,
+            secondary: document.getElementById('secondaryHex').value,
+            accent: document.getElementById('accentHex').value
+          })
+        });
+        showAlert('Colors saved. View your store to see the changes.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to save colors.', true);
+      }
+      saveColorsBtn.disabled = false;
+      saveColorsBtn.textContent = 'Save Colors';
+    });
+
+    saveCurrencyTaxBtn.addEventListener('click', async () => {
+      saveCurrencyTaxBtn.disabled = true;
+      saveCurrencyTaxBtn.textContent = 'Saving...';
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({
+            currency: document.getElementById('storeCurrency').value,
+            taxRatePercent: document.getElementById('taxRatePercent').value
+          })
+        });
+        showAlert('Currency and tax saved.');
+        await loadBrandSettings();
+        await loadBrand();
+      } catch (err) {
+        showAlert(err.message || 'Failed to save.', true);
+      }
+      saveCurrencyTaxBtn.disabled = false;
+      saveCurrencyTaxBtn.textContent = 'Save currency & tax';
+    });
+
+    bannerFile.addEventListener('change', () => {
+      uploadBannerBtn.disabled = !bannerFile.files || bannerFile.files.length === 0;
+    });
+
+    uploadBannerBtn.addEventListener('click', async () => {
+      if (!bannerFile.files || bannerFile.files.length === 0) return;
+      uploadBannerBtn.disabled = true;
+      uploadBannerBtn.textContent = 'Uploading...';
+      try {
+        const formData = new FormData();
+        formData.append('banner', bannerFile.files[0]);
+        const res = await fetch('/api/v1/admin/brand/banner', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + getToken() },
+          body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        document.getElementById('bannerImg').src = data.banner;
+        document.getElementById('bannerImg').style.display = 'block';
+        document.getElementById('bannerPlaceholder').style.display = 'none';
+        bannerFile.value = '';
+        uploadBannerBtn.disabled = true;
+        showAlert('Banner uploaded successfully.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to upload banner.', true);
+      }
+      uploadBannerBtn.disabled = false;
+      uploadBannerBtn.textContent = 'Upload Banner';
+    });
+
+    removeBannerBtn.addEventListener('click', async () => {
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({ banner: '' })
+        });
+      } catch (_) {}
+      await loadBrand();
+      showAlert('Banner removed. Store will show the gradient again.');
+    });
+
+    logoFile.addEventListener('change', () => {
+      uploadLogoBtn.disabled = !logoFile.files || logoFile.files.length === 0;
+    });
+
+    uploadLogoBtn.addEventListener('click', async () => {
+      if (!logoFile.files || logoFile.files.length === 0) return;
+      uploadLogoBtn.disabled = true;
+      uploadLogoBtn.textContent = 'Uploading...';
+      try {
+        const formData = new FormData();
+        formData.append('logo', logoFile.files[0]);
+        const res = await fetch('/api/v1/admin/brand/logo', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + getToken() },
+          body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        document.getElementById('logoImg').src = data.logo;
+        document.getElementById('logoImg').style.display = 'block';
+        document.getElementById('logoPlaceholder').style.display = 'none';
+        logoFile.value = '';
+        uploadLogoBtn.disabled = true;
+        showAlert('Logo uploaded successfully.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to upload logo.', true);
+      }
+      uploadLogoBtn.disabled = false;
+      uploadLogoBtn.textContent = 'Upload Logo';
+    });
+
+    removeLogoBtn.addEventListener('click', async () => {
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({ logo: '' })
+        });
+      } catch (_) {}
+      await loadBrand();
+      showAlert('Logo removed. Store will show the store name again.');
+    });
+
+    loadBrand();
+  </script>
+</body>
+</html>

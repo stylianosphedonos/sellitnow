@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">Sellitnow</a>
+      <nav class="nav">
+        <a href="/cart.html" class="nav-link cart-link">Cart <span class="cart-count" id="cartCount">0</span></a>
+        <a href="/login.html" class="nav-link" id="loginBtn">Login</a>
+        <a href="/profile.html" class="nav-link" id="profileBtn" style="display:none">Account</a>
+        <button class="nav-link" id="logoutBtn" style="display:none">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="checkout-layout">
+      <div class="checkout-main">
+        <h1 style="font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em">Checkout</h1>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px">Enter shipping details, then pay securely. Your order review on the right lists every SKU, color, and size.</p>
+        <div id="checkoutError" class="alert alert-error" style="display:none"></div>
+
+        <div id="stepShipping" class="checkout-card" style="max-width:640px">
+          <h2 style="margin:0 0 20px;font-size:18px">Shipping</h2>
+          <form id="checkoutForm">
+            <div class="form-group">
+              <label>Email *</label>
+              <input type="email" name="guest_email" id="guestEmail" required autocomplete="email">
+            </div>
+            <h3 style="margin:24px 0 12px;font-size:15px">Shipping address</h3>
+            <div class="form-group">
+              <label>Address line 1 *</label>
+              <input type="text" name="address_line1" required autocomplete="street-address">
+            </div>
+            <div class="form-group">
+              <label>City *</label>
+              <input type="text" name="city" required autocomplete="address-level2">
+            </div>
+            <div class="form-group">
+              <label>Postal code *</label>
+              <input type="text" name="postal_code" required autocomplete="postal-code">
+            </div>
+            <div class="form-group">
+              <label>Country (2-letter code) *</label>
+              <input type="text" name="country" value="CY" required maxlength="2" autocomplete="country">
+            </div>
+            <button type="submit" class="btn" id="placeOrderBtn" style="margin-top:24px;max-width:220px">Continue to payment</button>
+          </form>
+        </div>
+
+        <div id="stepPayment" class="checkout-card" style="display:none;max-width:640px">
+          <h2 style="margin-top:0;font-size:18px">Payment</h2>
+          <div id="paymentOrderBanner"></div>
+          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete your card details below. Items and options are fixed for this order.</p>
+          <form id="paymentForm">
+            <div id="payment-element"></div>
+            <div id="payment-message" class="alert alert-error" style="display:none;margin-top:12px"></div>
+            <button type="submit" class="btn" id="payBtn" style="margin-top:24px;max-width:200px">Pay now</button>
+          </form>
+          <p style="margin-top:20px;font-size:14px">
+            <a href="/checkout-cancel.html" id="cancelPaymentLink">Cancel and return to cart</a>
+          </p>
+        </div>
+      </div>
+
+      <aside class="checkout-aside" id="checkoutAside">
+        <div id="checkoutOrderReview"></div>
+      </aside>
+    </div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/order-review.js"></script>
+  <script>
+    const user = getUser();
+    if (user?.email) {
+      document.getElementById('guestEmail').value = user.email;
+      document.getElementById('guestEmail').readOnly = true;
+    }
+
+    let createdOrder = null;
+
+    async function loadCheckoutReview() {
+      const el = document.getElementById('checkoutOrderReview');
+      try {
+        const cart = await callApi('/cart');
+        el.innerHTML = buildOrderReviewPanel(cart);
+      } catch (err) {
+        el.innerHTML = buildOrderReviewPanel(null);
+      }
+    }
+
+    document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const errEl = document.getElementById('checkoutError');
+      const btn = document.getElementById('placeOrderBtn');
+      errEl.style.display = 'none';
+      btn.disabled = true;
+
+      const shipping_address = {
+        address_line1: form.address_line1.value,
+        city: form.city.value,
+        postal_code: form.postal_code.value,
+        country: form.country.value,
+      };
+      const body = { shipping_address };
+      const emailVal = form.guest_email?.value?.trim();
+      if (emailVal) body.guest_email = emailVal;
+
+      try {
+        const cartForReview = await callApi('/cart');
+        if (!cartForReview.items || cartForReview.items.length === 0) {
+          errEl.textContent = 'Your cart is empty. Add items before checkout.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          await loadCheckoutReview();
+          return;
+        }
+        const panelHtml = buildOrderReviewPanel(cartForReview);
+        document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
+
+        const data = await callApi('/orders', { method: 'POST', body: JSON.stringify(body) });
+        createdOrder = { id: data.order.id, order_number: data.order.order_number, total_amount: data.order.total_amount };
+
+        document.getElementById('stepShipping').style.display = 'none';
+        document.getElementById('stepPayment').style.display = 'block';
+        document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(
+          createdOrder.order_number,
+          createdOrder.total_amount
+        );
+        document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
+        initStripePayment();
+        loadCartCount();
+      } catch (err) {
+        errEl.textContent = err.message || 'Could not create order';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+      }
+    });
+
+    async function initStripePayment() {
+      const payBtn = document.getElementById('payBtn');
+      const cancelLink = document.getElementById('cancelPaymentLink');
+      if (!createdOrder) return;
+
+      try {
+        const configRes = await fetch('/api/v1/payments/config');
+        if (!configRes.ok) throw new Error('Payment is not configured');
+        const { publishableKey } = await configRes.json();
+        if (!publishableKey) throw new Error('Payment is not configured');
+
+        const intentRes = await callApi('/payments/create-intent', { method: 'POST', body: JSON.stringify({ order_id: createdOrder.id }) });
+        const clientSecret = intentRes.client_secret;
+        if (!clientSecret) throw new Error('Could not start payment');
+
+        const stripe = Stripe(publishableKey);
+        const elements = stripe.elements({ clientSecret });
+        const paymentElement = elements.create('payment');
+        paymentElement.mount('#payment-element');
+
+        const paymentForm = document.getElementById('paymentForm');
+        const messageEl = document.getElementById('payment-message');
+
+        paymentForm.onsubmit = async (e) => {
+          e.preventDefault();
+          messageEl.style.display = 'none';
+          messageEl.textContent = '';
+          payBtn.disabled = true;
+
+          const returnUrl = window.location.origin + '/order-confirm.html?id=' + createdOrder.id + '&number=' + encodeURIComponent(createdOrder.order_number);
+          const { error } = await stripe.confirmPayment({
+            elements,
+            clientSecret,
+            confirmParams: { return_url: returnUrl },
+          });
+
+          if (error) {
+            messageEl.textContent = error.message || 'Payment failed';
+            messageEl.style.display = 'block';
+            payBtn.disabled = false;
+          }
+        };
+
+        cancelLink.href = '/checkout-cancel.html?order_id=' + createdOrder.id + '&number=' + encodeURIComponent(createdOrder.order_number);
+      } catch (err) {
+        document.getElementById('payment-message').textContent = err.message || 'Payment could not be loaded';
+        document.getElementById('payment-message').style.display = 'block';
+        document.getElementById('payment-element').innerHTML = '<p>Unable to load payment form. <a href="/cart.html">Return to cart</a>.</p>';
+        payBtn.style.display = 'none';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadBrandSettings();
+      loadCheckoutReview();
+      loadCartCount();
+      updateNav();
+      initLogout();
+    });
+
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted || typeof loadBrandSettings !== 'function') return;
+      const payStep = document.getElementById('stepPayment');
+      if (payStep && payStep.style.display === 'block') return;
+      loadBrandSettings().then(() => {
+        loadCheckoutReview();
+        if (typeof loadCartCount === 'function') loadCartCount();
+      });
+    });
+  </script>
+</body>
+</html>

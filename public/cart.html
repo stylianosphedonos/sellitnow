@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cart - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a href="/" class="logo">Sellitnow</a>
+      <nav class="nav">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/cart.html" class="nav-link cart-link">Cart <span class="cart-count" id="cartCount">0</span></a>
+        <a href="/login.html" class="nav-link">Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main cart-page">
+    <div id="cartContent"></div>
+  </main>
+
+  <script src="/js/app.js"></script>
+  <script src="/js/cart.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof updateNav === 'function') updateNav();
+      if (typeof initLogout === 'function') initLogout();
+    });
+
+    window.addEventListener('pageshow', (e) => {
+      if (!e.persisted || typeof loadBrandSettings !== 'function' || typeof loadCart !== 'function') return;
+      loadBrandSettings().then(() => {
+        loadCart();
+        if (typeof loadCartCount === 'function') loadCartCount();
+      });
+    });
+  </script>
+</body>
+</html>

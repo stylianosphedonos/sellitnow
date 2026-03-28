@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Details - Admin - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/orders.html">← Orders</a>
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/user-management.html">User Management</a>
+    </aside>
+    <main class="admin-content">
+      <h1>Order <span id="orderNumber"></span></h1>
+      <div id="order"></div>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+  <script>
+    if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html';
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id) window.location.href = '/admin/orders.html';
+
+    async function loadOrder() {
+      try {
+        await loadBrandSettings();
+        const { order } = await callApi('/admin/orders/' + id);
+        document.getElementById('orderNumber').textContent = order.order_number;
+        const addr = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address;
+        document.getElementById('order').innerHTML = `
+          <div style="display:grid;gap:24px;grid-template-columns:1fr 1fr">
+            <div style="background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+              <h3>Customer</h3>
+              <p>${order.guest_email || order.user_email || '-'}</p>
+              <p>${order.first_name || ''} ${order.last_name || ''}</p>
+            </div>
+            <div style="background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+              <h3>Shipping Address</h3>
+              <p>${addr?.address_line1 || '-'}<br>${addr?.city || ''} ${addr?.postal_code || ''} ${addr?.country || ''}</p>
+            </div>
+          </div>
+          <h3 style="margin-top:24px">Items</h3>
+          <table class="table">
+            <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+            ${(order.items || []).map(i => {
+              const snap = typeof i.product_snapshot === 'string' ? JSON.parse(i.product_snapshot) : i.product_snapshot;
+              const v = [snap?.color, snap?.size].filter(Boolean).join(' · ');
+              const vCell = v ? `<br><span style="color:#666;font-size:13px">${v}</span>` : '';
+              return `<tr><td>${snap?.title || '-'}${vCell}</td><td>${i.quantity}</td><td>${formatStoreMoney(i.unit_price)}</td><td>${formatStoreMoney(i.total_price)}</td></tr>`;
+            }).join('')}
+          </table>
+          <p style="font-size:18px;font-weight:700;margin-top:16px">Total: ${formatStoreMoney(order.total_amount)}</p>
+          <h3 style="margin-top:24px">Update Status</h3>
+          <form id="statusForm" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select name="status"><option value="pending" ${order.status==='pending'?'selected':''}>Pending</option><option value="processing" ${order.status==='processing'?'selected':''}>Processing</option><option value="shipped" ${order.status==='shipped'?'selected':''}>Shipped</option><option value="delivered" ${order.status==='delivered'?'selected':''}>Delivered</option></select>
+            <input type="text" name="tracking_number" placeholder="Tracking #" value="${order.tracking_number||''}" style="width:200px;padding:8px">
+            <button type="submit" class="btn" style="max-width:150px">Update</button>
+          </form>
+          <button class="btn" style="margin-top:16px" onclick="downloadInvoice()">Download Invoice PDF</button>
+        `;
+        document.getElementById('statusForm')?.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const form = e.target;
+          try {
+            await callApi('/admin/orders/' + id + '/status', {
+              method: 'PATCH',
+              body: JSON.stringify({ status: form.status.value, tracking_number: form.tracking_number.value || undefined })
+            });
+            loadOrder();
+          } catch (err) { alert(err.message); }
+        });
+      } catch (err) {
+        document.getElementById('order').innerHTML = '<p>Failed to load order.</p>';
+      }
+    }
+
+    async function downloadInvoice() {
+      const res = await fetch('/api/v1/admin/orders/' + id + '/invoice', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'invoice-' + document.getElementById('orderNumber').textContent + '.pdf';
+      a.click();
+    }
+
+    loadOrder();
+  </script>
+</body>
+</html>

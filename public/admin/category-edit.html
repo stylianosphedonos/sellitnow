@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Category - Admin - Sellitnow</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/categories.html">← Categories</a>
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html">Brand</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <h1>Edit Category</h1>
+      <div id="error" class="alert alert-error" style="display:none"></div>
+      <div id="formContainer"></div>
+    </main>
+  </div>
+  <script src="/js/app.js"></script>
+  <script>
+    if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html';
+    const id = new URLSearchParams(location.search).get('id');
+    if (!id) window.location.href = '/admin/categories.html';
+    const categoryId = parseInt(id, 10);
+    if (!Number.isFinite(categoryId) || categoryId < 1) window.location.href = '/admin/categories.html';
+
+    let category;
+
+    async function loadCategory() {
+      try {
+        const data = await callApi('/categories/' + categoryId);
+        category = data.category;
+        if (!category) throw new Error('Category not found');
+        renderForm();
+      } catch (err) {
+        document.getElementById('formContainer').innerHTML = '<p>Failed to load category. ' + (err.message || '') + '</p>';
+      }
+    }
+
+    function renderForm() {
+      document.getElementById('formContainer').innerHTML = `
+        <form id="editForm" style="max-width:600px;background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <div class="form-group">
+            <label>Name *</label>
+            <input type="text" name="name" value="${escapeHtml(category.name || '')}" required>
+          </div>
+          <div class="form-group">
+            <label>Slug</label>
+            <input type="text" name="slug" value="${escapeHtml(category.slug || '')}" placeholder="URL segment; leave as-is or change manually">
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(category.description || '')}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Current image</label>
+            <div id="categoryCurrentImage" style="margin-bottom:12px">
+              ${category.image_url ? `<img src="${escapeHtml(category.image_url)}" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #eee">` : '<span style="color:#999">No image yet</span>'}
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Upload new image</label>
+            <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
+            <small style="color:#666">JPEG, PNG, WebP or GIF. Max 5MB each. Replaces the category image.</small>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:24px">
+            <button type="submit" class="btn" style="max-width:150px">Save Changes</button>
+            <a href="/admin/categories.html" class="btn btn-secondary" style="max-width:150px;text-align:center;text-decoration:none;display:inline-block">Cancel</a>
+          </div>
+        </form>
+      `;
+      document.getElementById('editForm').addEventListener('submit', handleSubmit);
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const errEl = document.getElementById('error');
+      errEl.style.display = 'none';
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+
+      const slugTrim = form.slug.value.trim();
+      const payload = {
+        name: form.name.value.trim(),
+        description: form.description.value.trim() === '' ? null : form.description.value
+      };
+      if (slugTrim) payload.slug = slugTrim;
+
+      try {
+        await callApi('/admin/categories/' + categoryId, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+
+        const fileInput = form.querySelector('input[name="image"]');
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+          const formData = new FormData();
+          formData.append('image', fileInput.files[0]);
+          const imgRes = await fetch('/api/v1/admin/categories/' + categoryId + '/image', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + getToken() },
+            body: formData
+          });
+          const imgData = await imgRes.json().catch(() => ({}));
+          if (!imgRes.ok) throw new Error(imgData.error || 'Failed to upload image');
+        }
+
+        window.location.href = '/admin/categories.html';
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
+    }
+
+    loadCategory();
+  </script>
+</body>
+</html>
