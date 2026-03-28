@@ -26,9 +26,22 @@ function shouldProxy(pathname) {
   );
 }
 
+/**
+ * API_ORIGIN must end up as origin only (scheme + host + port). If someone pastes
+ * https://host/api/v1 we strip the path — otherwise we'd request …/api/v1/api/v1/brand → 404.
+ */
 function resolveApiOrigin(env) {
   const raw = env.API_ORIGIN || env.UPSTREAM_ORIGIN || env.SELLITNOW_API || '';
-  return String(raw).trim().replace(/\/$/, '');
+  const s = String(raw).trim();
+  if (!s) return '';
+  const withScheme = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    return u.origin;
+  } catch {
+    return '';
+  }
 }
 
 function jsonError(code, message, status) {
@@ -56,18 +69,17 @@ async function proxyToOrigin(request, env) {
     );
   }
 
-  let upstreamUrl;
   let upstreamHost;
   try {
-    upstreamUrl = new URL(origin);
-    if (upstreamUrl.protocol !== 'https:' && upstreamUrl.protocol !== 'http:') {
+    const u = new URL(origin);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') {
       throw new Error('bad protocol');
     }
-    upstreamHost = upstreamUrl.host;
+    upstreamHost = u.host;
   } catch {
     return jsonError(
       'API_ORIGIN_INVALID',
-      'API_ORIGIN must be a full URL like https://api.example.com (no path, trim trailing slash).',
+      'API_ORIGIN must look like https://your-service.onrender.com (hostname only; any /api path is ignored when proxying).',
       503
     );
   }
@@ -115,7 +127,7 @@ async function proxyToOrigin(request, env) {
 
   try {
     const res = await fetch(target, init);
-    if (res.status >= 500) {
+    if (res.status === 404 || res.status >= 500) {
       const headers = new Headers(res.headers);
       headers.set('X-Sellitnow-Upstream-Status', String(res.status));
       headers.set('Access-Control-Expose-Headers', 'X-Sellitnow-Upstream-Status');
@@ -145,9 +157,10 @@ export default {
         {
           worker: true,
           api_origin_configured: Boolean(origin),
+          api_origin_effective: origin || undefined,
           hint: origin
-            ? 'Proxy is configured. If /api still returns 503, open Response headers for X-Sellitnow-Upstream-Status or hit API_ORIGIN/health directly.'
-            : 'Add API_ORIGIN (HTTPS origin of npm start / Express only).',
+            ? 'Test upstream: open api_origin_effective + /health and + /api/v1/brand in a new tab.'
+            : 'Add API_ORIGIN (e.g. https://xxx.onrender.com — not /api/v1 on the end).',
         },
         { headers: { 'Cache-Control': 'no-store' } }
       );

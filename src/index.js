@@ -57,13 +57,10 @@ app.post(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads
+// Static uploads (disk)
 app.use('/uploads', express.static(path.join(process.cwd(), config.app.uploadDir || 'uploads')));
 
-// Static frontend (public folder)
-app.use(express.static(path.join(process.cwd(), 'public')));
-
-// API routes
+// API before public static so /api/* is never shadowed by files under public/
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/products', productsRoutes);
 app.use('/api/v1/categories', categoriesRoutes);
@@ -72,7 +69,6 @@ app.use('/api/v1/orders', ordersRoutes);
 app.use('/api/v1/brand', brandRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
-// Payments (except webhook which is above)
 const paymentsRouter = express.Router();
 paymentsRouter.get('/config', (req, res) => {
   const key = config.stripe?.publishableKey;
@@ -105,12 +101,10 @@ paymentsRouter.post('/create-intent', async (req, res) => {
 });
 app.use('/api/v1/payments', paymentsRouter);
 
-// Health
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// One-time setup: reset admin user (admin@sellitnow.com / admin123)
 app.all('/api/v1/setup', async (req, res) => {
   try {
     const { pool } = require('./database/db');
@@ -134,6 +128,9 @@ app.all('/api/v1/setup', async (req, res) => {
     res.status(500).json({ error: msg });
   }
 });
+
+// Static frontend (public folder)
+app.use(express.static(path.join(process.cwd(), 'public')));
 
 // SPA fallback - serve index.html for non-API routes that don't match static files
 app.get('*', (req, res, next) => {
