@@ -281,7 +281,7 @@ router.put('/brand', async (req, res) => {
       if (!Number.isFinite(t) || t < 0 || t > 100) {
         return res.status(400).json({ error: 'Tax rate must be between 0 and 100 percent.' });
       }
-      updates.push({ key: 'taxRatePercent', value: String(Math.round(t * 10000) / 100) });
+      updates.push({ key: 'taxRatePercent', value: String(Math.round(t * 100) / 100) });
     }
 
     for (const u of updates) {
