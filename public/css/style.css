@@ -499,6 +499,124 @@ section h2 {
   margin-bottom: 24px;
 }
 
+/* Admin — mobile nav (hamburger + off-canvas sidebar) */
+.admin-mobile-topbar,
+.admin-nav-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .admin-mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    padding: 0 12px 0 8px;
+    background: var(--text);
+    color: var(--white);
+    z-index: 1003;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .admin-mobile-topbar__title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-nav-toggle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--white);
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .admin-nav-toggle:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .admin-nav-toggle__bars {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 20px;
+  }
+
+  .admin-nav-toggle__bars span {
+    display: block;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+  }
+
+  .admin-nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1001;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+
+  .admin-layout {
+    flex-direction: column;
+  }
+
+  .admin-layout--nav-open .admin-nav-overlay {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(280px, 86vw);
+    max-width: 280px;
+    height: 100%;
+    height: 100dvh;
+    padding-top: 52px;
+    z-index: 1002;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-layout--nav-open .admin-sidebar {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .admin-content {
+    width: 100%;
+    padding-top: 52px;
+    padding-left: 16px;
+    padding-right: 16px;
+    min-height: 100vh;
+  }
+}
+
 .table {
   width: 100%;
   background: var(--white);
