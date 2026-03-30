@@ -51,6 +51,7 @@ class AuthService {
     );
     const user = result.rows[0];
     if (!user) throw new Error('Invalid email or password');
+    if (user.is_active === 0) throw new Error('Account is disabled. Contact support.');
 
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
       throw new Error(`Account locked. Try again after ${user.locked_until}`);

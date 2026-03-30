@@ -191,7 +191,7 @@ router.get('/customers', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    let query = 'SELECT id, email, first_name, last_name, phone, created_at FROM users WHERE role = $1';
+    let query = 'SELECT id, email, first_name, last_name, phone, is_active, created_at FROM users WHERE role = $1';
     const params = ['customer'];
     let i = 2;
 
@@ -228,7 +228,7 @@ router.get('/customers/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const userResult = await pool.query(
-      'SELECT id, email, first_name, last_name, phone, created_at FROM users WHERE id = $1 AND role = $2',
+      'SELECT id, email, first_name, last_name, phone, is_active, created_at FROM users WHERE id = $1 AND role = $2',
       [id, 'customer']
     );
     if (!userResult.rows.length) {
@@ -336,7 +336,7 @@ router.post('/brand/logo', uploadLogo, async (req, res) => {
 router.get('/users', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, email, first_name, last_name, created_at FROM users WHERE role = $1 ORDER BY created_at DESC',
+      'SELECT id, email, first_name, last_name, is_active, created_at FROM users WHERE role = $1 ORDER BY created_at DESC',
       ['admin']
     );
     res.json({ users: result.rows });
@@ -392,6 +392,66 @@ router.post('/customers/:id/reset-password', async (req, res) => {
     ]);
 
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reset any user's password (admin, cannot reset own password here)
+router.post('/users/:id/reset-password', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid user id' });
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'Use your own account flow to change your password' });
+    }
+
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < config.app.passwordMinLength) {
+      return res.status(400).json({ error: `Password must be at least ${config.app.passwordMinLength} characters` });
+    }
+
+    const userResult = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
+    if (!userResult.rows.length) return res.status(404).json({ error: 'User not found' });
+
+    const password_hash = await bcrypt.hash(new_password, 12);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, failed_login_attempts = 0, locked_until = NULL WHERE id = $2',
+      [password_hash, id]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Enable/disable any user (admin, cannot disable self)
+router.patch('/users/:id/status', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid user id' });
+
+    const { is_active } = req.body || {};
+    if (typeof is_active !== 'boolean') {
+      return res.status(400).json({ error: 'is_active (boolean) is required' });
+    }
+    if (id === req.user.id && !is_active) {
+      return res.status(400).json({ error: 'You cannot disable your own account' });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET is_active = $2,
+           failed_login_attempts = CASE WHEN $2 = 1 THEN failed_login_attempts ELSE 0 END,
+           locked_until = CASE WHEN $2 = 1 THEN locked_until ELSE NULL END
+       WHERE id = $1
+       RETURNING id, email, first_name, last_name, role, is_active, created_at`,
+      [id, is_active ? 1 : 0]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
+
+    res.json({ user: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

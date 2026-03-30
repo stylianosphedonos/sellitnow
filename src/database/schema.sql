@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   email_verified INTEGER DEFAULT 0,
   email_verification_token TEXT,
   role TEXT DEFAULT 'customer' CHECK (role IN ('customer', 'admin')),
+  is_active INTEGER NOT NULL DEFAULT 1,
   failed_login_attempts INTEGER DEFAULT 0,
   locked_until TEXT,
   created_at TEXT DEFAULT (datetime('now'))

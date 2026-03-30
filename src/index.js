@@ -154,6 +154,11 @@ app.use((err, req, res, next) => {
 const PORT = config.port;
 
 function runSchemaMigrations(db) {
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!userCols.includes('is_active')) {
+    db.exec('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
+  }
+
   const productCols = db.prepare('PRAGMA table_info(products)').all();
   if (!productCols.some((c) => c.name === 'options_json')) {
     db.exec('ALTER TABLE products ADD COLUMN options_json TEXT');
