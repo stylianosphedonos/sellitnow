@@ -11,6 +11,8 @@ const usePostgres = Boolean(databaseUrl);
 module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
+  /** Host to bind (Render and most PaaS require 0.0.0.0 for inbound traffic) */
+  host: process.env.HOST || '0.0.0.0',
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
   database: {
     url: databaseUrl || null,

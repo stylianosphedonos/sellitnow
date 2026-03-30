@@ -152,6 +152,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = config.port;
+const HOST = config.host;
 
 function runSchemaMigrations(db) {
   const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
@@ -272,16 +273,24 @@ async function ensureSeed() {
   }
 }
 
-async function startup() {
+async function afterListenStartup() {
   await ensureDb();
   await ensureAdmin();
   await ensureSeed();
-  app.listen(PORT, () => {
-    console.log(`Sellitnow running at http://localhost:${PORT}`);
+}
+
+function startup() {
+  return new Promise((resolve, reject) => {
+    app.listen(PORT, HOST, () => {
+      console.log(`Sellitnow listening on http://${HOST}:${PORT}`);
+      resolve();
+    }).on('error', reject);
   });
 }
 
-startup().catch(err => {
-  console.error('Startup failed:', err);
-  process.exit(1);
-});
+startup()
+  .then(() => afterListenStartup())
+  .catch((err) => {
+    console.error('Startup failed:', err);
+    process.exit(1);
+  });
