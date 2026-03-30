@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: sellitnow
+    env: node
+    plan: starter
+    autoDeploy: true
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: sellitnow-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_BASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: STORAGE_ROOT
+        value: /var/data
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: SQLITE_DB_PATH
+        value: /var/data/data/sellitnow.db
+      - key: UPLOAD_URL_PREFIX
+        value: /uploads
+      - key: TRUST_PROXY
+        value: "1"

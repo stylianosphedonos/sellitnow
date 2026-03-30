@@ -31,6 +31,39 @@ The server auto-creates the database in `data/sellitnow.db`, runs migrations, an
 API and website: `http://localhost:3000`  
 Login: `admin@sellitnow.com` / `admin123`
 
+## Deploy on Render
+
+This project is now Render-ready with persistent disk storage for SQLite and uploads.
+
+### Option A: Blueprint (recommended)
+
+1. Push this repo to GitHub.
+2. In Render, create a new **Blueprint** and select this repository.
+3. Render will use `render.yaml` to provision:
+   - a Node web service
+   - persistent disk mounted at `/var/data`
+   - health check on `/health`
+4. Set these environment variables in Render:
+   - `API_BASE_URL` (your public Render URL/custom domain)
+   - Stripe/email variables if you use those features
+
+### Option B: Manual Web Service
+
+- **Build command:** `npm ci`
+- **Start command:** `npm start`
+- **Health check path:** `/health`
+- Add a persistent disk mounted at `/var/data`
+- Set env vars:
+  - `NODE_ENV=production`
+  - `STORAGE_ROOT=/var/data`
+  - `UPLOAD_DIR=/var/data/uploads`
+  - `SQLITE_DB_PATH=/var/data/data/sellitnow.db`
+  - `UPLOAD_URL_PREFIX=/uploads`
+  - `TRUST_PROXY=1`
+  - `JWT_SECRET=<strong-random-secret>`
+
+The app listens on `PORT` automatically (provided by Render).
+
 ## API Endpoints
 
 ### Authentication

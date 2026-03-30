@@ -58,7 +58,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Static uploads (disk)
-app.use('/uploads', express.static(path.join(process.cwd(), config.app.uploadDir || 'uploads')));
+app.use(config.app.uploadUrlPrefix, express.static(config.app.uploadDir));
 
 // API before public static so /api/* is never shadowed by files under public/
 app.use('/api/v1/auth', authRoutes);

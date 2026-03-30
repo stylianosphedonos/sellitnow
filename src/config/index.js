@@ -1,4 +1,10 @@
 require('dotenv').config();
+const path = require('path');
+
+const storageRoot = process.env.STORAGE_ROOT || process.env.RENDER_DISK_ROOT || process.cwd();
+const uploadUrlPrefix = (process.env.UPLOAD_URL_PREFIX || '/uploads').replace(/\/+$/, '') || '/uploads';
+const sqliteDbPath = process.env.SQLITE_DB_PATH || path.join(storageRoot, 'data', 'sellitnow.db');
+const uploadDir = process.env.UPLOAD_DIR || path.join(storageRoot, 'uploads');
 
 module.exports = {
   env: process.env.NODE_ENV || 'development',
@@ -6,6 +12,7 @@ module.exports = {
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
   database: {
     url: process.env.DATABASE_URL || 'postgresql://localhost:5432/sellitnow',
+    sqlitePath: sqliteDbPath,
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'dev-secret-change-me',
@@ -27,7 +34,8 @@ module.exports = {
   app: {
     vatRate: parseFloat(process.env.VAT_RATE || '0.20'),
     shippingCost: parseFloat(process.env.SHIPPING_COST || '5.99'),
-    uploadDir: process.env.UPLOAD_DIR || 'uploads',
+    uploadDir,
+    uploadUrlPrefix,
     maxImageSizeMB: parseInt(process.env.MAX_IMAGE_SIZE_MB || '5', 10),
     maxImagesPerProduct: parseInt(process.env.MAX_IMAGES_PER_PRODUCT || '5', 10),
     cartExpiryDays: 7,

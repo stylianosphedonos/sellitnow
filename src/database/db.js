@@ -1,10 +1,10 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const config = require('../config');
 
-// Use SQLite file in project root - no external server needed
-const dbPath = path.join(process.cwd(), 'data', 'sellitnow.db');
-const dataDir = path.join(process.cwd(), 'data');
+const dbPath = config.database.sqlitePath;
+const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
