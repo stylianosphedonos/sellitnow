@@ -25,6 +25,25 @@
       <div id="alert" class="alert" style="display:none;margin-bottom:24px"></div>
 
       <div style="display:grid;gap:32px;max-width:900px">
+        <!-- Current user: change password -->
+        <section id="changePasswordSection" style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:8px">Change my password</h2>
+          <p id="changePasswordHint" style="margin:0 0 20px;color:var(--text-muted);font-size:14px"></p>
+          <form id="changePasswordForm" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:16px;align-items:end;max-width:700px">
+            <div class="form-group">
+              <label>New password *</label>
+              <input type="password" id="newPassword" name="new_password" required minlength="8" autocomplete="new-password" placeholder="Min 8 characters">
+            </div>
+            <div class="form-group">
+              <label>Confirm new password *</label>
+              <input type="password" id="confirmPassword" name="confirm_password" required minlength="8" autocomplete="new-password" placeholder="Re-enter password">
+            </div>
+            <div class="form-group">
+              <button type="submit" class="btn" style="max-width:200px">Update password</button>
+            </div>
+          </form>
+        </section>
+
         <!-- Add user -->
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
           <h2 style="font-size:18px;margin-bottom:20px">Add Admin User</h2>
@@ -62,11 +81,16 @@
   <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
-    if (!getToken() || getUser()?.role !== 'admin') {
+    const me = getUser();
+    if (!getToken() || me?.role !== 'admin') {
       window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/user-management.html');
     }
 
     const alertEl = document.getElementById('alert');
+    const changePasswordHint = document.getElementById('changePasswordHint');
+    if (me?.email) {
+      changePasswordHint.textContent = `Signed in as ${me.email}. Your session stays valid until it expires; log in again if you want a fresh token after changing password.`;
+    }
 
     function showMsg(msg, isError) {
       alertEl.textContent = msg;
@@ -97,6 +121,46 @@
         document.getElementById('usersList').innerHTML = '<p>Failed to load users.</p>';
       }
     }
+
+    document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let uid = getUser()?.id ?? me?.id;
+      if (!uid && getToken()) {
+        try {
+          const { user } = await callApi('/auth/me');
+          if (user?.id) {
+            uid = user.id;
+            setUser({ ...getUser(), ...user });
+          }
+        } catch (_) {}
+      }
+      if (!uid) {
+        showMsg('Could not determine your user id. Please log out and log in again.', true);
+        return;
+      }
+      const newPwd = document.getElementById('newPassword').value;
+      const confirm = document.getElementById('confirmPassword').value;
+      if (newPwd !== confirm) {
+        showMsg('New password and confirmation do not match.', true);
+        return;
+      }
+      const form = e.target;
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Updating...';
+      try {
+        await callApi(`/admin/users/${uid}/reset-password`, {
+          method: 'POST',
+          body: JSON.stringify({ new_password: newPwd })
+        });
+        form.reset();
+        showMsg('Password updated successfully.');
+      } catch (err) {
+        showMsg(err.message || 'Failed to update password.', true);
+      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Update password';
+    });
 
     document.getElementById('addUserForm').addEventListener('submit', async (e) => {
       e.preventDefault();
