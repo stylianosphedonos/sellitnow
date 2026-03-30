@@ -127,8 +127,15 @@ async function loadBrandSettings() {
     if (hero) {
       if (data.banner) {
         const b = mediaUrl(data.banner);
-        hero.style.backgroundImage = `linear-gradient(135deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${JSON.stringify(b)})`;
+        hero.classList.add('hero--has-image');
+        /* Top: readability overlay; middle: image (sized via .hero--has-image contain); bottom: brand gradient fills letterbox */
+        hero.style.backgroundImage = [
+          'linear-gradient(135deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35))',
+          `url(${JSON.stringify(b)})`,
+          'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
+        ].join(', ');
       } else {
+        hero.classList.remove('hero--has-image');
         hero.style.backgroundImage = '';
       }
     }

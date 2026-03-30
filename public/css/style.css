@@ -144,6 +144,13 @@ body {
   overflow: hidden;
 }
 
+/* Banner photo: full image visible (letterbox uses brand gradient from stacked layers in JS) */
+.hero.hero--has-image {
+  background-size: 100% 100%, contain, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+}
+
 .hero__inner {
   position: relative;
   z-index: 1;
