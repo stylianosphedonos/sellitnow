@@ -133,6 +133,15 @@ CREATE TABLE IF NOT EXISTS brand_settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS media_blobs (
+  id UUID PRIMARY KEY,
+  content_type TEXT NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_blobs_created_at ON media_blobs(created_at);
+
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);

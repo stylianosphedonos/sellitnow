@@ -1,13 +1,8 @@
 const slugify = require('slugify');
-const path = require('path');
 const config = require('../config');
 const { pool } = require('../database/db');
 const { parseOptionsJson, stringifyOptionsJson } = require('../lib/productOptions');
-
-function buildUploadUrl(filename) {
-  const prefix = config.app.uploadUrlPrefix || '/uploads';
-  return `${prefix}/${filename}`.replace(/\/{2,}/g, '/');
-}
+const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 
 class ProductService {
   async adminList(page = 1, limit = 100) {
@@ -121,8 +116,7 @@ class ProductService {
 
     if (imageFiles.length) {
       for (let i = 0; i < imageFiles.length; i++) {
-        const filename = imageFiles[i].filename || path.basename(imageFiles[i].path);
-        const imageUrl = buildUploadUrl(filename);
+        const imageUrl = await publicUrlForUploadedFile(imageFiles[i]);
         await pool.query(
           'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
           [product.id, imageUrl, i]
@@ -176,8 +170,7 @@ class ProductService {
       const toAdd = Math.min(imageFiles.length, maxTotal - currentCount);
 
       for (let i = 0; i < toAdd; i++) {
-        const filename = imageFiles[i].filename || path.basename(imageFiles[i].path);
-        const imageUrl = buildUploadUrl(filename);
+        const imageUrl = await publicUrlForUploadedFile(imageFiles[i]);
         await pool.query(
           'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
           [id, imageUrl, currentCount + i]

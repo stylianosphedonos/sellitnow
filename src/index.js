@@ -3,6 +3,9 @@ const cors = require('cors');
 const path = require('path');
 const config = require('./config');
 
+const MediaBlobService = require('./services/MediaBlobService');
+const { isPostgres } = require('./database/db');
+
 const authRoutes = require('./routes/auth');
 const productsRoutes = require('./routes/products');
 const categoriesRoutes = require('./routes/categories');
@@ -57,8 +60,30 @@ app.post(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static uploads (disk)
-app.use(config.app.uploadUrlPrefix, express.static(config.app.uploadDir));
+function isUuidParam(s) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s));
+}
+
+const uploadMount = (config.app.uploadUrlPrefix || '/uploads').replace(/\/+$/, '') || '/uploads';
+
+// PostgreSQL: binary images served from media_blobs (survives redeploy without a disk)
+app.get(`${uploadMount}/blob/:id`, async (req, res, next) => {
+  if (!isPostgres) return res.status(404).end();
+  const { id } = req.params;
+  if (!isUuidParam(id)) return res.status(404).end();
+  try {
+    const row = await MediaBlobService.getById(id);
+    if (!row) return res.status(404).end();
+    res.setHeader('Content-Type', row.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(row.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Static uploads (disk — SQLite / local dev)
+app.use(uploadMount, express.static(config.app.uploadDir));
 
 // API before public static so /api/* is never shadowed by files under public/
 app.use('/api/v1/auth', authRoutes);

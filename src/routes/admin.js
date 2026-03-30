@@ -8,6 +8,7 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { uploadProductImages, uploadBanner, uploadLogo, uploadCategoryImage } = require('../middleware/upload');
+const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency } = require('./brand');
 const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
@@ -104,7 +105,7 @@ router.post('/categories/:id/image', uploadCategoryImage, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = '/uploads/' + req.file.filename;
+    const url = await publicUrlForUploadedFile(req.file);
     const category = await CategoryService.update(id, { image_url: url });
     res.json({ category });
   } catch (err) {
@@ -303,7 +304,7 @@ router.post('/brand/banner', uploadBanner, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = '/uploads/' + req.file.filename;
+    const url = await publicUrlForUploadedFile(req.file);
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['banner', url]
@@ -320,7 +321,7 @@ router.post('/brand/logo', uploadLogo, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = '/uploads/' + req.file.filename;
+    const url = await publicUrlForUploadedFile(req.file);
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['logo', url]
