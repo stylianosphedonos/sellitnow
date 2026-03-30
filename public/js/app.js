@@ -266,12 +266,19 @@ async function loadCategories() {
   if (!grid) return;
   try {
     const { categories } = await callApi('/categories');
-    grid.innerHTML = categories.map(c => `
+    grid.innerHTML = categories
+      .map((c) => {
+        const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
+        const media = imgUrl
+          ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}"></div>`
+          : `<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🛒</span></div>`;
+        return `
       <a href="/products.html?category=${c.id}" class="category-card">
-        <div class="icon">🛒</div>
-        <span>${c.name}</span>
-      </a>
-    `).join('');
+        ${media}
+        <span class="category-card__label">${escapeHtml(c.name)}</span>
+      </a>`;
+      })
+      .join('');
   } catch (err) {
     grid.innerHTML = '<p>No categories</p>';
   }
