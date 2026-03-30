@@ -26,8 +26,18 @@ function persistBrandSettings(data) {
       currency: data.currency || '',
       banner: data.banner || '',
       logo: data.logo || '',
+      heroTitle: data.heroTitle,
+      heroSubtitle: data.heroSubtitle,
     }));
   } catch (_) {}
+}
+
+function applyHeroCopy(data) {
+  if (!data || typeof data !== 'object') return;
+  const h1 = document.getElementById('heroTitle');
+  const sub = document.getElementById('heroSubtitle');
+  if (h1 && data.heroTitle !== undefined) h1.textContent = data.heroTitle;
+  if (sub && data.heroSubtitle !== undefined) sub.textContent = data.heroSubtitle;
 }
 
 function applyBrandTheme(data, persist = false) {
@@ -107,21 +117,19 @@ async function loadBrandSettings() {
   try {
     const cached = readCachedBrandSettings();
     if (cached) applyBrandTheme(cached, false);
+    applyHeroCopy(cached);
     const res = await fetch(apiPrefix() + '/brand');
     if (!res.ok) return;
     const data = await res.json();
     applyBrandTheme(data, true);
+    applyHeroCopy(data);
     const hero = document.querySelector('.hero');
     if (hero) {
       if (data.banner) {
         const b = mediaUrl(data.banner);
-        hero.style.backgroundImage = `linear-gradient(135deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url(${b})`;
-        hero.style.backgroundSize = 'cover';
-        hero.style.backgroundPosition = 'center';
+        hero.style.backgroundImage = `linear-gradient(135deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url(${JSON.stringify(b)})`;
       } else {
         hero.style.backgroundImage = '';
-        hero.style.backgroundSize = '';
-        hero.style.backgroundPosition = '';
       }
     }
     const logos = document.querySelectorAll('.logo');

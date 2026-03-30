@@ -22,7 +22,7 @@
     </aside>
     <main class="admin-content">
       <h1>Brand</h1>
-      <p style="margin-bottom:24px;color:var(--text-muted)">Customize your store colors, logo, and hero banner. Currency and tax are under <a href="/admin/settings.html">Settings</a>.</p>
+      <p style="margin-bottom:24px;color:var(--text-muted)">Customize your store colors, logo, hero banner image, and the headline text shown on the home page. Currency and tax are under <a href="/admin/settings.html">Settings</a>.</p>
 
       <div id="alert" class="alert" style="display:none;margin-bottom:24px"></div>
 
@@ -82,14 +82,23 @@
         <!-- Banner -->
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
           <h2 style="font-size:18px;margin-bottom:20px">Hero Banner</h2>
-          <div id="bannerPreview" style="width:100%;min-height:120px;background:linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);border-radius:8px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;aspect-ratio:1200/400">
-            <span id="bannerPlaceholder" style="color:rgba(255,255,255,0.9);font-size:18px">Current banner or gradient</span>
-            <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0">
+          <div class="form-group">
+            <label for="heroTitleInput">Headline</label>
+            <input type="text" id="heroTitleInput" maxlength="200" placeholder="Main hero title" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+          </div>
+          <div class="form-group">
+            <label for="heroSubtitleInput">Subheading</label>
+            <textarea id="heroSubtitleInput" rows="2" maxlength="400" placeholder="Supporting line under the headline" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
+          </div>
+          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px;max-width:200px">Save hero text</button>
+          <div id="bannerPreview" style="width:100%;background:linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);border-radius:8px;margin-bottom:16px;overflow:hidden;position:relative;aspect-ratio:21/9;min-height:140px">
+            <span id="bannerPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.9);font-size:16px;text-align:center;padding:16px;z-index:1">Current banner or gradient</span>
+            <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;object-position:center;position:absolute;inset:0">
           </div>
           <div class="form-group">
             <label>Upload New Banner Image</label>
             <input type="file" id="bannerFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
-            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Recommended: 1200×400px or wider.</small>
+            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Wide images work best; the storefront crops to cover the hero area.</small>
           </div>
           <button type="button" id="uploadBanner" class="btn" style="max-width:180px" disabled>Upload Banner</button>
           <button type="button" id="removeBanner" class="btn btn-secondary" style="margin-left:8px;max-width:140px">Remove Banner</button>
@@ -146,10 +155,15 @@
         document.getElementById('accentColor').value = data.accent || '#ff9000';
         document.getElementById('accentHex').value = data.accent || '#ff9000';
 
+        document.getElementById('heroTitleInput').value =
+          data.heroTitle != null ? data.heroTitle : '';
+        document.getElementById('heroSubtitleInput').value =
+          data.heroSubtitle != null ? data.heroSubtitle : '';
+
         const logoImg = document.getElementById('logoImg');
         const logoPlaceholder = document.getElementById('logoPlaceholder');
         if (data.logo) {
-          logoImg.src = data.logo;
+          logoImg.src = typeof mediaUrl === 'function' ? mediaUrl(data.logo) : data.logo;
           logoImg.style.display = 'block';
           logoPlaceholder.style.display = 'none';
         } else {
@@ -161,7 +175,7 @@
         const bannerImg = document.getElementById('bannerImg');
         const placeholder = document.getElementById('bannerPlaceholder');
         if (data.banner) {
-          bannerImg.src = data.banner;
+          bannerImg.src = typeof mediaUrl === 'function' ? mediaUrl(data.banner) : data.banner;
           bannerImg.style.display = 'block';
           placeholder.style.display = 'none';
         } else {
@@ -174,6 +188,26 @@
         showAlert('Failed to load brand settings.', true);
       }
     }
+
+    document.getElementById('saveHeroText').addEventListener('click', async () => {
+      const btn = document.getElementById('saveHeroText');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({
+            heroTitle: document.getElementById('heroTitleInput').value,
+            heroSubtitle: document.getElementById('heroSubtitleInput').value,
+          }),
+        });
+        showAlert('Hero text saved. Refresh the store home page to confirm.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to save hero text.', true);
+      }
+      btn.disabled = false;
+      btn.textContent = 'Save hero text';
+    });
 
     saveColorsBtn.addEventListener('click', async () => {
       saveColorsBtn.disabled = true;
@@ -214,7 +248,8 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Upload failed');
-        document.getElementById('bannerImg').src = data.banner;
+        document.getElementById('bannerImg').src =
+          typeof mediaUrl === 'function' ? mediaUrl(data.banner) : data.banner;
         document.getElementById('bannerImg').style.display = 'block';
         document.getElementById('bannerPlaceholder').style.display = 'none';
         bannerFile.value = '';

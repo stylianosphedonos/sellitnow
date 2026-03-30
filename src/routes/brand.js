@@ -12,6 +12,8 @@ const DEFAULTS = {
   banner: '',
   logo: '',
   currency: 'usd',
+  heroTitle: 'Up to 90% Off',
+  heroSubtitle: 'Discover amazing deals on electronics, fashion & more',
 };
 
 function rowToObj(rows) {
@@ -48,6 +50,15 @@ async function getBrandSettings() {
   const taxRatePercent = taxOverride !== undefined ? taxOverride : defaultTaxPercentFromConfig();
   const currency = normalizeCurrency(stored.currency) || DEFAULTS.currency;
 
+  const heroTitle =
+    stored.heroTitle !== undefined && stored.heroTitle !== null
+      ? String(stored.heroTitle)
+      : DEFAULTS.heroTitle;
+  const heroSubtitle =
+    stored.heroSubtitle !== undefined && stored.heroSubtitle !== null
+      ? String(stored.heroSubtitle)
+      : DEFAULTS.heroSubtitle;
+
   return {
     primary: stored.primary || DEFAULTS.primary,
     primaryDark: stored.primaryDark || DEFAULTS.primaryDark,
@@ -57,6 +68,8 @@ async function getBrandSettings() {
     logo: stored.logo || DEFAULTS.logo,
     currency,
     taxRatePercent,
+    heroTitle,
+    heroSubtitle,
   };
 }
 

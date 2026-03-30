@@ -262,7 +262,8 @@ router.get('/brand', async (req, res) => {
 
 router.put('/brand', async (req, res) => {
   try {
-    const { primary, primaryDark, secondary, accent, banner, logo, currency, taxRatePercent } = req.body;
+    const { primary, primaryDark, secondary, accent, banner, logo, currency, taxRatePercent, heroTitle, heroSubtitle } =
+      req.body;
     const updates = [
       primary != null && { key: 'primary', value: String(primary) },
       primaryDark != null && { key: 'primaryDark', value: String(primaryDark) },
@@ -270,6 +271,8 @@ router.put('/brand', async (req, res) => {
       accent != null && { key: 'accent', value: String(accent) },
       banner !== undefined && { key: 'banner', value: String(banner || '') },
       logo !== undefined && { key: 'logo', value: String(logo || '') },
+      heroTitle !== undefined && { key: 'heroTitle', value: String(heroTitle) },
+      heroSubtitle !== undefined && { key: 'heroSubtitle', value: String(heroSubtitle) },
     ].filter(Boolean);
 
     if (currency !== undefined && currency !== null && String(currency).trim() !== '') {
