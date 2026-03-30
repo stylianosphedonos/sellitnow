@@ -5,13 +5,16 @@ const storageRoot = process.env.STORAGE_ROOT || process.env.RENDER_DISK_ROOT || 
 const uploadUrlPrefix = (process.env.UPLOAD_URL_PREFIX || '/uploads').replace(/\/+$/, '') || '/uploads';
 const sqliteDbPath = process.env.SQLITE_DB_PATH || path.join(storageRoot, 'data', 'sellitnow.db');
 const uploadDir = process.env.UPLOAD_DIR || path.join(storageRoot, 'uploads');
+const databaseUrl = (process.env.DATABASE_URL || '').trim();
+const usePostgres = Boolean(databaseUrl);
 
 module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
   apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://localhost:5432/sellitnow',
+    url: databaseUrl || null,
+    usePostgres,
     sqlitePath: sqliteDbPath,
   },
   jwt: {

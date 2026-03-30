@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
-const { pool } = require('../database/db');
+const { pool, withTransaction } = require('../database/db');
 const config = require('../config');
 const EmailService = require('./EmailService');
 
@@ -118,15 +118,10 @@ class AuthService {
     if (!user) throw new Error('Invalid or expired reset token');
 
     const password_hash = await bcrypt.hash(newPassword, 12);
-    await pool.query('BEGIN');
-    try {
-      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [password_hash, user.id]);
-      await pool.query('UPDATE password_reset_tokens SET used = true WHERE token = $1', [token]);
-      await pool.query('COMMIT');
-    } catch (e) {
-      await pool.query('ROLLBACK');
-      throw e;
-    }
+    await withTransaction(async (client) => {
+      await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [password_hash, user.id]);
+      await client.query('UPDATE password_reset_tokens SET used = true WHERE token = $1', [token]);
+    });
 
     return { success: true };
   }

@@ -112,10 +112,10 @@ app.all('/api/v1/setup', async (req, res) => {
     const hash = await bcrypt.hash('admin123', 12);
     await pool.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, email_verified, role, failed_login_attempts, locked_until)
-       VALUES ($1, $2, $3, $4, 1, 'admin', 0, NULL)
+       VALUES ($1, $2, $3, $4, TRUE, 'admin', 0, NULL)
        ON CONFLICT (email) DO UPDATE SET
          password_hash = excluded.password_hash,
-         email_verified = 1,
+         email_verified = TRUE,
          role = 'admin',
          failed_login_attempts = 0,
          locked_until = NULL`,
@@ -186,11 +186,18 @@ function runSchemaMigrations(db) {
 async function ensureDb() {
   try {
     const fs = require('fs');
-    const { db } = require('./database/db');
+    const dbMod = require('./database/db');
+    if (config.database.usePostgres) {
+      const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.postgresql.sql'), 'utf8');
+      await dbMod.execPostgresScript(dbMod.pool, schema);
+      console.log('Database ready (PostgreSQL)');
+      return;
+    }
+    const { db } = dbMod;
     const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.sql'), 'utf8');
     db.exec(schema);
     runSchemaMigrations(db);
-    console.log('Database ready');
+    console.log('Database ready (SQLite)');
   } catch (err) {
     console.error('Database init failed:', err.message);
     throw err;
@@ -204,10 +211,10 @@ async function ensureAdmin() {
     const hash = await bcrypt.hash('admin123', 12);
     await pool.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, email_verified, role, failed_login_attempts, locked_until)
-       VALUES ($1, $2, $3, $4, 1, 'admin', 0, NULL)
+       VALUES ($1, $2, $3, $4, TRUE, 'admin', 0, NULL)
        ON CONFLICT (email) DO UPDATE SET
          password_hash = excluded.password_hash,
-         email_verified = 1,
+         email_verified = TRUE,
          role = 'admin',
          failed_login_attempts = 0,
          locked_until = NULL`,
@@ -238,18 +245,21 @@ async function ensureSeed() {
     const c1 = cat1.rows[0]?.id || 1;
     const c2 = cat2.rows[0]?.id || 2;
     await pool.query(
-      `INSERT OR IGNORE INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')`,
+      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+       ON CONFLICT (sku) DO NOTHING`,
       ['SKU-001', 'Wireless Headphones', 'wireless-headphones', 'High-quality wireless headphones', 49.99, 100, c1]
     );
     await pool.query(
-      `INSERT OR IGNORE INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')`,
+      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+       ON CONFLICT (sku) DO NOTHING`,
       ['SKU-002', 'USB-C Cable', 'usb-c-cable', 'Durable USB-C charging cable', 12.99, 200, c1]
     );
     await pool.query(
-      `INSERT OR IGNORE INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')`,
+      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+       ON CONFLICT (sku) DO NOTHING`,
       ['SKU-003', 'Cotton T-Shirt', 'cotton-t-shirt', 'Comfortable cotton t-shirt', 19.99, 50, c2]
     );
     await pool.query(

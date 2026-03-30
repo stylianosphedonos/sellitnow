@@ -14,6 +14,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false
       - key: API_BASE_URL
         sync: false
       - key: JWT_SECRET
@@ -22,8 +24,6 @@ services:
         value: /var/data
       - key: UPLOAD_DIR
         value: /var/data/uploads
-      - key: SQLITE_DB_PATH
-        value: /var/data/data/sellitnow.db
       - key: UPLOAD_URL_PREFIX
         value: /uploads
       - key: TRUST_PROXY

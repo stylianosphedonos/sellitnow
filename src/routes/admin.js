@@ -365,7 +365,7 @@ router.post('/users', async (req, res) => {
     const password_hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, email_verified, role, failed_login_attempts, locked_until)
-       VALUES ($1, $2, $3, $4, 1, 'admin', 0, NULL)
+       VALUES ($1, $2, $3, $4, TRUE, 'admin', 0, NULL)
        RETURNING id, email, first_name, last_name, created_at`,
       [email.toLowerCase(), password_hash, first_name, last_name]
     );
