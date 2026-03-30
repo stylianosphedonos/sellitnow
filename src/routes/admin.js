@@ -397,14 +397,11 @@ router.post('/customers/:id/reset-password', async (req, res) => {
   }
 });
 
-// Reset any user's password (admin, cannot reset own password here)
+// Reset any managed user's password (including the current admin's own account)
 router.post('/users/:id/reset-password', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid user id' });
-    if (id === req.user.id) {
-      return res.status(400).json({ error: 'Use your own account flow to change your password' });
-    }
 
     const { new_password } = req.body;
     if (!new_password || new_password.length < config.app.passwordMinLength) {

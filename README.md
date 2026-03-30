@@ -142,7 +142,7 @@ Use `X-Cart-Session` header for guest carts (UUID).
 | GET | /api/v1/admin/customers | List customers |
 | GET | /api/v1/admin/customers/:id | Customer details |
 | POST | /api/v1/admin/customers/:id/reset-password | Reset password (body: new_password) |
-| POST | /api/v1/admin/users/:id/reset-password | Reset any other user password (body: new_password) |
+| POST | /api/v1/admin/users/:id/reset-password | Reset admin user password, including your own (body: new_password) |
 | PATCH | /api/v1/admin/users/:id/status | Enable/disable any other user (body: is_active: boolean) |
 
 ## Cart Session
