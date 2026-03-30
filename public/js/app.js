@@ -8,6 +8,41 @@ function mediaUrl(u) {
   return u;
 }
 
+function readCachedBrandSettings() {
+  try {
+    return JSON.parse(localStorage.getItem('sellitnow.brand') || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function persistBrandSettings(data) {
+  try {
+    localStorage.setItem('sellitnow.brand', JSON.stringify({
+      primary: data.primary || '',
+      primaryDark: data.primaryDark || '',
+      secondary: data.secondary || '',
+      accent: data.accent || '',
+      currency: data.currency || '',
+      banner: data.banner || '',
+      logo: data.logo || '',
+    }));
+  } catch (_) {}
+}
+
+function applyBrandTheme(data, persist = false) {
+  if (!data) return;
+  if (typeof window !== 'undefined') {
+    window.__storeCurrency = String(data.currency || 'usd').toUpperCase();
+  }
+  const root = document.documentElement;
+  if (data.primary) root.style.setProperty('--primary', data.primary);
+  if (data.primaryDark) root.style.setProperty('--primary-dark', data.primaryDark);
+  if (data.secondary) root.style.setProperty('--secondary', data.secondary);
+  if (data.accent) root.style.setProperty('--accent', data.accent);
+  if (persist) persistBrandSettings(data);
+}
+
 function getToken() {
   return localStorage.getItem('token');
 }
@@ -70,17 +105,12 @@ function formatStoreMoney(amount, currencyCode) {
 
 async function loadBrandSettings() {
   try {
+    const cached = readCachedBrandSettings();
+    if (cached) applyBrandTheme(cached, false);
     const res = await fetch(apiPrefix() + '/brand');
     if (!res.ok) return;
     const data = await res.json();
-    if (typeof window !== 'undefined') {
-      window.__storeCurrency = String(data.currency || 'usd').toUpperCase();
-    }
-    const root = document.documentElement;
-    if (data.primary) root.style.setProperty('--primary', data.primary);
-    if (data.primaryDark) root.style.setProperty('--primary-dark', data.primaryDark);
-    if (data.secondary) root.style.setProperty('--secondary', data.secondary);
-    if (data.accent) root.style.setProperty('--accent', data.accent);
+    applyBrandTheme(data, true);
     const hero = document.querySelector('.hero');
     if (hero) {
       if (data.banner) {

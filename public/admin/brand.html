@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Brand - Admin - Sellitnow</title>
+  <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -180,6 +181,7 @@
     async function loadBrand() {
       try {
         const data = await callApi('/admin/brand');
+        applyBrandTheme(data, true);
         document.getElementById('primaryColor').value = data.primary || '#ee4d2d';
         document.getElementById('primaryHex').value = data.primary || '#ee4d2d';
         document.getElementById('primaryDarkColor').value = data.primaryDark || '#d4380d';
