@@ -201,7 +201,15 @@
           messageEl.textContent = '';
           payBtn.disabled = true;
 
-          let returnUrl =
+          const { error: submitError } = await elements.submit();
+          if (submitError) {
+            messageEl.textContent = submitError.message || 'Please check your payment details';
+            messageEl.style.display = 'block';
+            payBtn.disabled = false;
+            return;
+          }
+
+          const returnUrl =
             window.location.origin +
             '/order-confirm.html?id=' +
             createdOrder.id +
@@ -209,15 +217,17 @@
             encodeURIComponent(createdOrder.order_number);
           const { error } = await stripe.confirmPayment({
             elements,
-            clientSecret,
             confirmParams: { return_url: returnUrl },
+            redirect: 'if_required',
           });
 
           if (error) {
             messageEl.textContent = error.message || 'Payment failed';
             messageEl.style.display = 'block';
             payBtn.disabled = false;
+            return;
           }
+          window.location.assign(returnUrl);
         };
 
         cancelLink.href = '/checkout-cancel.html?order_id=' + createdOrder.id + '&number=' + encodeURIComponent(createdOrder.order_number);
