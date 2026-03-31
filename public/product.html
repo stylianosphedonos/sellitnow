@@ -130,7 +130,7 @@
           el.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:12px';
           img.appendChild(el);
         }
-        document.getElementById('qty').max = product.stock_quantity;
+        document.getElementById('qty').removeAttribute('max');
       } catch (err) {
         document.getElementById('product').innerHTML = '<p>Failed to load product.</p>';
       }

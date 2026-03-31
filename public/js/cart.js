@@ -49,7 +49,7 @@ function renderCartLine(item) {
         </div>
         <div class="cart-line__qty-wrap">
           <label class="cart-line__label" for="qty-${item.id}">Quantity</label>
-          <input type="number" class="cart-line__qty-input" id="qty-${item.id}" value="${item.quantity}" min="1" max="${item.stock_quantity}" data-item-id="${item.id}" aria-label="Quantity for ${escapeHtml(item.title)}">
+          <input type="number" class="cart-line__qty-input" id="qty-${item.id}" value="${item.quantity}" min="1" data-item-id="${item.id}" aria-label="Quantity for ${escapeHtml(item.title)}">
         </div>
         <div class="cart-line__line-wrap">
           <span class="cart-line__label">Line total</span>

@@ -27,13 +27,10 @@ function validateVariantForProduct(product, color, size) {
       : parseOptionsJson(product.options_json);
   const c = (color || '').trim();
   const s = (size || '').trim();
-  if (opts.colors.length > 0 && !c) {
-    throw new Error('Please choose a color');
-  }
-  if (opts.sizes.length > 0 && !s) {
-    throw new Error('Please choose a size');
-  }
-  return { color: c, size: s };
+  return {
+    color: c || 'Not Specified',
+    size: s || 'Not Specified',
+  };
 }
 
 module.exports = { parseOptionsJson, stringifyOptionsJson, validateVariantForProduct };

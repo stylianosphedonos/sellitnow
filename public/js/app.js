@@ -290,11 +290,6 @@ function showToast(message, options = {}) {
 async function quickAddProductFromCard(productId) {
   const card = document.querySelector(`.product-card[data-product-id="${productId}"]`);
   if (!card) return;
-  const btn = card.querySelector('[data-quick-add]');
-  if (btn && btn.getAttribute('data-need-options') === '1') {
-    window.location.href = '/product.html?id=' + productId;
-    return;
-  }
   try {
     await callApi('/cart/items', {
       method: 'POST',

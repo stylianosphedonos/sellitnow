@@ -102,7 +102,6 @@ class CartService {
     const cart = await this.getOrCreateCart(userId, sessionId);
     const product = await ProductService.getById(productId);
     if (product.status !== 'active') throw new Error('Product not available');
-    if (product.stock_quantity < quantity) throw new Error('Insufficient stock');
 
     const { color, size } = validateVariantForProduct(product, variant.color, variant.size);
 
@@ -113,7 +112,6 @@ class CartService {
 
     if (existing.rows.length) {
       const newQty = existing.rows[0].quantity + quantity;
-      if (product.stock_quantity < newQty) throw new Error('Insufficient stock');
       await pool.query(
         'UPDATE cart_items SET quantity = $1 WHERE cart_id = $2 AND product_id = $3 AND color = $4 AND size = $5',
         [newQty, cart.id, productId, color, size]
@@ -144,9 +142,6 @@ class CartService {
     if (quantity <= 0) {
       await pool.query('DELETE FROM cart_items WHERE id = $1', [itemId]);
     } else {
-      if (quantity > itemResult.rows[0].stock_quantity) {
-        throw new Error('Insufficient stock');
-      }
       await pool.query('UPDATE cart_items SET quantity = $1 WHERE id = $2', [quantity, itemId]);
     }
 
