@@ -8,6 +8,14 @@ const uploadDir = process.env.UPLOAD_DIR || path.join(storageRoot, 'uploads');
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
 const usePostgres = Boolean(databaseUrl);
 
+function parseBool(v, fallback = false) {
+  if (v == null) return fallback;
+  const s = String(v).trim().toLowerCase();
+  if (s === 'true' || s === '1' || s === 'yes') return true;
+  if (s === 'false' || s === '0' || s === 'no') return false;
+  return fallback;
+}
+
 module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
@@ -23,6 +31,12 @@ module.exports = {
     secret: process.env.JWT_SECRET || 'dev-secret-change-me',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     guestOrderTokenExpiresIn: process.env.GUEST_ORDER_TOKEN_EXPIRES_IN || '7d',
+  },
+  auth: {
+    cookieName: process.env.AUTH_COOKIE_NAME || 'sellitnow_auth',
+    csrfCookieName: process.env.CSRF_COOKIE_NAME || 'sellitnow_csrf',
+    cookieSecure: parseBool(process.env.AUTH_COOKIE_SECURE, process.env.NODE_ENV === 'production'),
+    cookieSameSite: process.env.AUTH_COOKIE_SAMESITE || 'lax',
   },
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY,

@@ -54,12 +54,14 @@ function applyBrandTheme(data, persist = false) {
 }
 
 function getToken() {
-  return localStorage.getItem('token');
+  const legacy = localStorage.getItem('token');
+  if (legacy) return legacy;
+  return getUser() ? 'cookie-session' : null;
 }
 
 function setToken(token) {
-  if (token) localStorage.setItem('token', token);
-  else localStorage.removeItem('token');
+  // Legacy compatibility: keep removal behavior but avoid persisting new JWTs in browser storage.
+  if (!token) localStorage.removeItem('token');
 }
 
 function getUser() {
@@ -90,13 +92,29 @@ function getCartSession() {
 async function callApi(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token && token !== 'cookie-session') headers['Authorization'] = `Bearer ${token}`;
+  const method = String(options.method || 'GET').toUpperCase();
+  const csrf = getCookie('sellitnow_csrf');
+  if (csrf && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    headers['X-CSRF-Token'] = csrf;
+  }
   headers['X-Cart-Session'] = getCartSession();
 
-  const res = await fetch(apiPrefix() + path, { ...options, headers });
+  const res = await fetch(apiPrefix() + path, { ...options, headers, credentials: 'include' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
+}
+
+function getCookie(name) {
+  const target = `${encodeURIComponent(name)}=`;
+  const bits = document.cookie ? document.cookie.split('; ') : [];
+  for (const bit of bits) {
+    if (bit.startsWith(target)) {
+      return decodeURIComponent(bit.slice(target.length));
+    }
+  }
+  return '';
 }
 
 function formatStoreMoney(amount, currencyCode) {
@@ -189,7 +207,10 @@ function updateNav() {
 function initLogout() {
   const btn = document.getElementById('logoutBtn');
   if (btn) {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
+      try {
+        await callApi('/auth/logout', { method: 'POST' });
+      } catch (_) {}
       setToken(null);
       setUser(null);
       window.location.href = '/';

@@ -75,6 +75,7 @@ The app listens on `PORT` automatically (provided by Render).
 | GET | /api/v1/auth/verify-email?token= | Verify email |
 | POST | /api/v1/auth/login | Login |
 | POST | /api/v1/auth/logout | Logout (Bearer token required) |
+| GET | /api/v1/auth/csrf | Get CSRF token cookie |
 | POST | /api/v1/auth/forgot-password | Request password reset |
 | POST | /api/v1/auth/reset-password | Reset password (body: token, password) |
 | GET | /api/v1/auth/me | Profile (auth required) |
@@ -117,13 +118,13 @@ Use `X-Cart-Session` header for guest carts (UUID).
 |--------|----------|-------------|
 | POST | /api/v1/orders | Create order (body: shipping_address, guest_email?) Returns `guest_order_token` for guest checkouts |
 | GET | /api/v1/orders | User orders (auth required) |
-| GET | /api/v1/orders/:id | Order details (auth user, or guest order + `guest_token` query param) |
+| GET | /api/v1/orders/:id | Order details (auth user, or guest order + `X-Guest-Order-Token` header) |
 
 ### Payments
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/v1/payments/process | Process payment (must belong to authenticated user, or guest order + guest_token) |
+| POST | /api/v1/payments/process | Process payment (must belong to authenticated user, or guest order + `X-Guest-Order-Token`) |
 | POST | /api/v1/payments/create-intent | Create PaymentIntent (same ownership rules as above) |
 | POST | /api/v1/payments/webhook | Stripe webhook |
 
@@ -145,6 +146,12 @@ Use `X-Cart-Session` header for guest carts (UUID).
 | POST | /api/v1/admin/customers/:id/reset-password | Reset password (body: new_password) |
 | POST | /api/v1/admin/users/:id/reset-password | Reset admin user password, including your own (body: new_password) |
 | PATCH | /api/v1/admin/users/:id/status | Enable/disable any other user (body: is_active: boolean) |
+
+## Auth & CSRF
+
+- Auth now uses an `HttpOnly` session cookie by default.
+- Browser clients must send `credentials: 'include'` on API requests.
+- For authenticated state-changing requests (`POST/PATCH/PUT/DELETE`), include `X-CSRF-Token` header with the value of `sellitnow_csrf` cookie.
 
 ## Cart Session
 

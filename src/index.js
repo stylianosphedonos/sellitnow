@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 const config = require('./config');
 
 const MediaBlobService = require('./services/MediaBlobService');
@@ -77,6 +78,37 @@ app.post(
 // JSON body parser (for all other routes)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use((req, res, next) => {
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    if (
+      config.env !== 'development' &&
+      res.statusCode >= 500 &&
+      body &&
+      typeof body === 'object' &&
+      typeof body.error === 'string'
+    ) {
+      return originalJson({ ...body, error: 'Internal server error' });
+    }
+    return originalJson(body);
+  };
+  next();
+});
+app.use((req, res, next) => {
+  const m = req.method;
+  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return next();
+  if (!req.path.startsWith('/api/v1/')) return next();
+  if (req.path === '/api/v1/payments/webhook') return next();
+  const authCookie = req.cookies?.[config.auth.cookieName];
+  if (!authCookie) return next();
+  const csrfCookie = req.cookies?.[config.auth.csrfCookieName];
+  const csrfHeader = req.headers['x-csrf-token'];
+  if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+    return res.status(403).json({ error: 'Invalid CSRF token' });
+  }
+  return next();
+});
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -134,13 +166,14 @@ paymentsRouter.use(paymentLimiter);
 paymentsRouter.post('/process', async (req, res) => {
   try {
     const { order_id, order_number, payment_method_id, guest_token } = req.body;
+    const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
     const orderRef = order_id ?? order_number;
     if (!orderRef || !payment_method_id) {
       return res.status(400).json({ error: 'order_id/order_number and payment_method_id required' });
     }
     const result = await PaymentService.processPayment(orderRef, payment_method_id, {
       userId: req.user?.id || null,
-      guestToken: guest_token || null,
+      guestToken: guestHeaderToken || guest_token || null,
     });
     res.json(result);
   } catch (err) {
@@ -150,11 +183,12 @@ paymentsRouter.post('/process', async (req, res) => {
 paymentsRouter.post('/create-intent', async (req, res) => {
   try {
     const { order_id, order_number, guest_token } = req.body;
+    const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
     const orderRef = order_id ?? order_number;
     if (!orderRef) return res.status(400).json({ error: 'order_id or order_number required' });
     const result = await PaymentService.createPaymentIntent(orderRef, {
       userId: req.user?.id || null,
-      guestToken: guest_token || null,
+      guestToken: guestHeaderToken || guest_token || null,
     });
     res.json(result);
   } catch (err) {

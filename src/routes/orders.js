@@ -56,7 +56,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid order id' });
     }
     const userId = req.user?.id || null;
-    const guestToken = typeof req.query.guest_token === 'string' ? req.query.guest_token : null;
+    const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
+    const guestQueryToken = typeof req.query.guest_token === 'string' ? req.query.guest_token : null;
+    const guestToken = guestHeaderToken || guestQueryToken;
 
     const order = await OrderService.getOrderById(orderId, userId, guestToken);
     res.json({ order });

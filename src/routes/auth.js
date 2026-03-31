@@ -1,5 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
+const config = require('../config');
 const AuthService = require('../services/AuthService');
 const AddressService = require('../services/AddressService');
 const CartService = require('../services/CartService');
@@ -13,11 +15,42 @@ const authLimiter = rateLimit({
   message: { error: 'Too many attempts, try again later' },
 });
 
+function authCookieOptions() {
+  const sameSiteRaw = String(config.auth.cookieSameSite || 'lax').toLowerCase();
+  const sameSite = sameSiteRaw === 'none' ? 'none' : sameSiteRaw === 'strict' ? 'strict' : 'lax';
+  return {
+    httpOnly: true,
+    secure: Boolean(config.auth.cookieSecure),
+    sameSite,
+    path: '/',
+  };
+}
+
+function csrfCookieOptions() {
+  return {
+    ...authCookieOptions(),
+    httpOnly: false,
+  };
+}
+
+function issueSessionCookies(res, token) {
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  res.cookie(config.auth.cookieName, token, authCookieOptions());
+  res.cookie(config.auth.csrfCookieName, csrfToken, csrfCookieOptions());
+  return csrfToken;
+}
+
+function clearSessionCookies(res) {
+  res.clearCookie(config.auth.cookieName, { path: '/' });
+  res.clearCookie(config.auth.csrfCookieName, { path: '/' });
+}
+
 // POST /api/v1/auth/register
 router.post('/register', authLimiter, async (req, res) => {
   try {
     const { email, password, first_name, last_name, phone } = req.body;
     const result = await AuthService.register({ email, password, first_name, last_name, phone });
+    issueSessionCookies(res, result.token);
     res.status(201).json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -43,6 +76,7 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
     const result = await AuthService.login(email, password);
+    issueSessionCookies(res, result.token);
 
     const sessionId = req.headers['x-cart-session'];
     if (sessionId) {
@@ -61,7 +95,14 @@ router.post('/login', authLimiter, async (req, res) => {
 
 // POST /api/v1/auth/logout (client clears token; optional server-side)
 router.post('/logout', authenticate, (req, res) => {
+  clearSessionCookies(res);
   res.json({ success: true });
+});
+
+router.get('/csrf', (req, res) => {
+  const csrfToken = req.cookies?.[config.auth.csrfCookieName] || crypto.randomBytes(32).toString('hex');
+  res.cookie(config.auth.csrfCookieName, csrfToken, csrfCookieOptions());
+  res.json({ csrfToken });
 });
 
 // POST /api/v1/auth/forgot-password

@@ -165,11 +165,13 @@
         if (!publishableKey) throw new Error('Payment is not configured');
 
         const intentPayload = { order_id: createdOrder.id };
+        const intentHeaders = {};
         if (createdOrder.guest_order_token) {
-          intentPayload.guest_token = createdOrder.guest_order_token;
+          intentHeaders['X-Guest-Order-Token'] = createdOrder.guest_order_token;
         }
         const intentRes = await callApi('/payments/create-intent', {
           method: 'POST',
+          headers: intentHeaders,
           body: JSON.stringify(intentPayload),
         });
         const clientSecret = intentRes.client_secret;
@@ -195,9 +197,6 @@
             createdOrder.id +
             '&number=' +
             encodeURIComponent(createdOrder.order_number);
-          if (createdOrder.guest_order_token) {
-            returnUrl += '&guest_token=' + encodeURIComponent(createdOrder.guest_order_token);
-          }
           const { error } = await stripe.confirmPayment({
             elements,
             clientSecret,

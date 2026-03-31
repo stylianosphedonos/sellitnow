@@ -77,6 +77,7 @@ if (config.database.usePostgres) {
   const { Pool } = require('pg');
   const url = config.database.url;
   const sslFromEnv = process.env.DATABASE_SSL;
+  const insecureTls = process.env.DATABASE_SSL_INSECURE === 'true';
   const useSsl =
     sslFromEnv === 'true' ||
     (sslFromEnv !== 'false' &&
@@ -84,12 +85,13 @@ if (config.database.usePostgres) {
       (url.includes('sslmode=require') ||
         url.includes('render.com') ||
         url.includes('amazonaws.com')));
+  const rejectUnauthorized = config.env === 'development' ? !insecureTls : true;
   pgPool = new Pool({
     connectionString: url,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
-    ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    ...(useSsl ? { ssl: { rejectUnauthorized } } : {}),
   });
 }
 
