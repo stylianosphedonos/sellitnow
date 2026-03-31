@@ -43,6 +43,26 @@ function defaultTaxPercentFromConfig() {
   return Math.round(v * 10000) / 100;
 }
 
+/** Loose validation for nodemailer "from" (email or "Name <email>") */
+function normalizeEmailFromInput(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const angle = s.match(/^(.+)<([^>]+)>$/);
+  const addrPart = angle ? angle[2].trim() : s;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addrPart)) {
+    throw new Error('Sender email must be a valid address (e.g. orders@yourstore.com or Shop <orders@yourstore.com>)');
+  }
+  return s;
+}
+
+/** Resolved From: admin-configured sender, else EMAIL_FROM env. */
+async function getOutboundEmailFrom() {
+  const s = await getBrandSettings();
+  if (s.emailFrom && String(s.emailFrom).trim()) return String(s.emailFrom).trim();
+  return config.email.from;
+}
+
 async function getBrandSettings() {
   const result = await pool.query('SELECT key, value FROM brand_settings');
   const stored = rowToObj(result.rows);
@@ -59,6 +79,15 @@ async function getBrandSettings() {
       ? String(stored.heroSubtitle)
       : DEFAULTS.heroSubtitle;
 
+  let emailFrom = null;
+  try {
+    if (stored.emailFrom != null && String(stored.emailFrom).trim() !== '') {
+      emailFrom = normalizeEmailFromInput(String(stored.emailFrom));
+    }
+  } catch {
+    emailFrom = null;
+  }
+
   return {
     primary: stored.primary || DEFAULTS.primary,
     primaryDark: stored.primaryDark || DEFAULTS.primaryDark,
@@ -70,6 +99,7 @@ async function getBrandSettings() {
     taxRatePercent,
     heroTitle,
     heroSubtitle,
+    emailFrom,
   };
 }
 
@@ -77,7 +107,8 @@ async function getBrandSettings() {
 router.get('/', async (req, res) => {
   try {
     const settings = await getBrandSettings();
-    res.json(settings);
+    const { emailFrom: _private, ...publicSettings } = settings;
+    res.json(publicSettings);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -85,5 +116,7 @@ router.get('/', async (req, res) => {
 
 module.exports = router;
 module.exports.getBrandSettings = getBrandSettings;
+module.exports.getOutboundEmailFrom = getOutboundEmailFrom;
+module.exports.normalizeEmailFromInput = normalizeEmailFromInput;
 module.exports.DEFAULTS = DEFAULTS;
 module.exports.normalizeCurrency = normalizeCurrency;

@@ -9,7 +9,7 @@ const { pool } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { uploadProductImages, uploadBanner, uploadLogo, uploadCategoryImage } = require('../middleware/upload');
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
-const { getBrandSettings, normalizeCurrency } = require('./brand');
+const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
 const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
 
@@ -336,8 +336,19 @@ router.get('/brand', async (req, res) => {
 
 router.put('/brand', async (req, res) => {
   try {
-    const { primary, primaryDark, secondary, accent, banner, logo, currency, taxRatePercent, heroTitle, heroSubtitle } =
-      req.body;
+    const {
+      primary,
+      primaryDark,
+      secondary,
+      accent,
+      banner,
+      logo,
+      currency,
+      taxRatePercent,
+      heroTitle,
+      heroSubtitle,
+      emailFrom,
+    } = req.body;
     const updates = [
       primary != null && { key: 'primary', value: String(primary) },
       primaryDark != null && { key: 'primaryDark', value: String(primaryDark) },
@@ -360,6 +371,18 @@ router.put('/brand', async (req, res) => {
         return res.status(400).json({ error: 'Tax rate must be between 0 and 100 percent.' });
       }
       updates.push({ key: 'taxRatePercent', value: String(Math.round(t * 100) / 100) });
+    }
+
+    if (emailFrom !== undefined) {
+      if (emailFrom === null || String(emailFrom).trim() === '') {
+        await pool.query(`DELETE FROM brand_settings WHERE key = 'emailFrom'`);
+      } else {
+        const normalized = normalizeEmailFromInput(emailFrom);
+        await pool.query(
+          'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          ['emailFrom', normalized]
+        );
+      }
     }
 
     for (const u of updates) {

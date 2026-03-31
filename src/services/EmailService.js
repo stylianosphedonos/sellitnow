@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 const { pool } = require('../database/db');
-const { getBrandSettings } = require('../routes/brand');
+const { getBrandSettings, getOutboundEmailFrom } = require('../routes/brand');
 const { formatMoney } = require('../lib/formatMoney');
 
 function escapeHtml(s) {
@@ -33,14 +33,15 @@ class EmailService {
   }
 
   async send({ to, subject, html, text }) {
+    const from = await getOutboundEmailFrom();
     if (!this.transporter) {
-      console.log('[Email] (no SMTP configured) Would send:', { to, subject });
+      console.log('[Email] (no SMTP configured) Would send:', { from, to, subject });
       return { success: true };
     }
 
     try {
       await this.transporter.sendMail({
-        from: config.email.from,
+        from,
         to,
         subject,
         html: html || text,
@@ -158,7 +159,7 @@ class EmailService {
     );
     let recipients = adminResult.rows.map((r) => r.email).filter((e) => e && String(e).trim().includes('@'));
     if (!recipients.length) {
-      const fallback = parseFromAddress(config.email.from);
+      const fallback = parseFromAddress(await getOutboundEmailFrom());
       if (fallback) recipients = [fallback];
       else {
         console.log('[Email] No admin recipients for new order notification:', order.order_number);
