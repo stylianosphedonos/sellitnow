@@ -408,27 +408,46 @@ function renderProductCardMarkup(p) {
   `;
 }
 
+function bindLoadAllProductsFromCategorySection() {
+  const btn = document.getElementById('loadAllProductsBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const url = new URL(location.href);
+    url.searchParams.delete('category');
+    history.replaceState({}, '', url.pathname + url.search);
+    loadProducts(1, null);
+  });
+}
+
 async function loadCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
+  const allProductsTile = `
+      <button type="button" class="category-card" id="loadAllProductsBtn" aria-label="Show all products">
+        <div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>
+        <span class="category-card__label">All products</span>
+      </button>`;
   try {
     const { categories } = await callApi('/categories');
-    grid.innerHTML = categories
-      .map((c) => {
-        const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
-        const media = imgUrl
-          ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
-          : `<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🛒</span></div>`;
-        return `
+    grid.innerHTML =
+      allProductsTile +
+      categories
+        .map((c) => {
+          const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
+          const media = imgUrl
+            ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
+            : `<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🛒</span></div>`;
+          return `
       <a href="/products.html?category=${c.id}" class="category-card">
         ${media}
         <span class="category-card__label">${escapeHtml(c.name)}</span>
       </a>`;
-      })
-      .join('');
+        })
+        .join('');
   } catch (err) {
-    grid.innerHTML = '<p>No categories</p>';
+    grid.innerHTML = allProductsTile + '<p>No categories</p>';
   }
+  bindLoadAllProductsFromCategorySection();
 }
 
 let currentProductSearch = '';
