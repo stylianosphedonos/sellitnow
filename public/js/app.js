@@ -89,14 +89,79 @@ function getCartSession() {
   return id;
 }
 
+let sellitnowCsrfMemory = null;
+let sellitnowCsrfFetchPromise = null;
+
+function sellitnowCsrfCookieName() {
+  if (typeof window !== 'undefined' && window.__SELLITNOW_CSRF_COOKIE__ != null) {
+    return String(window.__SELLITNOW_CSRF_COOKIE__);
+  }
+  return 'sellitnow_csrf';
+}
+
+function clearSellitnowCsrfCache() {
+  sellitnowCsrfMemory = null;
+  sellitnowCsrfFetchPromise = null;
+}
+
+/**
+ * CSRF cookie is readable from JS only when the page and API share the same site
+ * (typical single-origin deploy). If static assets and API are on different origins,
+ * the cookie is still sent on API requests but document.cookie cannot see it — use GET /auth/csrf.
+ */
+async function getCsrfTokenForMutations() {
+  const name = sellitnowCsrfCookieName();
+  const fromCookie = getCookie(name);
+  if (fromCookie) return fromCookie;
+  if (sellitnowCsrfMemory) return sellitnowCsrfMemory;
+  if (!sellitnowCsrfFetchPromise) {
+    sellitnowCsrfFetchPromise = fetch(apiPrefix() + '/auth/csrf', { credentials: 'include' })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        sellitnowCsrfFetchPromise = null;
+        const t = typeof data.csrfToken === 'string' ? data.csrfToken : '';
+        if (t) sellitnowCsrfMemory = t;
+        return t;
+      })
+      .catch(() => {
+        sellitnowCsrfFetchPromise = null;
+        return '';
+      });
+  }
+  return sellitnowCsrfFetchPromise;
+}
+
+function sellitnowAuthHeaderPair() {
+  const token = getToken();
+  if (token && token !== 'cookie-session') return { Authorization: `Bearer ${token}` };
+  return {};
+}
+
+/** Same-origin or cross-origin API calls with session cookie + optional Bearer. */
+function sellitnowFetchWithAuth(url, options = {}) {
+  const headers = { ...sellitnowAuthHeaderPair(), ...(options.headers || {}) };
+  return fetch(url, { ...options, headers, credentials: 'include' });
+}
+
+/** Mutating requests (e.g. multipart) — includes CSRF when the session uses the auth cookie. */
+async function sellitnowFetchWithCsrf(url, options = {}) {
+  const method = String(options.method || 'GET').toUpperCase();
+  const headers = { ...sellitnowAuthHeaderPair(), ...(options.headers || {}) };
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrf = await getCsrfTokenForMutations();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
+  return fetch(url, { ...options, headers, credentials: 'include' });
+}
+
 async function callApi(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   const token = getToken();
   if (token && token !== 'cookie-session') headers['Authorization'] = `Bearer ${token}`;
   const method = String(options.method || 'GET').toUpperCase();
-  const csrf = getCookie('sellitnow_csrf');
-  if (csrf && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    headers['X-CSRF-Token'] = csrf;
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrf = await getCsrfTokenForMutations();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
   }
   headers['X-Cart-Session'] = getCartSession();
 
@@ -211,6 +276,7 @@ function initLogout() {
       try {
         await callApi('/auth/logout', { method: 'POST' });
       } catch (_) {}
+      clearSellitnowCsrfCache();
       setToken(null);
       setUser(null);
       window.location.href = '/';

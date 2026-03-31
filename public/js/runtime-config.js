@@ -9,6 +9,9 @@
  *
  * If the API lives on another origin, optional explicit origin for /uploads and other paths:
  *   window.__SELLITNOW_BACKEND_ORIGIN__ = 'https://your-api.example.com';
+ *
+ * If you set CSRF_COOKIE_NAME on the server, set the same name here so the client can read it when same-origin:
+ *   window.__SELLITNOW_CSRF_COOKIE__ = 'your_cookie_name';
  */
 (function (g) {
   function getApiBase() {

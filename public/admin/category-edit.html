@@ -152,9 +152,8 @@
         if (fileInput && fileInput.files && fileInput.files.length > 0) {
           const formData = new FormData();
           formData.append('image', fileInput.files[0]);
-          const imgRes = await fetch(sellitnowApiUrl('/admin/categories/' + categoryId + '/image'), {
+          const imgRes = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/categories/' + categoryId + '/image'), {
             method: 'POST',
-            headers: { Authorization: 'Bearer ' + getToken() },
             body: formData
           });
           const imgData = await imgRes.json().catch(() => ({}));

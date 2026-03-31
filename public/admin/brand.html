@@ -241,9 +241,8 @@
       try {
         const formData = new FormData();
         formData.append('banner', bannerFile.files[0]);
-        const res = await fetch(sellitnowApiUrl('/admin/brand/banner'), {
+        const res = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/brand/banner'), {
           method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + getToken() },
           body: formData
         });
         const data = await res.json().catch(() => ({}));
@@ -284,9 +283,8 @@
       try {
         const formData = new FormData();
         formData.append('logo', logoFile.files[0]);
-        const res = await fetch(sellitnowApiUrl('/admin/brand/logo'), {
+        const res = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/brand/logo'), {
           method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + getToken() },
           body: formData
         });
         const data = await res.json().catch(() => ({}));

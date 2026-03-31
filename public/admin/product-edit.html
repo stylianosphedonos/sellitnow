@@ -254,9 +254,8 @@
           for (let i = 0; i < fileInput.files.length; i++) {
             formData.append('images', fileInput.files[i]);
           }
-          const imgRes = await fetch(sellitnowApiUrl('/admin/products/' + id + '/images'), {
+          const imgRes = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/products/' + id + '/images'), {
             method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + getToken() },
             body: formData
           });
           const imgData = await imgRes.json().catch(() => ({}));

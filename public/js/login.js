@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         body: JSON.stringify(data),
       });
+      clearSellitnowCsrfCache();
       setToken(res.token);
       setUser(res.user);
       const redirect = new URLSearchParams(location.search).get('redirect');
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST',
         body: JSON.stringify(data),
       });
+      clearSellitnowCsrfCache();
       setToken(res.token);
       setUser(res.user);
       const redirect = new URLSearchParams(location.search).get('redirect');

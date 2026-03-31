@@ -82,7 +82,7 @@
     }
 
     async function downloadInvoice() {
-      const res = await fetch(sellitnowApiUrl('/admin/orders/' + id + '/invoice'), { headers: { 'Authorization': 'Bearer ' + getToken() } });
+      const res = await sellitnowFetchWithAuth(sellitnowApiUrl('/admin/orders/' + id + '/invoice'));
       const blob = await res.blob();
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
