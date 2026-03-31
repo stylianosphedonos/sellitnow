@@ -119,6 +119,17 @@ router.post('/products/:id/images', uploadProductImages, async (req, res) => {
   }
 });
 
+router.delete('/products/:id/images/:imageId', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const imageId = parseInt(req.params.imageId, 10);
+    const product = await ProductService.removeImage(id, imageId);
+    res.json({ product });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.delete('/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

@@ -181,6 +181,33 @@ class ProductService {
     return this.getById(id);
   }
 
+  async removeImage(productId, imageId) {
+    await this.getById(productId);
+
+    const parsedImageId = Number(imageId);
+    if (!Number.isInteger(parsedImageId)) {
+      throw new Error('Invalid image id');
+    }
+
+    const deleted = await pool.query(
+      'DELETE FROM product_images WHERE id = $1 AND product_id = $2 RETURNING id',
+      [parsedImageId, productId]
+    );
+    if (!deleted.rows.length) {
+      throw new Error('Image not found');
+    }
+
+    const remaining = await pool.query(
+      'SELECT id FROM product_images WHERE product_id = $1 ORDER BY display_order, id',
+      [productId]
+    );
+    for (let i = 0; i < remaining.rows.length; i++) {
+      await pool.query('UPDATE product_images SET display_order = $1 WHERE id = $2', [i, remaining.rows[i].id]);
+    }
+
+    return this.getById(productId);
+  }
+
   async delete(id) {
     const result = await pool.query('DELETE FROM products WHERE id = $1 RETURNING id', [id]);
     if (!result.rows.length) throw new Error('Product not found');

@@ -37,6 +37,7 @@
     let categories = [];
     let editColors = [];
     let editSizes = [];
+    let removingImageIds = new Set();
 
     async function loadCategories() {
       try {
@@ -121,6 +122,14 @@
               ${(product.images || []).map(img => `
                 <div style="position:relative">
                   <img src="${img.image_url}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #eee">
+                  <button
+                    type="button"
+                    class="btn btn-secondary remove-image-btn"
+                    data-image-id="${img.id}"
+                    style="position:absolute;bottom:4px;left:4px;right:4px;padding:4px 6px;font-size:12px"
+                  >
+                    Remove
+                  </button>
                 </div>
               `).join('')}
               ${!(product.images && product.images.length) ? '<span style="color:#999">No images yet</span>' : ''}
@@ -179,6 +188,31 @@
         document.getElementById('inputEditSize').value = '';
         paintVariantChips();
       });
+
+      form.addEventListener('click', async (e) => {
+        const removeBtn = e.target.closest('.remove-image-btn');
+        if (!removeBtn) return;
+
+        const imageId = parseInt(removeBtn.dataset.imageId, 10);
+        if (!Number.isInteger(imageId) || removingImageIds.has(imageId)) return;
+        if (!confirm('Remove this image from the product?')) return;
+
+        try {
+          removingImageIds.add(imageId);
+          removeBtn.disabled = true;
+          removeBtn.textContent = 'Removing...';
+          await removeProductImage(imageId);
+          renderForm();
+        } catch (err) {
+          const errEl = document.getElementById('error');
+          errEl.textContent = err.message || 'Failed to remove image';
+          errEl.style.display = 'block';
+          removeBtn.disabled = false;
+          removeBtn.textContent = 'Remove';
+        } finally {
+          removingImageIds.delete(imageId);
+        }
+      });
     }
 
     function escapeHtml(str) {
@@ -236,6 +270,14 @@
         submitBtn.disabled = false;
         submitBtn.textContent = 'Save Changes';
       }
+    }
+
+    async function removeProductImage(imageId) {
+      const data = await callApi('/admin/products/' + id + '/images/' + imageId, {
+        method: 'DELETE'
+      });
+      product = data.product;
+      return data.product;
     }
 
     (async () => {
