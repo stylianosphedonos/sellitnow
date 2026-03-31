@@ -12,6 +12,7 @@ const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
 const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
+const { createFullBackup, restoreFullBackup } = require('../services/DatabaseBackupService');
 
 const router = express.Router();
 
@@ -428,6 +429,29 @@ router.post('/brand/logo', uploadLogo, async (req, res) => {
     );
     const settings = await getBrandSettings();
     res.json(settings);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Full database backup/restore (admin-only)
+router.get('/database/backup', async (req, res) => {
+  try {
+    const backup = await createFullBackup();
+    const safeTs = String(backup?.createdAt || Date.now()).replace(/[:.]/g, '-');
+    res.setHeader('Content-Disposition', `attachment; filename="sellitnow-db-backup-${safeTs}.json"`);
+    res.json(backup);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/database/restore', async (req, res) => {
+  try {
+    const { backup } = req.body || {};
+    if (!backup) return res.status(400).json({ error: 'Missing backup payload' });
+    const result = await restoreFullBackup(backup);
+    res.json({ success: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

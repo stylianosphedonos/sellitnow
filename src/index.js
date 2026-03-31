@@ -78,7 +78,8 @@ app.post(
 );
 
 // JSON body parser (for all other routes)
-app.use(express.json());
+// Used by admin actions like database restore (potentially large payloads).
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use((req, res, next) => {
