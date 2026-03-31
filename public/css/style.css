@@ -710,6 +710,12 @@ section h2 {
   color: #060;
 }
 
+.alert-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
 /* —— Cart page & shared line items —— */
 .cart-page {
   max-width: 1120px;

@@ -241,6 +241,11 @@ function runSchemaMigrations(db) {
     db.exec('ALTER TABLE products ADD COLUMN options_json TEXT');
   }
 
+  const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
+  if (!orderCols.includes('stock_warning')) {
+    db.exec('ALTER TABLE orders ADD COLUMN stock_warning TEXT');
+  }
+
   const cartCols = db.prepare('PRAGMA table_info(cart_items)').all().map((c) => c.name);
   if (!cartCols.includes('color') || !cartCols.includes('size')) {
     db.exec(`CREATE TABLE cart_items_new (
@@ -267,6 +272,7 @@ async function ensureDb() {
     if (config.database.usePostgres) {
       const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.postgresql.sql'), 'utf8');
       await dbMod.execPostgresScript(dbMod.pool, schema);
+      await dbMod.pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
       console.log('Database ready (PostgreSQL)');
       return;
     }

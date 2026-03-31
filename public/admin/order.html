@@ -34,7 +34,12 @@
         const { order } = await callApi('/admin/orders/' + id);
         document.getElementById('orderNumber').textContent = order.order_number;
         const addr = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address;
+        const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const stockAlert = order.stock_warning
+          ? `<div class="alert alert-warning" style="margin-bottom:20px" role="status"><strong>Stock:</strong> ${esc(order.stock_warning)}</div>`
+          : '';
         document.getElementById('order').innerHTML = `
+          ${stockAlert}
           <div style="display:grid;gap:24px;grid-template-columns:1fr 1fr">
             <div style="background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
               <h3>Customer</h3>

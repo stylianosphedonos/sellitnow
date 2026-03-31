@@ -58,6 +58,7 @@
 
         <div id="stepPayment" class="checkout-card" style="display:none;max-width:640px">
           <h2 style="margin-top:0;font-size:18px">Payment</h2>
+          <div id="stockWarningBanner" class="alert alert-warning" style="display:none;margin-bottom:16px" role="status"></div>
           <div id="paymentOrderBanner"></div>
           <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete your card details below. Items and options are fixed for this order.</p>
           <form id="paymentForm">
@@ -135,10 +136,19 @@
           order_number: data.order.order_number,
           total_amount: data.order.total_amount,
           guest_order_token: data.guest_order_token || null,
+          stock_warning: data.order.stock_warning || null,
         };
 
         document.getElementById('stepShipping').style.display = 'none';
         document.getElementById('stepPayment').style.display = 'block';
+        const stockBanner = document.getElementById('stockWarningBanner');
+        if (createdOrder.stock_warning) {
+          stockBanner.textContent = createdOrder.stock_warning;
+          stockBanner.style.display = 'block';
+        } else {
+          stockBanner.textContent = '';
+          stockBanner.style.display = 'none';
+        }
         document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(
           createdOrder.order_number,
           createdOrder.total_amount

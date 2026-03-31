@@ -34,13 +34,19 @@ class OrderService {
     const email = userId ? null : guestEmail;
     if (!userId && !email) throw new Error('Email required for guest checkout');
 
-    // Validate stock before creating order
+    const stockIssueLines = [];
     for (const item of cartData.items) {
       const product = await ProductService.getById(item.product_id);
-      if (product.stock_quantity < item.quantity) {
-        throw new Error(`Insufficient stock for "${product.title}" (available: ${product.stock_quantity})`);
+      if (Number(product.stock_quantity) < Number(item.quantity)) {
+        stockIssueLines.push(
+          `"${product.title}": ordered ${item.quantity}, available ${product.stock_quantity}`
+        );
       }
     }
+    const stockWarning =
+      stockIssueLines.length > 0
+        ? `Stock was not available for all line items at checkout: ${stockIssueLines.join('; ')}.`
+        : null;
 
     let userEmail = null;
     if (userId) {
@@ -56,8 +62,8 @@ class OrderService {
     const orderNumber = this.generateOrderNumber();
 
     const orderResult = await pool.query(
-      `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status)
-       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, 'pending')
+      `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status, stock_warning)
+       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, 'pending', $9)
        RETURNING *`,
       [
         orderNumber,
@@ -68,6 +74,7 @@ class OrderService {
         shippingCost,
         totalAmount,
         JSON.stringify(shippingAddress),
+        stockWarning,
       ]
     );
     const order = orderResult.rows[0];

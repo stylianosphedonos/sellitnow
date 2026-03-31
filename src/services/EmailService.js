@@ -67,6 +67,13 @@ class EmailService {
     const email = order.guest_email || (order.user_email || '');
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
+    const stockNote =
+      order.stock_warning
+        ? `<p style="color:#b45309;background:#fffbeb;padding:12px;border-radius:6px;border:1px solid #fcd34d"><strong>Stock notice:</strong> ${String(order.stock_warning)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')}</p>`
+        : '';
     const itemsList = items
       .map((i) => {
         let snap = i.product_snapshot;
@@ -89,6 +96,7 @@ class EmailService {
         <h2>Order Confirmation</h2>
         <p>Order Number: <strong>${order.order_number}</strong></p>
         <p>Total: ${fmt(order.total_amount)}</p>
+        ${stockNote}
         <table border="1" cellpadding="8">
           <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>
           ${itemsList}
@@ -122,10 +130,16 @@ class EmailService {
 
   async sendAdminNewOrder(order) {
     const { currency } = await getBrandSettings();
+    const warn = order.stock_warning
+      ? `<p style="color:#b45309"><strong>Stock:</strong> ${String(order.stock_warning)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')}</p>`
+      : '';
     return this.send({
       to: config.email.from,
       subject: `New order #${order.order_number}`,
-      html: `<p>New order received: <strong>#${order.order_number}</strong>. Total: ${formatMoney(order.total_amount, currency)}</p>`,
+      html: `<p>New order received: <strong>#${order.order_number}</strong>. Total: ${formatMoney(order.total_amount, currency)}</p>${warn}`,
     });
   }
 }

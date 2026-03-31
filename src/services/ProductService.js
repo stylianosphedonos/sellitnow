@@ -236,8 +236,8 @@ class ProductService {
 
   async decrementStock(productId, quantity) {
     const result = await pool.query(
-      'UPDATE products SET stock_quantity = stock_quantity - $2 WHERE id = $1 AND stock_quantity >= $3 RETURNING id',
-      [productId, quantity, quantity]
+      'UPDATE products SET stock_quantity = stock_quantity - $2 WHERE id = $1 RETURNING id',
+      [productId, quantity]
     );
     return result.rows.length > 0;
   }

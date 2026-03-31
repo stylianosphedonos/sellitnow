@@ -235,9 +235,12 @@ router.get('/orders/:id/invoice', async (req, res) => {
     doc.fontSize(12).text(`Date: ${new Date(order.created_at).toLocaleDateString()}`, 50, 80);
     doc.text(`Status: ${order.status}`, 50, 95);
     doc.text(`Total: ${fmt(order.total_amount)}`, 50, 110);
-
-    doc.moveDown(2);
-    doc.text('Items:', 50, doc.y);
+    if (order.stock_warning) {
+      doc.fillColor('#b45309');
+      doc.text(`Stock notice: ${order.stock_warning}`, 50, doc.y + 8, { width: 500 });
+      doc.fillColor('black');
+    }
+    doc.text('Items:', 50, doc.y + 14);
     doc.moveDown(0.5);
 
     let y = doc.y;
