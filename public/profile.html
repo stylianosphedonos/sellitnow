@@ -65,11 +65,12 @@
         document.getElementById('orders').innerHTML = `
           <div class="table">
             <table style="width:100%;border-collapse:collapse">
-              <tr><th>Order #</th><th>Status</th><th>Total</th><th>Date</th></tr>
+              <tr><th>Order #</th><th>Status</th><th>Payment</th><th>Total</th><th>Date</th></tr>
               ${items.map(o => `
                 <tr>
                   <td>${o.order_number}</td>
                   <td>${o.status}</td>
+                  <td>${o.payment_method === 'pay_on_delivery' ? 'On delivery (' + o.payment_status + ')' : o.payment_status}</td>
                   <td>${formatStoreMoney(o.total_amount)}</td>
                   <td>${new Date(o.created_at).toLocaleDateString()}</td>
                 </tr>

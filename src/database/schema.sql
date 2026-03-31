@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS orders (
   total_amount REAL NOT NULL,
   shipping_address TEXT NOT NULL,
   payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded')),
+  payment_method TEXT DEFAULT 'card' CHECK (payment_method IN ('card', 'pay_on_delivery')),
   tracking_number TEXT,
   stock_warning TEXT,
   created_at TEXT DEFAULT (datetime('now')),

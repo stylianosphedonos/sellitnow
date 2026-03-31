@@ -26,10 +26,13 @@ class OrderService {
 
   /**
    * Create order from cart
+   * @param {'card'|'pay_on_delivery'} paymentMethod
    */
-  async createOrder(userId, guestEmail, shippingAddress, cartId, sessionId) {
+  async createOrder(userId, guestEmail, shippingAddress, cartId, sessionId, paymentMethod = 'card') {
     const cartData = await CartService.getCart(userId, sessionId);
     if (cartData.items.length === 0) throw new Error('Cart is empty');
+
+    const pm = paymentMethod === 'pay_on_delivery' ? 'pay_on_delivery' : 'card';
 
     const email = userId ? null : guestEmail;
     if (!userId && !email) throw new Error('Email required for guest checkout');
@@ -62,8 +65,8 @@ class OrderService {
     const orderNumber = this.generateOrderNumber();
 
     const orderResult = await pool.query(
-      `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status, stock_warning)
-       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, 'pending', $9)
+      `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status, payment_method, stock_warning)
+       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, 'pending', $9, $10)
        RETURNING *`,
       [
         orderNumber,
@@ -74,6 +77,7 @@ class OrderService {
         shippingCost,
         totalAmount,
         JSON.stringify(shippingAddress),
+        pm,
         stockWarning,
       ]
     );
@@ -105,7 +109,16 @@ class OrderService {
 
     await CartService.clearCart(cartData.cart_id);
 
-    // Stock is decremented only when payment succeeds (PaymentService.handlePaymentSuccess)
+    if (pm === 'pay_on_delivery') {
+      for (const item of cartData.items) {
+        await ProductService.decrementStock(item.product_id, item.quantity);
+      }
+      const upd = await pool.query(
+        `UPDATE orders SET status = 'processing', updated_at = NOW() WHERE id = $1 RETURNING *`,
+        [order.id]
+      );
+      Object.assign(order, upd.rows[0]);
+    }
 
     const items = await pool.query(
       'SELECT * FROM order_items WHERE order_id = $1',
@@ -134,10 +147,10 @@ class OrderService {
     const total = countResult.rows[0].count;
 
     const result = await pool.query(
-      `SELECT id, order_number, status, total_amount, payment_status, created_at
+      `SELECT id, order_number, status, total_amount, payment_status, payment_method, created_at
        FROM orders WHERE user_id = $1
        ORDER BY created_at DESC
-       LIMIT $1 OFFSET $2`,
+       LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
     );
 
@@ -264,17 +277,17 @@ class OrderService {
     try {
       await client.query('BEGIN');
       const currentResult = await client.query(
-        'SELECT id, status, payment_status FROM orders WHERE id = $1 FOR UPDATE',
+        'SELECT id, status, payment_status, payment_method FROM orders WHERE id = $1 FOR UPDATE',
         [orderId]
       );
       if (!currentResult.rows.length) throw new Error('Order not found');
       const currentOrder = currentResult.rows[0];
 
-      const shouldReleaseStock = (
-        status === 'cancelled'
-        && currentOrder.status !== 'cancelled'
-        && ['paid', 'refunded'].includes(currentOrder.payment_status)
-      );
+      const inventoryReserved =
+        ['paid', 'refunded'].includes(currentOrder.payment_status)
+        || currentOrder.payment_method === 'pay_on_delivery';
+      const shouldReleaseStock =
+        status === 'cancelled' && currentOrder.status !== 'cancelled' && inventoryReserved;
       if (shouldReleaseStock) {
         await this.releaseOrderItemsToStock(client, orderId);
       }

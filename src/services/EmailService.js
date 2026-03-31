@@ -74,6 +74,10 @@ class EmailService {
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')}</p>`
         : '';
+    const payOnDeliveryNote =
+      order.payment_method === 'pay_on_delivery'
+        ? '<p><strong>Payment:</strong> Pay on delivery — please have the exact amount or agreed payment method ready when your order arrives.</p>'
+        : '';
     const itemsList = items
       .map((i) => {
         let snap = i.product_snapshot;
@@ -96,6 +100,7 @@ class EmailService {
         <h2>Order Confirmation</h2>
         <p>Order Number: <strong>${order.order_number}</strong></p>
         <p>Total: ${fmt(order.total_amount)}</p>
+        ${payOnDeliveryNote}
         ${stockNote}
         <table border="1" cellpadding="8">
           <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>

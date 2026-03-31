@@ -62,6 +62,7 @@
             }).join('')}
           </table>
           <p style="font-size:18px;font-weight:700;margin-top:16px">Total: ${formatStoreMoney(order.total_amount)}</p>
+          <p style="margin-top:8px;color:#444"><strong>Payment:</strong> ${order.payment_method === 'pay_on_delivery' ? 'Pay on delivery' : 'Card'} · <strong>Status:</strong> ${order.payment_status}</p>
           <h3 style="margin-top:24px">Update Status</h3>
           <form id="statusForm" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <select name="status"><option value="pending" ${order.status==='pending'?'selected':''}>Pending</option><option value="processing" ${order.status==='processing'?'selected':''}>Processing</option><option value="shipped" ${order.status==='shipped'?'selected':''}>Shipped</option><option value="delivered" ${order.status==='delivered'?'selected':''}>Delivered</option><option value="cancelled" ${order.status==='cancelled'?'selected':''}>Cancelled</option></select>

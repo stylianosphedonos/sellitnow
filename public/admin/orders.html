@@ -48,7 +48,7 @@
                 <td>${o.guest_email || o.user_email || '-'}</td>
                 <td>${formatStoreMoney(o.total_amount)}</td>
                 <td>${o.status}</td>
-                <td>${o.payment_status}</td>
+                <td>${o.payment_method === 'pay_on_delivery' ? 'On delivery' : 'Card'} · ${o.payment_status}</td>
                 <td>${new Date(o.created_at).toLocaleDateString()}</td>
                 <td><a href="/admin/order.html?id=${o.id}" style="color:var(--primary)">View</a></td>
               </tr>

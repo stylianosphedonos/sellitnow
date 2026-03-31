@@ -15,7 +15,7 @@ function getCartContext(req) {
 router.post('/', optionalAuth, async (req, res) => {
   try {
     const { userId, sessionId } = getCartContext(req);
-    const { guest_email, shipping_address } = req.body;
+    const { guest_email, shipping_address, payment_method } = req.body;
 
     if (!shipping_address) {
       return res.status(400).json({ error: 'Shipping address is required' });
@@ -27,7 +27,8 @@ router.post('/', optionalAuth, async (req, res) => {
       guest_email,
       shipping_address,
       cart.cart_id,
-      sessionId
+      sessionId,
+      payment_method
     );
 
     res.status(201).json({ order, items, guest_order_token });

@@ -53,6 +53,7 @@ class PaymentService {
     if (!order) throw new Error('Order not found');
     this.assertOrderAccess(order, actor);
     if (order.payment_status === 'paid') throw new Error('Order already paid');
+    if (order.payment_method === 'pay_on_delivery') throw new Error('This order is pay on delivery');
 
     const amountInCents = Math.round(parseFloat(order.total_amount) * 100);
     if (amountInCents < 50) throw new Error('Amount too small');
@@ -125,6 +126,7 @@ class PaymentService {
     if (!order) throw new Error('Order not found');
     this.assertOrderAccess(order, actor);
     if (order.payment_status === 'paid') throw new Error('Order already paid');
+    if (order.payment_method === 'pay_on_delivery') throw new Error('This order is pay on delivery');
 
     const amountInCents = Math.round(parseFloat(order.total_amount) * 100);
     if (amountInCents < 50) throw new Error('Amount too small');

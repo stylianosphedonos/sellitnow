@@ -21,6 +21,7 @@
     <div style="max-width:500px;margin:60px auto;background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
       <h1 style="color:var(--primary);margin-bottom:16px">Order Confirmed!</h1>
       <p id="orderNumber" style="font-size:18px;font-weight:600;margin-bottom:24px"></p>
+      <p id="podPaymentNote" style="display:none;color:#666;margin-bottom:16px;font-size:15px">You chose <strong>pay on delivery</strong>. Please have payment ready when your order arrives.</p>
       <p style="color:#666">Thank you for your order. You will receive a confirmation email shortly.</p>
       <a href="/" class="btn" style="display:inline-block;margin-top:24px;text-decoration:none">Continue Shopping</a>
     </div>
@@ -37,6 +38,9 @@
       document.querySelector('.btn').textContent = 'Back to cart';
     } else {
       document.getElementById('orderNumber').textContent = 'Order #' + (params.get('number') || params.get('id') || '');
+      if (params.get('payment') === 'delivery') {
+        document.getElementById('podPaymentNote').style.display = 'block';
+      }
     }
   </script>
 </body>
