@@ -248,6 +248,9 @@ function runSchemaMigrations(db) {
   if (!orderCols.includes('stock_warning')) {
     db.exec('ALTER TABLE orders ADD COLUMN stock_warning TEXT');
   }
+  if (!orderCols.includes('payment_method')) {
+    db.exec("ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT 'card'");
+  }
 
   const cartCols = db.prepare('PRAGMA table_info(cart_items)').all().map((c) => c.name);
   if (!cartCols.includes('color') || !cartCols.includes('size')) {
@@ -276,6 +279,9 @@ async function ensureDb() {
       const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.postgresql.sql'), 'utf8');
       await dbMod.execPostgresScript(dbMod.pool, schema);
       await dbMod.pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
+      await dbMod.pool.query(
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'card'`
+      );
       console.log('Database ready (PostgreSQL)');
       return;
     }
