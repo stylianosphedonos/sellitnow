@@ -174,6 +174,16 @@ router.post('/categories/:id/image', uploadCategoryImage, async (req, res) => {
   }
 });
 
+router.delete('/categories/:id/image', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const category = await CategoryService.update(id, { image_url: null });
+    res.json({ category });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Orders
 router.get('/orders', async (req, res) => {
   try {

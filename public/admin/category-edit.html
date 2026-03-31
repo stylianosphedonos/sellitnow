@@ -36,6 +36,7 @@
     if (!Number.isFinite(categoryId) || categoryId < 1) window.location.href = '/admin/categories.html';
 
     let category;
+    let removingCategoryImage = false;
 
     async function loadCategory() {
       try {
@@ -66,7 +67,18 @@
           <div class="form-group">
             <label>Current image</label>
             <div id="categoryCurrentImage" style="margin-bottom:12px">
-              ${category.image_url ? `<img src="${escapeHtml(category.image_url)}" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #eee">` : '<span style="color:#999">No image yet</span>'}
+              ${category.image_url
+                ? `<div style="position:relative;display:inline-block">
+                    <img src="${escapeHtml(category.image_url)}" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #eee">
+                    <button
+                      type="button"
+                      class="btn btn-secondary remove-category-image-btn"
+                      style="position:absolute;bottom:4px;left:4px;right:4px;padding:4px 6px;font-size:12px"
+                    >
+                      Remove
+                    </button>
+                  </div>`
+                : '<span style="color:#999">No image yet</span>'}
             </div>
           </div>
           <div class="form-group">
@@ -80,7 +92,31 @@
           </div>
         </form>
       `;
-      document.getElementById('editForm').addEventListener('submit', handleSubmit);
+      const form = document.getElementById('editForm');
+      form.addEventListener('submit', handleSubmit);
+      form.addEventListener('click', async (e) => {
+        const removeBtn = e.target.closest('.remove-category-image-btn');
+        if (!removeBtn) return;
+        if (removingCategoryImage) return;
+        if (!confirm('Remove this category image?')) return;
+        const errEl = document.getElementById('error');
+        errEl.style.display = 'none';
+        try {
+          removingCategoryImage = true;
+          removeBtn.disabled = true;
+          removeBtn.textContent = 'Removing...';
+          const data = await callApi('/admin/categories/' + categoryId + '/image', { method: 'DELETE' });
+          category = data.category;
+          renderForm();
+        } catch (err) {
+          errEl.textContent = err.message || 'Failed to remove image';
+          errEl.style.display = 'block';
+          removeBtn.disabled = false;
+          removeBtn.textContent = 'Remove';
+        } finally {
+          removingCategoryImage = false;
+        }
+      });
     }
 
     function escapeHtml(str) {
