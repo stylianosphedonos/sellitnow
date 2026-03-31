@@ -37,6 +37,14 @@ class OrderService {
     const email = userId ? null : guestEmail;
     if (!userId && !email) throw new Error('Email required for guest checkout');
 
+    if (pm === 'pay_on_delivery') {
+      const phone =
+        shippingAddress && typeof shippingAddress.phone === 'string'
+          ? shippingAddress.phone.trim()
+          : '';
+      if (!phone) throw new Error('Phone number is required for pay on delivery');
+    }
+
     const stockIssueLines = [];
     for (const item of cartData.items) {
       const product = await ProductService.getById(item.product_id);

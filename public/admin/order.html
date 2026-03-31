@@ -49,6 +49,7 @@
             <div style="background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
               <h3>Shipping Address</h3>
               <p>${addr?.address_line1 || '-'}<br>${addr?.city || ''} ${addr?.postal_code || ''} ${addr?.country || ''}</p>
+              ${addr?.phone ? `<p style="margin-top:12px"><strong>Phone</strong><br>${esc(addr.phone)}</p>` : ''}
             </div>
           </div>
           <h3 style="margin-top:24px">Items</h3>

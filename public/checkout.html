@@ -35,7 +35,28 @@
               <label>Email *</label>
               <input type="email" name="guest_email" id="guestEmail" required autocomplete="email">
             </div>
-            <h3 style="margin:24px 0 12px;font-size:15px">Shipping address</h3>
+
+            <div class="form-group" style="margin-top:24px">
+              <div class="checkout-payment-options" role="radiogroup" aria-labelledby="checkoutPaymentLegend">
+                <span id="checkoutPaymentLegend" class="checkout-payment-options__legend">How would you like to pay?</span>
+                <label class="checkout-payment-option">
+                  <input type="radio" name="checkout_payment_method" value="card" checked>
+                  <span class="checkout-payment-option__box">
+                    <span class="checkout-payment-option__title">Pay by card</span>
+                    <span class="checkout-payment-option__hint">Secure checkout with Stripe on the next step.</span>
+                  </span>
+                </label>
+                <label class="checkout-payment-option">
+                  <input type="radio" name="checkout_payment_method" value="pay_on_delivery">
+                  <span class="checkout-payment-option__box">
+                    <span class="checkout-payment-option__title">Pay on delivery</span>
+                    <span class="checkout-payment-option__hint">No card charge now — pay the courier or driver when your order arrives.</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <h3 style="margin:8px 0 12px;font-size:15px">Delivery address</h3>
             <div class="form-group">
               <label>Address line 1 *</label>
               <input type="text" name="address_line1" required autocomplete="street-address">
@@ -52,17 +73,11 @@
               <label>Country (2-letter code) *</label>
               <input type="text" name="country" value="CY" required maxlength="2" autocomplete="country">
             </div>
-            <fieldset class="form-group" style="border:none;padding:0;margin:24px 0 0">
-              <legend style="font-size:15px;font-weight:600;margin-bottom:12px;padding:0">Payment method</legend>
-              <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;cursor:pointer;font-weight:400">
-                <input type="radio" name="checkout_payment_method" value="card" checked style="margin-top:3px">
-                <span>Pay by card <span style="color:var(--text-muted);font-size:13px;display:block">Secure payment with Stripe after this step.</span></span>
-              </label>
-              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-weight:400">
-                <input type="radio" name="checkout_payment_method" value="pay_on_delivery" style="margin-top:3px">
-                <span>Pay on delivery <span style="color:var(--text-muted);font-size:13px;display:block">Pay when you receive your order — no card charge online.</span></span>
-              </label>
-            </fieldset>
+            <div id="checkoutPhoneWrap" class="form-group checkout-phone-field--highlight">
+              <label id="checkoutPhoneLabel" for="checkoutPhone">Phone <span id="checkoutPhoneOptional" style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+              <input type="tel" name="phone" id="checkoutPhone" autocomplete="tel" inputmode="tel" placeholder="">
+              <p id="checkoutPhoneHint" class="checkout-phone-hint" style="display:none;margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--text-muted)">We’ll use this number if the delivery needs to reach you.</p>
+            </div>
             <button type="submit" class="btn" id="placeOrderBtn" style="margin-top:24px;max-width:240px">Continue to payment</button>
           </form>
         </div>
@@ -98,19 +113,43 @@
       document.getElementById('guestEmail').value = user.email;
       document.getElementById('guestEmail').readOnly = true;
     }
+    if (user?.phone) {
+      document.getElementById('checkoutPhone').value = user.phone;
+    }
 
     let createdOrder = null;
 
-    function syncPlaceOrderButtonLabel() {
+    function syncCheckoutPaymentUi() {
       const btn = document.getElementById('placeOrderBtn');
-      const cardSelected = document.querySelector('input[name="checkout_payment_method"][value="card"]')?.checked;
+      const podSelected = document.querySelector('input[name="checkout_payment_method"][value="pay_on_delivery"]')?.checked;
+      const cardSelected = !podSelected;
       if (btn) btn.textContent = cardSelected ? 'Continue to payment' : 'Place order';
+
+      const phoneInput = document.getElementById('checkoutPhone');
+      const phoneLabelOptional = document.getElementById('checkoutPhoneOptional');
+      const phoneHint = document.getElementById('checkoutPhoneHint');
+      const phoneWrap = document.getElementById('checkoutPhoneWrap');
+      if (phoneInput && phoneLabelOptional && phoneHint && phoneWrap) {
+        if (podSelected) {
+          phoneInput.required = true;
+          phoneLabelOptional.textContent = '*';
+          phoneLabelOptional.style.color = 'var(--text)';
+          phoneHint.style.display = 'block';
+          phoneWrap.classList.add('is-active');
+        } else {
+          phoneInput.required = false;
+          phoneLabelOptional.textContent = '(optional)';
+          phoneLabelOptional.style.color = 'var(--text-muted)';
+          phoneHint.style.display = 'none';
+          phoneWrap.classList.remove('is-active');
+        }
+      }
     }
 
     document.querySelectorAll('input[name="checkout_payment_method"]').forEach((el) => {
-      el.addEventListener('change', syncPlaceOrderButtonLabel);
+      el.addEventListener('change', syncCheckoutPaymentUi);
     });
-    syncPlaceOrderButtonLabel();
+    syncCheckoutPaymentUi();
 
     async function loadCheckoutReview() {
       const el = document.getElementById('checkoutOrderReview');
@@ -130,12 +169,23 @@
       errEl.style.display = 'none';
       btn.disabled = true;
 
+      const phoneTrim = (form.phone?.value || '').trim();
+      const payChoiceEarly = form.querySelector('input[name="checkout_payment_method"]:checked')?.value;
+      if (payChoiceEarly === 'pay_on_delivery' && !phoneTrim) {
+        errEl.textContent = 'Please enter a phone number so we can contact you about delivery.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('checkoutPhone')?.focus();
+        return;
+      }
+
       const shipping_address = {
-        address_line1: form.address_line1.value,
-        city: form.city.value,
-        postal_code: form.postal_code.value,
-        country: form.country.value,
+        address_line1: form.address_line1.value.trim(),
+        city: form.city.value.trim(),
+        postal_code: form.postal_code.value.trim(),
+        country: form.country.value.trim(),
       };
+      if (phoneTrim) shipping_address.phone = phoneTrim;
       const body = { shipping_address };
       const emailVal = form.guest_email?.value?.trim();
       if (emailVal) body.guest_email = emailVal;
