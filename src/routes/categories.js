@@ -19,7 +19,8 @@ router.get('/:id/products', async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const result = await CategoryService.getProductsByCategoryId(id, page, limit);
+    const q = String(req.query.q || req.query.search || '').trim();
+    const result = await CategoryService.getProductsByCategoryId(id, page, limit, q);
     res.json(result);
   } catch (err) {
     res.status(404).json({ error: err.message });

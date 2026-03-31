@@ -365,38 +365,85 @@ async function loadCategories() {
   }
 }
 
-async function loadProducts(page = 1, categoryId = null) {
+let currentProductSearch = '';
+
+async function loadProducts(page = 1, categoryId = null, searchQuery) {
   const grid = document.getElementById('productGrid');
   const pagination = document.getElementById('pagination');
   if (!grid) return;
 
+  if (searchQuery !== undefined) {
+    currentProductSearch = String(searchQuery).trim();
+  }
+  const qParam = currentProductSearch ? `&q=${encodeURIComponent(currentProductSearch)}` : '';
+
   try {
     let data;
     if (categoryId) {
-      data = await callApi(`/categories/${categoryId}/products?page=${page}&limit=12`);
+      data = await callApi(`/categories/${categoryId}/products?page=${page}&limit=12${qParam}`);
     } else {
-      data = await callApi(`/products?page=${page}&limit=12`);
+      data = await callApi(`/products?page=${page}&limit=12${qParam}`);
     }
     const items = data.items || [];
-    grid.innerHTML = items.map((p) => renderProductCardMarkup(p)).join('');
+    grid.innerHTML = items.length
+      ? items.map((p) => renderProductCardMarkup(p)).join('')
+      : '<p>No products match your search.</p>';
     bindProductCardControls(grid);
 
     if (pagination && data.totalPages > 1) {
-      let html = '';
+      pagination.innerHTML = '';
       if (data.page > 1) {
-        html += `<button onclick="loadProducts(${data.page - 1}${categoryId ? ', ' + categoryId : ''})">Prev</button>`;
+        const prev = document.createElement('button');
+        prev.textContent = 'Prev';
+        prev.addEventListener('click', () => loadProducts(data.page - 1, categoryId));
+        pagination.appendChild(prev);
       }
-      html += `<span style="padding:8px">Page ${data.page} of ${data.totalPages}</span>`;
+      const span = document.createElement('span');
+      span.style.padding = '8px';
+      span.textContent = `Page ${data.page} of ${data.totalPages}`;
+      pagination.appendChild(span);
       if (data.page < data.totalPages) {
-        html += `<button onclick="loadProducts(${data.page + 1}${categoryId ? ', ' + categoryId : ''})">Next</button>`;
+        const next = document.createElement('button');
+        next.textContent = 'Next';
+        next.addEventListener('click', () => loadProducts(data.page + 1, categoryId));
+        pagination.appendChild(next);
       }
-      pagination.innerHTML = html;
     } else if (pagination) {
       pagination.innerHTML = '';
     }
   } catch (err) {
     grid.innerHTML = '<p>Failed to load products. Make sure the server is running.</p>';
   }
+}
+
+function initHomeSearch() {
+  const input = document.getElementById('searchInput');
+  const btn = document.querySelector('.btn-search');
+  if (!input && !btn) return;
+
+  const syncQueryInUrl = (q) => {
+    const url = new URL(location.href);
+    if (q) url.searchParams.set('q', q);
+    else url.searchParams.delete('q');
+    history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  const runSearch = () => {
+    const q = (input?.value || '').trim();
+    const params = new URLSearchParams(location.search);
+    const categoryRaw = params.get('category');
+    const categoryId = categoryRaw ? parseInt(categoryRaw, 10) : null;
+    syncQueryInUrl(q);
+    loadProducts(1, categoryId, q);
+  };
+
+  btn?.addEventListener('click', runSearch);
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runSearch();
+    }
+  });
 }
 
 async function initHomePage() {
@@ -407,7 +454,11 @@ async function initHomePage() {
   loadCategories();
   const params = new URLSearchParams(location.search);
   const categoryId = params.get('category');
-  loadProducts(1, categoryId ? parseInt(categoryId) : null);
+  const q = params.get('q') || '';
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.value = q;
+  loadProducts(1, categoryId ? parseInt(categoryId, 10) : null, q);
+  initHomeSearch();
 }
 
 if (document.readyState === 'loading') {
@@ -421,6 +472,9 @@ window.addEventListener('pageshow', (e) => {
   loadBrandSettings().then(() => {
     const params = new URLSearchParams(location.search);
     const categoryId = params.get('category');
-    loadProducts(1, categoryId ? parseInt(categoryId, 10) : null);
+    const q = params.get('q') || '';
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = q;
+    loadProducts(1, categoryId ? parseInt(categoryId, 10) : null, q);
   });
 });

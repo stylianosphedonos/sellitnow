@@ -17,22 +17,42 @@ class ProductService {
     return { items: result.rows, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async list(page = 1, limit = 20) {
+  async list(page = 1, limit = 20, search = '') {
     const offset = (page - 1) * limit;
-    const countResult = await pool.query(
-      "SELECT COUNT(*)::int FROM products WHERE status = 'active'"
-    );
+    const term = search != null ? String(search).trim() : '';
+    const pattern = term ? `%${term}%` : null;
+
+    const countResult = pattern
+      ? await pool.query(
+          `SELECT COUNT(*)::int FROM products p
+           WHERE p.status = 'active'
+             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)`,
+          [pattern]
+        )
+      : await pool.query("SELECT COUNT(*)::int FROM products WHERE status = 'active'");
+
     const total = countResult.rows[0].count;
 
-    const result = await pool.query(
-      `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
-              (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
-       FROM products p
-       WHERE p.status = 'active'
-       ORDER BY p.id
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    const result = pattern
+      ? await pool.query(
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
+                  (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
+           FROM products p
+           WHERE p.status = 'active'
+             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)
+           ORDER BY p.id
+           LIMIT $2 OFFSET $3`,
+          [pattern, limit, offset]
+        )
+      : await pool.query(
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
+                  (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
+           FROM products p
+           WHERE p.status = 'active'
+           ORDER BY p.id
+           LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        );
 
     const items = result.rows.map((row) => {
       const opts = parseOptionsJson(row.options_json);

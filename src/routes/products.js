@@ -9,7 +9,8 @@ router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const result = await ProductService.list(page, limit);
+    const q = String(req.query.q || req.query.search || '').trim();
+    const result = await ProductService.list(page, limit, q);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
