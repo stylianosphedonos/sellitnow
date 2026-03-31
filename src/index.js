@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
@@ -33,6 +34,7 @@ function parseTrustProxy() {
 }
 
 app.set('trust proxy', parseTrustProxy());
+app.use(compression());
 
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();

@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS brand_settings (
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
+CREATE INDEX IF NOT EXISTS idx_product_images_product_display ON product_images(product_id, display_order);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);

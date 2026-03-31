@@ -26,7 +26,7 @@ function formatVariantsHtml(color, size) {
 
 function renderCartLine(item) {
   const thumb = item.image_url
-    ? `<img class="line-item__img" src="${escapeHtml(imgSrc(item.image_url))}" alt="${escapeHtml(item.title)}">`
+    ? `<img class="line-item__img" src="${escapeHtml(imgSrc(item.image_url))}" alt="${escapeHtml(item.title)}" loading="lazy" decoding="async">`
     : '<div class="line-item__img line-item__img--placeholder" aria-hidden="true">📦</div>';
   const unit = parseFloat(item.price);
   const lineTotal = parseFloat(item.line_total);

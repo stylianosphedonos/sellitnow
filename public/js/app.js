@@ -394,7 +394,7 @@ function renderProductCardMarkup(p) {
     <article class="product-card product-card--compact" data-product-id="${p.id}">
       <a href="/product.html?id=${p.id}" class="product-card__link">
         <div class="product-image">
-          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}">` : '📦'}
+          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}" loading="lazy" decoding="async">` : '📦'}
         </div>
         <div class="product-info">
           <div class="product-title">${escapeHtml(p.title)}</div>
@@ -417,7 +417,7 @@ async function loadCategories() {
       .map((c) => {
         const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
         const media = imgUrl
-          ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}"></div>`
+          ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
           : `<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🛒</span></div>`;
         return `
       <a href="/products.html?category=${c.id}" class="category-card">
@@ -513,18 +513,21 @@ function initHomeSearch() {
 }
 
 async function initHomePage() {
-  await loadBrandSettings();
-  loadCartCount();
   updateNav();
   initLogout();
-  loadCategories();
   const params = new URLSearchParams(location.search);
-  const categoryId = params.get('category');
+  const categoryId = params.get('category') ? parseInt(params.get('category'), 10) : null;
   const q = params.get('q') || '';
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = q;
-  loadProducts(1, categoryId ? parseInt(categoryId, 10) : null, q);
   initHomeSearch();
+
+  await Promise.all([
+    loadBrandSettings(),
+    loadCartCount(),
+    loadCategories(),
+    loadProducts(1, categoryId, q),
+  ]);
 }
 
 if (document.readyState === 'loading') {
@@ -535,12 +538,10 @@ if (document.readyState === 'loading') {
 
 window.addEventListener('pageshow', (e) => {
   if (!e.persisted || !document.getElementById('productGrid')) return;
-  loadBrandSettings().then(() => {
-    const params = new URLSearchParams(location.search);
-    const categoryId = params.get('category');
-    const q = params.get('q') || '';
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) searchInput.value = q;
-    loadProducts(1, categoryId ? parseInt(categoryId, 10) : null, q);
-  });
+  const params = new URLSearchParams(location.search);
+  const categoryId = params.get('category') ? parseInt(params.get('category'), 10) : null;
+  const q = params.get('q') || '';
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.value = q;
+  void Promise.all([loadBrandSettings(), loadProducts(1, categoryId, q)]);
 });
