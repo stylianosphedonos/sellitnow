@@ -18,6 +18,63 @@ const router = express.Router();
 router.use(authenticate);
 router.use(requireAdmin);
 
+function parseRequiredNumber(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    throw new Error(`${fieldName} is required.`);
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid number.`);
+  }
+  return parsed;
+}
+
+function parseNonNegativeInteger(value, fieldName, { required = false, defaultValue = undefined } = {}) {
+  if (value === undefined || value === null || value === '') {
+    if (required) throw new Error(`${fieldName} is required.`);
+    return defaultValue;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${fieldName} must be a whole number.`);
+  }
+  if (parsed < 0) {
+    throw new Error(`${fieldName} cannot be negative.`);
+  }
+  return parsed;
+}
+
+function parseNullableInteger(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${fieldName} must be a whole number.`);
+  }
+  return parsed;
+}
+
+function normalizeProductPayload(data, { forUpdate = false } = {}) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Invalid request body');
+  }
+
+  const clean = { ...data };
+
+  clean.price = parseRequiredNumber(clean.price, 'Price');
+  clean.stock_quantity = parseNonNegativeInteger(clean.stock_quantity, 'Stock quantity', {
+    required: false,
+    defaultValue: 0,
+  });
+  clean.category_id = parseNullableInteger(clean.category_id, 'Category id');
+
+  if (!forUpdate) {
+    if (!String(clean.title || '').trim()) throw new Error('Title is required.');
+    if (!String(clean.sku || '').trim()) throw new Error('SKU is required.');
+  }
+
+  return clean;
+}
+
 // Products
 router.get('/products', async (req, res) => {
   try {
@@ -32,7 +89,7 @@ router.get('/products', async (req, res) => {
 
 router.post('/products', async (req, res) => {
   try {
-    const data = req.body;
+    const data = normalizeProductPayload(req.body);
     const product = await ProductService.create(data, []);
     res.status(201).json({ product });
   } catch (err) {
@@ -43,14 +100,7 @@ router.post('/products', async (req, res) => {
 router.put('/products/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const data = req.body;
-    if (!data || typeof data !== 'object') {
-      return res.status(400).json({ error: 'Invalid request body' });
-    }
-    const clean = { ...data };
-    clean.category_id = (clean.category_id === '' || clean.category_id === undefined) ? null : parseInt(clean.category_id, 10);
-    clean.stock_quantity = parseInt(clean.stock_quantity, 10) || 0;
-    clean.price = parseFloat(clean.price) || 0;
+    const clean = normalizeProductPayload(req.body, { forUpdate: true });
     const product = await ProductService.update(id, clean, []);
     res.json({ product });
   } catch (err) {
