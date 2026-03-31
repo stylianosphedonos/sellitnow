@@ -225,6 +225,68 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+/**
+ * @param {string} message
+ * @param {{ type?: 'success' | 'error', duration?: number, action?: { label: string, href: string } }} [options]
+ */
+function showToast(message, options = {}) {
+  const type = options.type || 'success';
+  const duration = options.duration ?? (type === 'error' ? 5200 : 4000);
+  const action = options.action;
+
+  let host = document.getElementById('sellitnow-toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'sellitnow-toast-host';
+    host.className = 'toast-host';
+    host.setAttribute('aria-live', 'polite');
+    host.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(host);
+  }
+
+  const el = document.createElement('div');
+  el.className = `toast toast--${type}`;
+  el.setAttribute('role', 'status');
+
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'toast__icon';
+  iconWrap.setAttribute('aria-hidden', 'true');
+  iconWrap.textContent = type === 'error' ? '!' : '✓';
+
+  const body = document.createElement('div');
+  body.className = 'toast__body';
+
+  const msg = document.createElement('span');
+  msg.className = 'toast__msg';
+  msg.textContent = message;
+  body.appendChild(msg);
+
+  if (action && action.href && action.label) {
+    const a = document.createElement('a');
+    a.className = 'toast__action';
+    a.href = action.href;
+    a.textContent = action.label;
+    body.appendChild(a);
+  }
+
+  el.appendChild(iconWrap);
+  el.appendChild(body);
+  host.appendChild(el);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => el.classList.add('toast--visible'));
+  });
+
+  const dismiss = () => {
+    el.classList.remove('toast--visible');
+    const removeEl = () => el.remove();
+    el.addEventListener('transitionend', removeEl, { once: true });
+    setTimeout(removeEl, 320);
+  };
+
+  setTimeout(dismiss, duration);
+}
+
 async function quickAddProductFromCard(productId) {
   const card = document.querySelector(`.product-card[data-product-id="${productId}"]`);
   if (!card) return;
@@ -239,9 +301,12 @@ async function quickAddProductFromCard(productId) {
       body: JSON.stringify({ product_id: productId, quantity: 1, color: '', size: '' }),
     });
     loadCartCount();
-    alert('Added to cart!');
+    showToast('Added to cart', {
+      type: 'success',
+      action: { label: 'View cart', href: '/cart.html' },
+    });
   } catch (err) {
-    alert(err.message);
+    showToast(err.message, { type: 'error' });
   }
 }
 

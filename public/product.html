@@ -147,10 +147,13 @@
           method: 'POST',
           body: JSON.stringify({ product_id: product.id, quantity: qty, color, size }),
         });
-        alert('Added to cart!');
+        showToast('Added to cart', {
+          type: 'success',
+          action: { label: 'View cart', href: '/cart.html' },
+        });
         loadCartCount();
       } catch (err) {
-        alert(err.message);
+        showToast(err.message, { type: 'error' });
       }
     });
 
