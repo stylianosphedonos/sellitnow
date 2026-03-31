@@ -5,6 +5,7 @@ const { getBrandSettings } = require('../routes/brand');
 const OrderService = require('./OrderService');
 const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
+const { verifyGuestOrderToken } = require('../lib/guestOrderToken');
 
 let stripe = null;
 if (config.stripe.secretKey) {
@@ -12,17 +13,45 @@ if (config.stripe.secretKey) {
 }
 
 class PaymentService {
+  assertOrderAccess(order, { userId = null, guestToken = null } = {}) {
+    if (order.user_id) {
+      if (!userId || Number(order.user_id) !== Number(userId)) {
+        throw new Error('Not authorized to access this order');
+      }
+      return;
+    }
+    if (!order.guest_email) {
+      throw new Error('Order has no checkout identity');
+    }
+    if (!guestToken) {
+      throw new Error('Not authorized to access this order');
+    }
+    let payload;
+    try {
+      payload = verifyGuestOrderToken(guestToken);
+    } catch {
+      throw new Error('Not authorized to access this order');
+    }
+    if (
+      payload.orderId !== Number(order.id) ||
+      payload.guestEmail !== String(order.guest_email).trim().toLowerCase()
+    ) {
+      throw new Error('Not authorized to access this order');
+    }
+  }
+
   /**
    * Process payment with Stripe
    * orderRef can be order_id (number) or order_number (string)
    */
-  async processPayment(orderRef, paymentMethodId) {
+  async processPayment(orderRef, paymentMethodId, actor = {}) {
     if (!stripe) throw new Error('Stripe is not configured');
 
     const order = Number.isInteger(Number(orderRef))
       ? await OrderService.getById(Number(orderRef))
       : await OrderService.getOrderByNumber(orderRef);
     if (!order) throw new Error('Order not found');
+    this.assertOrderAccess(order, actor);
     if (order.payment_status === 'paid') throw new Error('Order already paid');
 
     const amountInCents = Math.round(parseFloat(order.total_amount) * 100);
@@ -87,13 +116,14 @@ class PaymentService {
    * Create PaymentIntent for client-side confirmation
    * orderRef can be order_id (number) or order_number (string)
    */
-  async createPaymentIntent(orderRef) {
+  async createPaymentIntent(orderRef, actor = {}) {
     if (!stripe) throw new Error('Stripe is not configured');
 
     const order = Number.isInteger(Number(orderRef))
       ? await OrderService.getById(Number(orderRef))
       : await OrderService.getOrderByNumber(orderRef);
     if (!order) throw new Error('Order not found');
+    this.assertOrderAccess(order, actor);
     if (order.payment_status === 'paid') throw new Error('Order already paid');
 
     const amountInCents = Math.round(parseFloat(order.total_amount) * 100);

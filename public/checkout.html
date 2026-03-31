@@ -130,7 +130,12 @@
         document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
 
         const data = await callApi('/orders', { method: 'POST', body: JSON.stringify(body) });
-        createdOrder = { id: data.order.id, order_number: data.order.order_number, total_amount: data.order.total_amount };
+        createdOrder = {
+          id: data.order.id,
+          order_number: data.order.order_number,
+          total_amount: data.order.total_amount,
+          guest_order_token: data.guest_order_token || null,
+        };
 
         document.getElementById('stepShipping').style.display = 'none';
         document.getElementById('stepPayment').style.display = 'block';
@@ -159,7 +164,14 @@
         const { publishableKey } = await configRes.json();
         if (!publishableKey) throw new Error('Payment is not configured');
 
-        const intentRes = await callApi('/payments/create-intent', { method: 'POST', body: JSON.stringify({ order_id: createdOrder.id }) });
+        const intentPayload = { order_id: createdOrder.id };
+        if (createdOrder.guest_order_token) {
+          intentPayload.guest_token = createdOrder.guest_order_token;
+        }
+        const intentRes = await callApi('/payments/create-intent', {
+          method: 'POST',
+          body: JSON.stringify(intentPayload),
+        });
         const clientSecret = intentRes.client_secret;
         if (!clientSecret) throw new Error('Could not start payment');
 
@@ -177,7 +189,15 @@
           messageEl.textContent = '';
           payBtn.disabled = true;
 
-          const returnUrl = window.location.origin + '/order-confirm.html?id=' + createdOrder.id + '&number=' + encodeURIComponent(createdOrder.order_number);
+          let returnUrl =
+            window.location.origin +
+            '/order-confirm.html?id=' +
+            createdOrder.id +
+            '&number=' +
+            encodeURIComponent(createdOrder.order_number);
+          if (createdOrder.guest_order_token) {
+            returnUrl += '&guest_token=' + encodeURIComponent(createdOrder.guest_order_token);
+          }
           const { error } = await stripe.confirmPayment({
             elements,
             clientSecret,

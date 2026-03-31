@@ -4,6 +4,7 @@ const { pool } = require('../database/db');
 const CartService = require('./CartService');
 const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
+const { createGuestOrderToken, verifyGuestOrderToken } = require('../lib/guestOrderToken');
 
 class OrderService {
   generateOrderNumber() {
@@ -94,7 +95,11 @@ class OrderService {
     await EmailService.sendOrderConfirmation(orderWithEmail, items.rows);
     await EmailService.sendAdminNewOrder(order);
 
-    return { order, items: items.rows };
+    const result = { order, items: items.rows };
+    if (!userId && email) {
+      result.guest_order_token = createGuestOrderToken(order.id, email);
+    }
+    return result;
   }
 
   /**
@@ -122,7 +127,7 @@ class OrderService {
   /**
    * Get order by id (user or guest)
    */
-  async getOrderById(orderId, userId = null, guestEmail = null) {
+  async getOrderById(orderId, userId = null, guestAccessToken = null) {
     const result = await pool.query(
       `SELECT o.*, u.email as user_email
        FROM orders o
@@ -133,8 +138,22 @@ class OrderService {
     if (!result.rows.length) throw new Error('Order not found');
 
     const ord = result.rows[0];
-    if (userId != null && ord.user_id !== userId) throw new Error('Order not found');
-    if (userId == null && ord.guest_email !== guestEmail) throw new Error('Order not found');
+    if (userId != null) {
+      if (Number(ord.user_id) !== Number(userId)) throw new Error('Order not found');
+    } else {
+      if (!guestAccessToken) throw new Error('Order not found');
+      let tokenPayload;
+      try {
+        tokenPayload = verifyGuestOrderToken(guestAccessToken);
+      } catch {
+        throw new Error('Order not found');
+      }
+      const orderGuest = String(ord.guest_email || '').trim().toLowerCase();
+      if (!orderGuest) throw new Error('Order not found');
+      if (tokenPayload.orderId !== Number(ord.id) || tokenPayload.guestEmail !== orderGuest) {
+        throw new Error('Order not found');
+      }
+    }
 
     const itemsResult = await pool.query(
       'SELECT * FROM order_items WHERE order_id = $1',

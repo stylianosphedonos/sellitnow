@@ -18,6 +18,8 @@ services:
         sync: false
       - key: API_BASE_URL
         sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: STORAGE_ROOT

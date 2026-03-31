@@ -26,10 +26,9 @@ npm start
 npm run dev
 ```
 
-The server auto-creates the database in `data/sellitnow.db`, runs migrations, and seeds admin + sample products. No PostgreSQL needed.
+The server auto-creates the database in `data/sellitnow.db`, runs migrations, and seeds sample products. No PostgreSQL needed.
 
-API and website: `http://localhost:3000`  
-Login: `admin@sellitnow.com` / `admin123`
+API and website: `http://localhost:3000`
 
 ## Deploy on Render
 
@@ -45,6 +44,7 @@ This project is now Render-ready with persistent disk storage for SQLite and upl
    - health check on `/health`
 4. Set these environment variables in Render:
    - `API_BASE_URL` (your public Render URL/custom domain)
+   - `CORS_ALLOWED_ORIGINS` (comma-separated frontend origins that can call the API)
    - Stripe/email variables if you use those features
 
 ### Option B: Manual Web Service
@@ -61,6 +61,7 @@ This project is now Render-ready with persistent disk storage for SQLite and upl
   - `UPLOAD_URL_PREFIX=/uploads`
   - `TRUST_PROXY=1`
   - `JWT_SECRET=<strong-random-secret>`
+  - `CORS_ALLOWED_ORIGINS=https://your-domain`
 
 The app listens on `PORT` automatically (provided by Render).
 
@@ -114,16 +115,16 @@ Use `X-Cart-Session` header for guest carts (UUID).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/v1/orders | Create order (body: shipping_address, guest_email?) |
+| POST | /api/v1/orders | Create order (body: shipping_address, guest_email?) Returns `guest_order_token` for guest checkouts |
 | GET | /api/v1/orders | User orders (auth required) |
-| GET | /api/v1/orders/:id | Order details (auth or guest_email query param) |
+| GET | /api/v1/orders/:id | Order details (auth user, or guest order + `guest_token` query param) |
 
 ### Payments
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | /api/v1/payments/process | Process payment (body: order_id/order_number, payment_method_id) |
-| POST | /api/v1/payments/create-intent | Create PaymentIntent |
+| POST | /api/v1/payments/process | Process payment (must belong to authenticated user, or guest order + guest_token) |
+| POST | /api/v1/payments/create-intent | Create PaymentIntent (same ownership rules as above) |
 | POST | /api/v1/payments/webhook | Stripe webhook |
 
 ### Admin (Bearer token, admin role)

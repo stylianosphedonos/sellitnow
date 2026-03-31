@@ -22,7 +22,7 @@ router.post('/', optionalAuth, async (req, res) => {
     }
 
     const cart = await CartService.getCart(userId, sessionId);
-    const { order, items } = await OrderService.createOrder(
+    const { order, items, guest_order_token } = await OrderService.createOrder(
       userId,
       guest_email,
       shipping_address,
@@ -30,7 +30,7 @@ router.post('/', optionalAuth, async (req, res) => {
       sessionId
     );
 
-    res.status(201).json({ order, items });
+    res.status(201).json({ order, items, guest_order_token });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -52,10 +52,13 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const orderId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(orderId)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
     const userId = req.user?.id || null;
-    const guestEmail = req.query.guest_email || null;
+    const guestToken = typeof req.query.guest_token === 'string' ? req.query.guest_token : null;
 
-    const order = await OrderService.getOrderById(orderId, userId, guestEmail);
+    const order = await OrderService.getOrderById(orderId, userId, guestToken);
     res.json({ order });
   } catch (err) {
     res.status(404).json({ error: err.message });

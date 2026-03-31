@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const config = require('./config');
 
 const MediaBlobService = require('./services/MediaBlobService');
@@ -15,6 +16,7 @@ const adminRoutes = require('./routes/admin');
 const brandRoutes = require('./routes/brand');
 
 const PaymentService = require('./services/PaymentService');
+const { optionalAuth } = require('./middleware/auth');
 
 const app = express();
 
@@ -36,7 +38,23 @@ app.get('/favicon.ico', (req, res) => {
 });
 
 // CORS
-app.use(cors({ origin: true, credentials: true }));
+function parseCorsOrigins() {
+  const raw = String(process.env.CORS_ALLOWED_ORIGINS || '').trim();
+  if (!raw) return null;
+  const origins = raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return origins.length ? origins : null;
+}
+
+const corsOrigins = parseCorsOrigins();
+app.use(
+  cors({
+    origin: corsOrigins || false,
+    credentials: Boolean(corsOrigins && corsOrigins.length),
+  })
+);
 
 // Stripe webhook needs raw body - must be before express.json()
 app.post(
@@ -59,6 +77,12 @@ app.post(
 // JSON body parser (for all other routes)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 
 function isUuidParam(s) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s));
@@ -95,19 +119,29 @@ app.use('/api/v1/brand', brandRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 const paymentsRouter = express.Router();
+const paymentLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: 'Too many payment attempts, try again later' },
+});
 paymentsRouter.get('/config', (req, res) => {
   const key = config.stripe?.publishableKey;
   if (!key) return res.status(503).json({ error: 'Stripe not configured' });
   res.json({ publishableKey: key });
 });
+paymentsRouter.use(optionalAuth);
+paymentsRouter.use(paymentLimiter);
 paymentsRouter.post('/process', async (req, res) => {
   try {
-    const { order_id, order_number, payment_method_id } = req.body;
+    const { order_id, order_number, payment_method_id, guest_token } = req.body;
     const orderRef = order_id ?? order_number;
     if (!orderRef || !payment_method_id) {
       return res.status(400).json({ error: 'order_id/order_number and payment_method_id required' });
     }
-    const result = await PaymentService.processPayment(orderRef, payment_method_id);
+    const result = await PaymentService.processPayment(orderRef, payment_method_id, {
+      userId: req.user?.id || null,
+      guestToken: guest_token || null,
+    });
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -115,10 +149,13 @@ paymentsRouter.post('/process', async (req, res) => {
 });
 paymentsRouter.post('/create-intent', async (req, res) => {
   try {
-    const { order_id, order_number } = req.body;
+    const { order_id, order_number, guest_token } = req.body;
     const orderRef = order_id ?? order_number;
     if (!orderRef) return res.status(400).json({ error: 'order_id or order_number required' });
-    const result = await PaymentService.createPaymentIntent(orderRef);
+    const result = await PaymentService.createPaymentIntent(orderRef, {
+      userId: req.user?.id || null,
+      guestToken: guest_token || null,
+    });
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -128,30 +165,6 @@ app.use('/api/v1/payments', paymentsRouter);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
-});
-
-app.all('/api/v1/setup', async (req, res) => {
-  try {
-    const { pool } = require('./database/db');
-    const bcrypt = require('bcryptjs');
-    const hash = await bcrypt.hash('admin123', 12);
-    await pool.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, email_verified, role, failed_login_attempts, locked_until)
-       VALUES ($1, $2, $3, $4, TRUE, 'admin', 0, NULL)
-       ON CONFLICT (email) DO UPDATE SET
-         password_hash = excluded.password_hash,
-         email_verified = TRUE,
-         role = 'admin',
-         failed_login_attempts = 0,
-         locked_until = NULL`,
-      ['admin@sellitnow.com', hash, 'Admin', 'User']
-    );
-    res.json({ message: 'Admin ready. Login with admin@sellitnow.com / admin123' });
-  } catch (err) {
-    const msg = err.message || err.code || err.detail || err.hint || (err.toString && err.toString()) || 'Unknown error';
-    console.error('Setup failed:', err);
-    res.status(500).json({ error: msg });
-  }
 });
 
 // Static frontend (public folder)
@@ -173,7 +186,10 @@ app.use((req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: err.message || 'Internal server error' });
+  if (config.env === 'development') {
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+  return res.status(500).json({ error: 'Internal server error' });
 });
 
 const PORT = config.port;
@@ -230,28 +246,6 @@ async function ensureDb() {
   }
 }
 
-async function ensureAdmin() {
-  try {
-    const bcrypt = require('bcryptjs');
-    const { pool } = require('./database/db');
-    const hash = await bcrypt.hash('admin123', 12);
-    await pool.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, email_verified, role, failed_login_attempts, locked_until)
-       VALUES ($1, $2, $3, $4, TRUE, 'admin', 0, NULL)
-       ON CONFLICT (email) DO UPDATE SET
-         password_hash = excluded.password_hash,
-         email_verified = TRUE,
-         role = 'admin',
-         failed_login_attempts = 0,
-         locked_until = NULL`,
-      ['admin@sellitnow.com', hash, 'Admin', 'User']
-    );
-    console.log('Admin ready: admin@sellitnow.com / admin123');
-  } catch (err) {
-    console.warn('Could not ensure admin:', err.message);
-  }
-}
-
 async function ensureSeed() {
   try {
     const slugify = require('slugify');
@@ -300,11 +294,18 @@ async function ensureSeed() {
 
 async function afterListenStartup() {
   await ensureDb();
-  await ensureAdmin();
   await ensureSeed();
 }
 
 function startup() {
+  if (config.env !== 'development') {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev-secret-change-me') {
+      throw new Error('JWT_SECRET must be configured in non-development environments');
+    }
+    if (!corsOrigins) {
+      throw new Error('CORS_ALLOWED_ORIGINS must be configured in non-development environments');
+    }
+  }
   return new Promise((resolve, reject) => {
     app.listen(PORT, HOST, () => {
       console.log(`Sellitnow listening on http://${HOST}:${PORT}`);

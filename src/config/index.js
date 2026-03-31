@@ -22,6 +22,7 @@ module.exports = {
   jwt: {
     secret: process.env.JWT_SECRET || 'dev-secret-change-me',
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    guestOrderTokenExpiresIn: process.env.GUEST_ORDER_TOKEN_EXPIRES_IN || '7d',
   },
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY,
