@@ -134,7 +134,7 @@ class OrderService {
     );
     const orderWithEmail = { ...order, user_email: userEmail };
     await EmailService.sendOrderConfirmation(orderWithEmail, items.rows);
-    await EmailService.sendAdminNewOrder(order);
+    await EmailService.sendAdminNewOrder(orderWithEmail, items.rows);
 
     const result = { order, items: items.rows };
     if (!userId && email) {
