@@ -67,4 +67,23 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/v1/orders/:id/cancel - cancel own order (user/guest)
+router.patch('/:id/cancel', optionalAuth, async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(orderId)) {
+      return res.status(400).json({ error: 'Invalid order id' });
+    }
+    const userId = req.user?.id || null;
+    const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
+    const guestBodyToken = typeof req.body?.guest_token === 'string' ? req.body.guest_token : null;
+    const guestToken = guestHeaderToken || guestBodyToken;
+
+    const order = await OrderService.cancelOrder(orderId, userId, guestToken);
+    res.json({ order });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

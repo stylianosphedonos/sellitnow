@@ -7,6 +7,19 @@ const EmailService = require('./EmailService');
 const { createGuestOrderToken, verifyGuestOrderToken } = require('../lib/guestOrderToken');
 
 class OrderService {
+  async releaseOrderItemsToStock(client, orderId) {
+    const itemsResult = await client.query(
+      'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+      [orderId]
+    );
+    for (const item of itemsResult.rows) {
+      await client.query(
+        'UPDATE products SET stock_quantity = stock_quantity + $2 WHERE id = $1',
+        [item.product_id, item.quantity]
+      );
+    }
+  }
+
   generateOrderNumber() {
     return `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   }
@@ -239,14 +252,40 @@ class OrderService {
    * Admin: update order status
    */
   async updateOrderStatus(orderId, status, trackingNumber = null) {
-    const result = await pool.query(
-      `UPDATE orders SET status = $1, tracking_number = COALESCE($2, tracking_number), updated_at = NOW()
-       WHERE id = $3 RETURNING *`,
-      [status, trackingNumber, orderId]
-    );
-    if (!result.rows.length) throw new Error('Order not found');
+    const client = await pool.connect();
+    let order;
+    try {
+      await client.query('BEGIN');
+      const currentResult = await client.query(
+        'SELECT id, status, payment_status FROM orders WHERE id = $1 FOR UPDATE',
+        [orderId]
+      );
+      if (!currentResult.rows.length) throw new Error('Order not found');
+      const currentOrder = currentResult.rows[0];
 
-    const order = result.rows[0];
+      const shouldReleaseStock = (
+        status === 'cancelled'
+        && currentOrder.status !== 'cancelled'
+        && ['paid', 'refunded'].includes(currentOrder.payment_status)
+      );
+      if (shouldReleaseStock) {
+        await this.releaseOrderItemsToStock(client, orderId);
+      }
+
+      const result = await client.query(
+        `UPDATE orders SET status = $1, tracking_number = COALESCE($2, tracking_number), updated_at = NOW()
+         WHERE id = $3 RETURNING *`,
+        [status, trackingNumber, orderId]
+      );
+      order = result.rows[0];
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
     if (status === 'shipped' && (order.guest_email || order.user_id)) {
       const u = order.user_id ? await pool.query('SELECT email FROM users WHERE id = $1', [order.user_id]) : { rows: [] };
       const email = order.guest_email || (u.rows[0]?.email);
@@ -263,6 +302,14 @@ class OrderService {
     }
 
     return order;
+  }
+
+  /**
+   * Cancel order (user or guest)
+   */
+  async cancelOrder(orderId, userId = null, guestAccessToken = null) {
+    const order = await this.getOrderById(orderId, userId, guestAccessToken);
+    return this.updateOrderStatus(order.id, 'cancelled');
   }
 }
 
