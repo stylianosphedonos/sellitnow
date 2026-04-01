@@ -47,8 +47,9 @@
             <input type="number" name="stock_quantity" value="0">
           </div>
           <div class="form-group">
-            <label>Category ID</label>
-            <input type="number" name="category_id">
+            <label>Categories</label>
+            <select id="createProductCategories" name="category_ids" multiple size="6"></select>
+            <small style="color:#666">Hold Cmd/Ctrl to select multiple categories.</small>
           </div>
           <div class="form-group">
             <label>Status</label>
@@ -65,6 +66,19 @@
   <script src="/js/admin-layout.js"></script>
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/products.html');
+    let categories = [];
+
+    async function loadCategories() {
+      try {
+        const data = await callApi('/categories');
+        categories = data.categories || [];
+      } catch (_) {
+        categories = [];
+      }
+      const select = document.getElementById('createProductCategories');
+      if (!select) return;
+      select.innerHTML = categories.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
 
     async function loadProducts() {
       try {
@@ -97,7 +111,9 @@
       const form = e.target;
       const data = Object.fromEntries(new FormData(form));
       data.stock_quantity = parseInt(data.stock_quantity) || 0;
-      data.category_id = data.category_id ? parseInt(data.category_id) : null;
+      data.category_ids = Array.from(form.category_ids.selectedOptions || [])
+        .map((opt) => parseInt(opt.value, 10))
+        .filter((x) => Number.isInteger(x));
       try {
         await callApi('/admin/products', { method: 'POST', body: JSON.stringify(data) });
         form.reset();
@@ -112,10 +128,10 @@
       window.location.href = '/admin/product-edit.html?id=' + id;
     }
 
-    loadProducts();
+    loadCategories().then(loadProducts);
 
     window.addEventListener('pageshow', (e) => {
-      if (e.persisted) loadProducts();
+      if (e.persisted) loadCategories().then(loadProducts);
     });
   </script>
 </body>

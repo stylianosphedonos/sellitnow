@@ -36,12 +36,25 @@ class CategoryService {
     const countResult = pattern
       ? await pool.query(
           `SELECT COUNT(*)::int FROM products p
-           WHERE p.category_id = $1 AND p.status = $2
+           WHERE p.status = $2
+             AND (
+               p.category_id = $1 OR EXISTS (
+                 SELECT 1 FROM product_categories pc
+                 WHERE pc.product_id = p.id AND pc.category_id = $1
+               )
+             )
              AND (p.title ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)`,
           [categoryId, 'active', pattern]
         )
       : await pool.query(
-          'SELECT COUNT(*)::int FROM products WHERE category_id = $1 AND status = $2',
+          `SELECT COUNT(*)::int FROM products p
+           WHERE p.status = $2
+             AND (
+               p.category_id = $1 OR EXISTS (
+                 SELECT 1 FROM product_categories pc
+                 WHERE pc.product_id = p.id AND pc.category_id = $1
+               )
+             )`,
           [categoryId, 'active']
         );
 
@@ -49,29 +62,61 @@ class CategoryService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.options_json,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
-           WHERE p.category_id = $1 AND p.status = $2
+           WHERE p.status = $2
+             AND (
+               p.category_id = $1 OR EXISTS (
+                 SELECT 1 FROM product_categories pc
+                 WHERE pc.product_id = p.id AND pc.category_id = $1
+               )
+             )
              AND (p.title ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)
            ORDER BY p.id
            LIMIT $4 OFFSET $5`,
           [categoryId, 'active', pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.options_json,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
-           WHERE p.category_id = $1 AND p.status = $2
+           WHERE p.status = $2
+             AND (
+               p.category_id = $1 OR EXISTS (
+                 SELECT 1 FROM product_categories pc
+                 WHERE pc.product_id = p.id AND pc.category_id = $1
+               )
+             )
            ORDER BY p.id
            LIMIT $3 OFFSET $4`,
           [categoryId, 'active', limit, offset]
         );
 
+    const productIds = result.rows.map((row) => row.id);
+    const categoryMap = new Map();
+    if (productIds.length) {
+      const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
+      const categoryRows = await pool.query(
+        `SELECT product_id, category_id FROM product_categories
+         WHERE product_id IN (${placeholders})
+         ORDER BY product_id, category_id`,
+        productIds
+      );
+      for (const row of categoryRows.rows) {
+        if (!categoryMap.has(row.product_id)) categoryMap.set(row.product_id, []);
+        categoryMap.get(row.product_id).push(row.category_id);
+      }
+    }
+
     const items = result.rows.map((row) => {
       const opts = parseOptionsJson(row.options_json);
       const { options_json: _o, ...rest } = row;
-      return { ...rest, options: opts };
+      return {
+        ...rest,
+        category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
+        options: opts,
+      };
     });
 
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };

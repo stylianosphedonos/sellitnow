@@ -269,6 +269,16 @@ function runSchemaMigrations(db) {
     db.exec('DROP TABLE cart_items');
     db.exec('ALTER TABLE cart_items_new RENAME TO cart_items');
   }
+
+  db.exec(`CREATE TABLE IF NOT EXISTS product_categories (
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (product_id, category_id)
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_product_categories_category_id ON product_categories(category_id)');
+  db.exec(`INSERT OR IGNORE INTO product_categories (product_id, category_id)
+    SELECT id, category_id FROM products WHERE category_id IS NOT NULL`);
 }
 
 async function ensureDb() {
@@ -281,6 +291,11 @@ async function ensureDb() {
       await dbMod.pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
       await dbMod.pool.query(
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'card'`
+      );
+      await dbMod.pool.query(
+        `INSERT INTO product_categories (product_id, category_id)
+         SELECT id, category_id FROM products WHERE category_id IS NOT NULL
+         ON CONFLICT (product_id, category_id) DO NOTHING`
       );
       console.log('Database ready (PostgreSQL)');
       return;

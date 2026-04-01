@@ -60,8 +60,13 @@
     }
 
     function renderForm() {
+      const selectedCategoryIds = new Set(
+        (Array.isArray(product.category_ids) ? product.category_ids : (product.category_id ? [product.category_id] : []))
+          .map((x) => Number(x))
+          .filter((x) => Number.isInteger(x))
+      );
       const catOptions = categories.map(c =>
-        `<option value="${c.id}" ${product.category_id == c.id ? 'selected' : ''}>${c.name}</option>`
+        `<option value="${c.id}" ${selectedCategoryIds.has(Number(c.id)) ? 'selected' : ''}>${c.name}</option>`
       ).join('');
       document.getElementById('formContainer').innerHTML = `
         <form id="editForm" style="max-width:600px;background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
@@ -86,11 +91,11 @@
             <input type="number" name="stock_quantity" value="${product.stock_quantity ?? 0}" min="0">
           </div>
           <div class="form-group">
-            <label>Category</label>
-            <select name="category_id">
-              <option value="">-- None --</option>
+            <label>Categories</label>
+            <select name="category_ids" multiple size="6">
               ${catOptions}
             </select>
+            <small style="color:#666">Hold Cmd/Ctrl to select multiple categories.</small>
           </div>
           <div class="form-group">
             <label>Status</label>
@@ -231,13 +236,17 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'Saving...';
 
+      const selectedCategories = Array.from(form.category_ids.selectedOptions || [])
+        .map((opt) => parseInt(opt.value, 10))
+        .filter((x) => Number.isInteger(x));
+
       const productData = {
         title: form.title.value,
         sku: form.sku.value,
         description: form.description.value,
         price: parseFloat(form.price.value) || 0,
         stock_quantity: parseInt(form.stock_quantity.value, 10) || 0,
-        category_id: form.category_id.value ? parseInt(form.category_id.value, 10) : null,
+        category_ids: selectedCategories,
         status: form.status.value,
         options: { colors: [...editColors], sizes: [...editSizes] }
       };

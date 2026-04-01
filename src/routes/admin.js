@@ -66,7 +66,16 @@ function normalizeProductPayload(data, { forUpdate = false } = {}) {
     required: false,
     defaultValue: 0,
   });
-  clean.category_id = parseNullableInteger(clean.category_id, 'Category id');
+  const parsedSingleCategoryId = parseNullableInteger(clean.category_id, 'Category id');
+  const categoryIdsInput = Array.isArray(clean.category_ids)
+    ? clean.category_ids
+    : (parsedSingleCategoryId != null ? [parsedSingleCategoryId] : []);
+  clean.category_ids = [...new Set(
+    categoryIdsInput
+      .map((x) => parseNullableInteger(x, 'Category id'))
+      .filter((x) => x != null)
+  )];
+  clean.category_id = clean.category_ids[0] ?? null;
 
   if (!forUpdate) {
     if (!String(clean.title || '').trim()) throw new Error('Title is required.');

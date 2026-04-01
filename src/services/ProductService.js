@@ -5,6 +5,43 @@ const { parseOptionsJson, stringifyOptionsJson } = require('../lib/productOption
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 
 class ProductService {
+  async getCategoryIdsByProductIds(productIds) {
+    if (!Array.isArray(productIds) || productIds.length === 0) return new Map();
+    const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await pool.query(
+      `SELECT product_id, category_id
+       FROM product_categories
+       WHERE product_id IN (${placeholders})
+       ORDER BY product_id, category_id`,
+      productIds
+    );
+    const map = new Map();
+    for (const row of result.rows) {
+      if (!map.has(row.product_id)) map.set(row.product_id, []);
+      map.get(row.product_id).push(row.category_id);
+    }
+    return map;
+  }
+
+  async assignProductCategories(productId, categoryIdsInput = null) {
+    let categoryIds = Array.isArray(categoryIdsInput) ? categoryIdsInput : [];
+    categoryIds = [...new Set(
+      categoryIds
+        .map((x) => Number(x))
+        .filter((x) => Number.isInteger(x))
+    )];
+    await pool.query('DELETE FROM product_categories WHERE product_id = $1', [productId]);
+    for (const categoryId of categoryIds) {
+      await pool.query(
+        `INSERT INTO product_categories (product_id, category_id)
+         VALUES ($1, $2)
+         ON CONFLICT (product_id, category_id) DO NOTHING`,
+        [productId, categoryId]
+      );
+    }
+    return categoryIds;
+  }
+
   async adminList(page = 1, limit = 100) {
     const offset = (page - 1) * limit;
     const countResult = await pool.query('SELECT COUNT(*)::int FROM products');
@@ -14,7 +51,13 @@ class ProductService {
        FROM products p ORDER BY p.id LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-    return { items: result.rows, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const items = result.rows;
+    const categoryMap = await this.getCategoryIdsByProductIds(items.map((x) => x.id));
+    const mapped = items.map((row) => ({
+      ...row,
+      category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
+    }));
+    return { items: mapped, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async list(page = 1, limit = 20, search = '') {
@@ -54,10 +97,15 @@ class ProductService {
           [limit, offset]
         );
 
+    const categoryMap = await this.getCategoryIdsByProductIds(result.rows.map((x) => x.id));
     const items = result.rows.map((row) => {
       const opts = parseOptionsJson(row.options_json);
       const { options_json: _o, ...rest } = row;
-      return { ...rest, options: opts };
+      return {
+        ...rest,
+        category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
+        options: opts,
+      };
     });
 
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -80,6 +128,16 @@ class ProductService {
     );
     product.images = imagesResult.rows;
     product.image_url = product.images[0]?.image_url || null;
+    const catRows = await pool.query(
+      `SELECT pc.category_id, c.name
+       FROM product_categories pc
+       LEFT JOIN categories c ON c.id = pc.category_id
+       WHERE pc.product_id = $1
+       ORDER BY pc.category_id`,
+      [id]
+    );
+    product.category_ids = catRows.rows.map((r) => r.category_id);
+    product.category_names = catRows.rows.map((r) => r.name).filter(Boolean);
     product.options = parseOptionsJson(product.options_json);
     delete product.options_json;
     return product;
@@ -102,6 +160,16 @@ class ProductService {
     );
     product.images = imagesResult.rows;
     product.image_url = product.images[0]?.image_url || null;
+    const catRows = await pool.query(
+      `SELECT pc.category_id, c.name
+       FROM product_categories pc
+       LEFT JOIN categories c ON c.id = pc.category_id
+       WHERE pc.product_id = $1
+       ORDER BY pc.category_id`,
+      [product.id]
+    );
+    product.category_ids = catRows.rows.map((r) => r.category_id);
+    product.category_names = catRows.rows.map((r) => r.name).filter(Boolean);
     product.options = parseOptionsJson(product.options_json);
     delete product.options_json;
     return product;
@@ -116,6 +184,11 @@ class ProductService {
       optionsJson = data.options_json;
     }
 
+    const categoryIds = Array.isArray(data.category_ids)
+      ? data.category_ids
+      : (data.category_id ? [data.category_id] : []);
+    const primaryCategoryId = categoryIds.length ? categoryIds[0] : null;
+
     const result = await pool.query(
       `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, options_json)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -127,12 +200,13 @@ class ProductService {
         data.description || null,
         data.price,
         data.stock_quantity ?? 0,
-        data.category_id || null,
+        primaryCategoryId,
         data.status || 'draft',
         optionsJson,
       ]
     );
     const product = result.rows[0];
+    await this.assignProductCategories(product.id, categoryIds);
 
     if (imageFiles.length) {
       for (let i = 0; i < imageFiles.length; i++) {
@@ -156,7 +230,18 @@ class ProductService {
     const description = data.description !== undefined ? data.description : product.description;
     const price = data.price !== undefined && data.price !== null ? data.price : product.price;
     const stock_quantity = data.stock_quantity !== undefined && data.stock_quantity !== null ? data.stock_quantity : product.stock_quantity;
-    const category_id = data.category_id !== undefined ? data.category_id : product.category_id;
+    const category_ids =
+      data.category_ids !== undefined
+        ? data.category_ids
+        : (data.category_id !== undefined
+          ? (data.category_id ? [data.category_id] : [])
+          : (Array.isArray(product.category_ids) ? product.category_ids : []));
+    const normalizedCategoryIds = [...new Set(
+      (Array.isArray(category_ids) ? category_ids : [])
+        .map((x) => Number(x))
+        .filter((x) => Number.isInteger(x))
+    )];
+    const category_id = normalizedCategoryIds.length ? normalizedCategoryIds[0] : null;
     const status = data.status !== undefined && data.status !== null ? data.status : product.status;
 
     const optRow = await pool.query('SELECT options_json FROM products WHERE id = $1', [id]);
@@ -182,6 +267,7 @@ class ProductService {
        WHERE id = $1`,
       [id, sku, title, slug, description, price, stock_quantity, category_id, status, optionsJson]
     );
+    await this.assignProductCategories(id, normalizedCategoryIds);
 
     if (imageFiles.length) {
       const existing = await pool.query('SELECT id FROM product_images WHERE product_id = $1', [id]);
