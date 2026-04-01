@@ -451,6 +451,22 @@ async function loadCategories() {
 }
 
 let currentProductSearch = '';
+let currentProductPageSize = 0;
+
+function getResponsiveProductPageSize() {
+  const width = window.innerWidth || document.documentElement.clientWidth || 0;
+  if (width <= 640) return 8;
+  if (width <= 1024) return 12;
+  return 15;
+}
+
+function getCurrentCategoryFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const categoryRaw = params.get('category');
+  if (!categoryRaw) return null;
+  const categoryId = parseInt(categoryRaw, 10);
+  return Number.isFinite(categoryId) ? categoryId : null;
+}
 
 async function loadProducts(page = 1, categoryId = null, searchQuery) {
   const grid = document.getElementById('productGrid');
@@ -461,13 +477,15 @@ async function loadProducts(page = 1, categoryId = null, searchQuery) {
     currentProductSearch = String(searchQuery).trim();
   }
   const qParam = currentProductSearch ? `&q=${encodeURIComponent(currentProductSearch)}` : '';
+  const pageSize = getResponsiveProductPageSize();
+  currentProductPageSize = pageSize;
 
   try {
     let data;
     if (categoryId) {
-      data = await callApi(`/categories/${categoryId}/products?page=${page}&limit=12${qParam}`);
+      data = await callApi(`/categories/${categoryId}/products?page=${page}&limit=${pageSize}${qParam}`);
     } else {
-      data = await callApi(`/products?page=${page}&limit=12${qParam}`);
+      data = await callApi(`/products?page=${page}&limit=${pageSize}${qParam}`);
     }
     const items = data.items || [];
     grid.innerHTML = items.length
@@ -499,6 +517,16 @@ async function loadProducts(page = 1, categoryId = null, searchQuery) {
   } catch (err) {
     grid.innerHTML = '<p>Failed to load products. Make sure the server is running.</p>';
   }
+}
+
+function initResponsiveProductPageSizeReload() {
+  const onResize = () => {
+    const nextPageSize = getResponsiveProductPageSize();
+    if (nextPageSize === currentProductPageSize) return;
+    const categoryId = getCurrentCategoryFromUrl();
+    loadProducts(1, categoryId);
+  };
+  window.addEventListener('resize', onResize);
 }
 
 function initHomeSearch() {
@@ -540,6 +568,7 @@ async function initHomePage() {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = q;
   initHomeSearch();
+  initResponsiveProductPageSizeReload();
 
   await Promise.all([
     loadBrandSettings(),
