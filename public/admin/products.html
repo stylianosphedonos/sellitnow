@@ -55,6 +55,11 @@
             <label>Status</label>
             <select name="status"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select>
           </div>
+          <div class="form-group">
+            <label>Product Image(s)</label>
+            <input type="file" name="images" accept="image/jpeg,image/png,image/webp,image/gif" multiple>
+            <small style="color:#666">JPEG, PNG, WebP or GIF. Max 5MB each. Up to 5 images per product.</small>
+          </div>
           <button type="submit" class="btn">Create Product</button>
         </form>
       </div>
@@ -109,13 +114,30 @@
     document.getElementById('addProduct')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target;
-      const data = Object.fromEntries(new FormData(form));
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData);
       data.stock_quantity = parseInt(data.stock_quantity) || 0;
       data.category_ids = Array.from(form.category_ids.selectedOptions || [])
         .map((opt) => parseInt(opt.value, 10))
         .filter((x) => Number.isInteger(x));
       try {
-        await callApi('/admin/products', { method: 'POST', body: JSON.stringify(data) });
+        const created = await callApi('/admin/products', { method: 'POST', body: JSON.stringify(data) });
+        const productId = created?.product?.id;
+        const files = formData.getAll('images').filter((f) => f && typeof f === 'object' && f.size > 0);
+
+        if (productId && files.length) {
+          const imageData = new FormData();
+          for (const file of files) imageData.append('images', file);
+          const uploadRes = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/products/' + productId + '/images'), {
+            method: 'POST',
+            body: imageData
+          });
+          const uploadJson = await uploadRes.json().catch(() => ({}));
+          if (!uploadRes.ok) {
+            throw new Error(uploadJson.error || 'Product created, but image upload failed.');
+          }
+        }
+
         form.reset();
         document.getElementById('productForm').style.display = 'none';
         loadProducts();
