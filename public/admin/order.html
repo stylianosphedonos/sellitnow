@@ -17,6 +17,7 @@
     </aside>
     <main class="admin-content">
       <h1>Order <span id="orderNumber"></span></h1>
+      <div id="statusMessage" style="display:none;padding:10px 12px;border-radius:6px;margin-bottom:12px"></div>
       <div id="order"></div>
     </main>
   </div>
@@ -27,11 +28,28 @@
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html';
     const id = new URLSearchParams(location.search).get('id');
     if (!id) window.location.href = '/admin/orders.html';
+    let currentOrder = null;
+
+    function showStatusMessage(message, isError = false) {
+      const el = document.getElementById('statusMessage');
+      if (!el) return;
+      el.textContent = message;
+      el.style.display = 'block';
+      el.style.background = isError ? '#fee2e2' : '#dcfce7';
+      el.style.color = isError ? '#991b1b' : '#166534';
+      if (!isError) {
+        clearTimeout(window.statusMessageTimeout);
+        window.statusMessageTimeout = setTimeout(() => {
+          el.style.display = 'none';
+        }, 2500);
+      }
+    }
 
     async function loadOrder() {
       try {
         await loadBrandSettings();
         const { order } = await callApi('/admin/orders/' + id);
+        currentOrder = order;
         document.getElementById('orderNumber').textContent = order.order_number;
         const addr = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address;
         const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -63,6 +81,7 @@
             }).join('')}
           </table>
           <p style="font-size:18px;font-weight:700;margin-top:16px">Total: ${formatStoreMoney(order.total_amount)}</p>
+          <p style="margin-top:8px;color:#444"><strong>Order Status:</strong> <span id="currentOrderStatus">${order.status}</span></p>
           <p style="margin-top:8px;color:#444"><strong>Payment:</strong> ${order.payment_method === 'pay_on_delivery' ? 'Pay on delivery' : 'Card'} · <strong>Status:</strong> ${order.payment_status}</p>
           <h3 style="margin-top:24px">Update Status</h3>
           <form id="statusForm" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -75,13 +94,24 @@
         document.getElementById('statusForm')?.addEventListener('submit', async (e) => {
           e.preventDefault();
           const form = e.target;
+          const nextStatus = form.status.value;
+          const prevStatus = currentOrder?.status;
+          const submitBtn = form.querySelector('button[type="submit"]');
+          if (submitBtn) submitBtn.disabled = true;
           try {
-            await callApi('/admin/orders/' + id + '/status', {
+            const { order: updatedOrder } = await callApi('/admin/orders/' + id + '/status', {
               method: 'PATCH',
-              body: JSON.stringify({ status: form.status.value, tracking_number: form.tracking_number.value || undefined })
+              body: JSON.stringify({ status: nextStatus, tracking_number: form.tracking_number.value || undefined })
             });
-            loadOrder();
-          } catch (err) { alert(err.message); }
+            currentOrder = updatedOrder;
+            const statusEl = document.getElementById('currentOrderStatus');
+            if (statusEl) statusEl.textContent = updatedOrder.status;
+            showStatusMessage(`Order status changed from "${prevStatus}" to "${updatedOrder.status}".`);
+          } catch (err) {
+            showStatusMessage(err.message || 'Failed to update order status.', true);
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
         });
       } catch (err) {
         document.getElementById('order').innerHTML = '<p>Failed to load order.</p>';

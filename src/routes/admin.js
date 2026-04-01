@@ -219,6 +219,29 @@ router.patch('/orders/:id/status', async (req, res) => {
   }
 });
 
+router.patch('/orders/status/bulk', async (req, res) => {
+  try {
+    const { order_ids, status, tracking_number } = req.body || {};
+    if (!Array.isArray(order_ids) || order_ids.length === 0) {
+      return res.status(400).json({ error: 'order_ids is required' });
+    }
+    const ids = [...new Set(order_ids.map((id) => parseInt(id, 10)).filter(Number.isInteger))];
+    if (!ids.length) {
+      return res.status(400).json({ error: 'No valid order IDs provided' });
+    }
+    if (!status || typeof status !== 'string') {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    const updates = await Promise.all(
+      ids.map(async (id) => OrderService.updateOrderStatus(id, status, tracking_number))
+    );
+    res.json({ orders: updates, updated_count: updates.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Invoice PDF
 router.get('/orders/:id/invoice', async (req, res) => {
   try {
