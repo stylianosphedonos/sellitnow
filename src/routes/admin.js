@@ -7,7 +7,13 @@ const OrderService = require('../services/OrderService');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { uploadProductImages, uploadBanner, uploadLogo, uploadCategoryImage } = require('../middleware/upload');
+const {
+  uploadProductImages,
+  uploadBanner,
+  uploadLogo,
+  uploadCategoryImage,
+  uploadAllProductsTileImage,
+} = require('../middleware/upload');
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
 const { formatMoney } = require('../lib/formatMoney');
@@ -376,6 +382,7 @@ router.put('/brand', async (req, res) => {
       accent,
       banner,
       logo,
+      allProductsImage,
       currency,
       taxRatePercent,
       heroTitle,
@@ -389,6 +396,7 @@ router.put('/brand', async (req, res) => {
       accent != null && { key: 'accent', value: String(accent) },
       banner !== undefined && { key: 'banner', value: String(banner || '') },
       logo !== undefined && { key: 'logo', value: String(logo || '') },
+      allProductsImage !== undefined && { key: 'allProductsImage', value: String(allProductsImage || '') },
       heroTitle !== undefined && { key: 'heroTitle', value: String(heroTitle) },
       heroSubtitle !== undefined && { key: 'heroSubtitle', value: String(heroSubtitle) },
     ].filter(Boolean);
@@ -458,6 +466,23 @@ router.post('/brand/logo', uploadLogo, async (req, res) => {
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['logo', url]
+    );
+    const settings = await getBrandSettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/brand/all-products-image', uploadAllProductsTileImage, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+    const url = await publicUrlForUploadedFile(req.file);
+    await pool.query(
+      'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['allProductsImage', url]
     );
     const settings = await getBrandSettings();
     res.json(settings);

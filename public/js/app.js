@@ -26,6 +26,7 @@ function persistBrandSettings(data) {
       currency: data.currency || '',
       banner: data.banner || '',
       logo: data.logo || '',
+      allProductsImage: data.allProductsImage || '',
       heroTitle: data.heroTitle,
       heroSubtitle: data.heroSubtitle,
     }));
@@ -422,9 +423,15 @@ function bindLoadAllProductsFromCategorySection() {
 async function loadCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
+  const cachedBrand = readCachedBrandSettings();
+  const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
   const allProductsTile = `
       <button type="button" class="category-card" id="loadAllProductsBtn" aria-label="Show all products">
-        <div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>
+        ${
+          allProductsImage
+            ? `<div class="category-card__media"><img src="${escapeHtml(allProductsImage)}" alt="All products" loading="lazy" decoding="async"></div>`
+            : '<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>'
+        }
         <span class="category-card__label">All products</span>
       </button>`;
   try {
@@ -570,12 +577,8 @@ async function initHomePage() {
   initHomeSearch();
   initResponsiveProductPageSizeReload();
 
-  await Promise.all([
-    loadBrandSettings(),
-    loadCartCount(),
-    loadCategories(),
-    loadProducts(1, categoryId, q),
-  ]);
+  await loadBrandSettings();
+  await Promise.all([loadCartCount(), loadCategories(), loadProducts(1, categoryId, q)]);
 }
 
 if (document.readyState === 'loading') {

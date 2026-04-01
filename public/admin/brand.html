@@ -103,6 +103,22 @@
           <button type="button" id="uploadBanner" class="btn" style="max-width:180px" disabled>Upload Banner</button>
           <button type="button" id="removeBanner" class="btn btn-secondary" style="margin-left:8px;max-width:140px">Remove Banner</button>
         </section>
+
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:20px">All Products Tile</h2>
+          <p style="color:var(--text-muted);margin-top:0;margin-bottom:16px">Set the image used for the "All products" category card on the main screen.</p>
+          <div id="allProductsPreview" style="width:160px;height:120px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:16px">
+            <span id="allProductsPlaceholder" style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px">Current image</span>
+            <img id="allProductsImg" src="" alt="All products tile" style="display:none;width:100%;height:100%;object-fit:cover">
+          </div>
+          <div class="form-group">
+            <label>Upload New Image</label>
+            <input type="file" id="allProductsFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
+            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB.</small>
+          </div>
+          <button type="button" id="uploadAllProducts" class="btn" style="max-width:220px" disabled>Upload Tile Image</button>
+          <button type="button" id="removeAllProducts" class="btn btn-secondary" style="margin-left:8px;max-width:140px">Remove Image</button>
+        </section>
       </div>
     </main>
   </div>
@@ -122,6 +138,9 @@
     const uploadLogoBtn = document.getElementById('uploadLogo');
     const removeLogoBtn = document.getElementById('removeLogo');
     const logoFile = document.getElementById('logoFile');
+    const allProductsFile = document.getElementById('allProductsFile');
+    const uploadAllProductsBtn = document.getElementById('uploadAllProducts');
+    const removeAllProductsBtn = document.getElementById('removeAllProducts');
 
     function showAlert(msg, isError) {
       alertEl.textContent = msg;
@@ -182,6 +201,18 @@
           bannerImg.src = '';
           bannerImg.style.display = 'none';
           placeholder.style.display = 'block';
+        }
+
+        const allProductsImg = document.getElementById('allProductsImg');
+        const allProductsPlaceholder = document.getElementById('allProductsPlaceholder');
+        if (data.allProductsImage) {
+          allProductsImg.src = typeof mediaUrl === 'function' ? mediaUrl(data.allProductsImage) : data.allProductsImage;
+          allProductsImg.style.display = 'block';
+          allProductsPlaceholder.style.display = 'none';
+        } else {
+          allProductsImg.src = '';
+          allProductsImg.style.display = 'none';
+          allProductsPlaceholder.style.display = 'block';
         }
 
       } catch (err) {
@@ -311,6 +342,48 @@
       } catch (_) {}
       await loadBrand();
       showAlert('Logo removed. Store will show the store name again.');
+    });
+
+    allProductsFile.addEventListener('change', () => {
+      uploadAllProductsBtn.disabled = !allProductsFile.files || allProductsFile.files.length === 0;
+    });
+
+    uploadAllProductsBtn.addEventListener('click', async () => {
+      if (!allProductsFile.files || allProductsFile.files.length === 0) return;
+      uploadAllProductsBtn.disabled = true;
+      uploadAllProductsBtn.textContent = 'Uploading...';
+      try {
+        const formData = new FormData();
+        formData.append('image', allProductsFile.files[0]);
+        const res = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/brand/all-products-image'), {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        document.getElementById('allProductsImg').src =
+          typeof mediaUrl === 'function' ? mediaUrl(data.allProductsImage) : data.allProductsImage;
+        document.getElementById('allProductsImg').style.display = 'block';
+        document.getElementById('allProductsPlaceholder').style.display = 'none';
+        allProductsFile.value = '';
+        uploadAllProductsBtn.disabled = true;
+        showAlert('All products tile image uploaded successfully.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to upload image.', true);
+      }
+      uploadAllProductsBtn.disabled = false;
+      uploadAllProductsBtn.textContent = 'Upload Tile Image';
+    });
+
+    removeAllProductsBtn.addEventListener('click', async () => {
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({ allProductsImage: '' })
+        });
+      } catch (_) {}
+      await loadBrand();
+      showAlert('All products tile image removed.');
     });
 
     loadBrand();
