@@ -123,6 +123,31 @@
   <script src="/js/app.js"></script>
   <script src="/js/order-review.js"></script>
   <script>
+    /** 2-letter country from order shipping (for Stripe Payment Request when merchant env is unset). */
+    function orderShippingCountry(order) {
+      if (!order?.shipping_address) return null;
+      let addr = order.shipping_address;
+      if (typeof addr === 'string') {
+        try {
+          addr = JSON.parse(addr);
+        } catch {
+          return null;
+        }
+      }
+      const c = String(addr.country || '')
+        .trim()
+        .toUpperCase()
+        .slice(0, 2);
+      return /^[A-Z]{2}$/.test(c) ? c : null;
+    }
+
+    /** Stripe canMakePayment() shape varies by browser; treat legacy `true` as usable. */
+    function paymentRequestSupportsApplePay(can) {
+      if (!can) return false;
+      if (can === true) return true;
+      return can.applePay === true;
+    }
+
     const user = getUser();
     if (user?.email) {
       document.getElementById('guestEmail').value = user.email;
@@ -247,6 +272,7 @@
           stock_warning: data.order.stock_warning || null,
           payment_method: data.order.payment_method || 'card',
           preferApplePay: payChoice === 'apple_pay',
+          shippingCountry: orderShippingCountry(data.order),
         };
 
         if (createdOrder.payment_method === 'pay_on_delivery') {
@@ -375,10 +401,12 @@
         const currencyLower = String(currency || 'usd')
           .trim()
           .toLowerCase();
-        const prCountry = String(paymentRequestCountry || 'US')
-          .trim()
-          .toUpperCase()
-          .slice(0, 2);
+        let prCountry =
+          (paymentRequestCountry && String(paymentRequestCountry).trim()) ||
+          createdOrder.shippingCountry ||
+          'US';
+        prCountry = String(prCountry).trim().toUpperCase().slice(0, 2);
+        if (!/^[A-Z]{2}$/.test(prCountry)) prCountry = 'US';
 
         cancelLink.href =
           '/checkout-cancel.html?order_id=' +
@@ -410,7 +438,7 @@
 
         const can = await paymentRequest.canMakePayment();
 
-        if (can && can.applePay === true) {
+        if (paymentRequestSupportsApplePay(can)) {
           paymentForm.style.display = 'none';
           payBtn.style.display = 'none';
           appleWrap.style.display = 'block';

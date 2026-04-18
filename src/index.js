@@ -167,7 +167,7 @@ paymentsRouter.get('/config', async (req, res) => {
     res.json({
       publishableKey: key,
       currency: settings.currency || 'usd',
-      paymentRequestCountry: config.stripe.paymentRequestCountry || 'US',
+      paymentRequestCountry: config.stripe.paymentRequestCountry,
     });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Could not load payment config' });

@@ -42,10 +42,15 @@ module.exports = {
     secretKey: process.env.STRIPE_SECRET_KEY,
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-    /** ISO country for Stripe.js Payment Request (Apple Pay); should match your Stripe account / business. */
+    /**
+     * ISO country for Stripe.js Payment Request (Apple Pay).
+     * Must match your Stripe account country; if unset, checkout uses the order shipping country.
+     */
     paymentRequestCountry: (() => {
-      const c = (process.env.STRIPE_PAYMENT_REQUEST_COUNTRY || 'US').trim().toUpperCase();
-      return /^[A-Z]{2}$/.test(c) ? c : 'US';
+      const raw = process.env.STRIPE_PAYMENT_REQUEST_COUNTRY;
+      if (raw == null || String(raw).trim() === '') return null;
+      const c = String(raw).trim().toUpperCase().slice(0, 2);
+      return /^[A-Z]{2}$/.test(c) ? c : null;
     })(),
   },
   email: {
