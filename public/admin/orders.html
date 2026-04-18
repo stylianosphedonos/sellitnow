@@ -23,8 +23,22 @@
     <main class="admin-content">
       <h1>Orders</h1>
       <div id="ordersMessage" style="display:none;padding:10px 12px;border-radius:6px;margin-bottom:12px"></div>
-      <div class="form-group" style="max-width:300px;margin-bottom:16px">
-        <input type="text" id="searchOrders" placeholder="Search by order # or email" style="width:100%">
+      <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
+        <div class="form-group" style="max-width:300px;margin:0">
+          <label for="searchOrders" style="display:block;font-size:13px;margin-bottom:6px;color:var(--text-muted)">Search</label>
+          <input type="text" id="searchOrders" placeholder="Order # or email" style="width:100%">
+        </div>
+        <div class="form-group" style="max-width:200px;margin:0">
+          <label for="statusFilter" style="display:block;font-size:13px;margin-bottom:6px;color:var(--text-muted)">Status</label>
+          <select id="statusFilter" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
         <select id="bulkStatus" aria-label="Bulk status">
@@ -61,10 +75,20 @@
       }
     }
 
-    async function loadOrders(search = '') {
+    function ordersListQueryString() {
+      const params = new URLSearchParams();
+      const search = (document.getElementById('searchOrders')?.value || '').trim();
+      const status = (document.getElementById('statusFilter')?.value || '').trim();
+      if (search) params.set('search', search);
+      if (status) params.set('status', status);
+      const q = params.toString();
+      return q ? '?' + q : '';
+    }
+
+    async function loadOrders() {
       try {
         await loadBrandSettings();
-        const data = await callApi('/admin/orders?search=' + encodeURIComponent(search));
+        const data = await callApi('/admin/orders' + ordersListQueryString());
         const items = data.items || [];
         document.getElementById('orders').innerHTML = `
           <table class="table">
@@ -123,6 +147,7 @@
           row?.querySelector('.order-status')?.replaceChildren(document.createTextNode(order.status));
         }
         showOrdersMessage(`Updated ${updatedOrders.length} order${updatedOrders.length === 1 ? '' : 's'} to "${status}".`);
+        await loadOrders();
       } catch (err) {
         showOrdersMessage(err.message || 'Failed to update selected orders.', true);
       } finally {
@@ -133,10 +158,11 @@
       }
     }
 
-    document.getElementById('searchOrders')?.addEventListener('input', (e) => {
+    document.getElementById('searchOrders')?.addEventListener('input', () => {
       clearTimeout(window.searchTimeout);
-      window.searchTimeout = setTimeout(() => loadOrders(e.target.value), 300);
+      window.searchTimeout = setTimeout(() => loadOrders(), 300);
     });
+    document.getElementById('statusFilter')?.addEventListener('change', () => loadOrders());
     document.getElementById('applyBulkStatus')?.addEventListener('click', applyBulkStatusUpdate);
 
     loadOrders();

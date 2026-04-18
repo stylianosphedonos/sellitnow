@@ -217,9 +217,10 @@ router.delete('/categories/:id/image', async (req, res) => {
 router.get('/orders', async (req, res) => {
   try {
     const search = req.query.search || '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
-    const result = await OrderService.adminListOrders(search, page, limit);
+    const result = await OrderService.adminListOrders(search, page, limit, status || null);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -232,29 +232,63 @@ class OrderService {
   }
 
   /**
-   * Admin: list all orders with search
+   * Admin: list all orders with optional search and fulfillment status filter
    */
-  async adminListOrders(search, page = 1, limit = 20) {
+  async adminListOrders(search, page = 1, limit = 20, status = null) {
     const offset = (page - 1) * limit;
-    let query = 'SELECT o.*, u.email as user_email FROM orders o LEFT JOIN users u ON o.user_id = u.id';
+    const allowedStatuses = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
+    const statusFilter =
+      status && typeof status === 'string' && allowedStatuses.has(String(status).trim().toLowerCase())
+        ? String(status).trim().toLowerCase()
+        : null;
+
+    const conditions = [];
     const params = [];
-    let i = 1;
+    let n = 1;
 
     if (search) {
-      query += ' WHERE (o.order_number ILIKE $1 OR o.guest_email ILIKE $1 OR u.email ILIKE $1)';
+      conditions.push(
+        `(o.order_number ILIKE $${n} OR o.guest_email ILIKE $${n} OR u.email ILIKE $${n})`
+      );
       params.push(`%${search}%`);
-      i++;
+      n += 1;
     }
-    query += ` ORDER BY o.created_at DESC LIMIT $${i} OFFSET $${i + 1}`;
+    if (statusFilter) {
+      conditions.push(`o.status = $${n}`);
+      params.push(statusFilter);
+      n += 1;
+    }
+
+    let query = 'SELECT o.*, u.email as user_email FROM orders o LEFT JOIN users u ON o.user_id = u.id';
+    if (conditions.length) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    query += ` ORDER BY o.created_at DESC LIMIT $${n} OFFSET $${n + 1}`;
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
-    const countResult = await pool.query(
-      search
-        ? 'SELECT COUNT(*)::int FROM orders o LEFT JOIN users u ON o.user_id = u.id WHERE (o.order_number ILIKE $1 OR o.guest_email ILIKE $1 OR u.email ILIKE $1)'
-        : 'SELECT COUNT(*)::int FROM orders',
-      search ? [`%${search}%`] : []
-    );
+
+    const countConditions = [];
+    const countParams = [];
+    let cn = 1;
+    if (search) {
+      countConditions.push(
+        `(o.order_number ILIKE $${cn} OR o.guest_email ILIKE $${cn} OR u.email ILIKE $${cn})`
+      );
+      countParams.push(`%${search}%`);
+      cn += 1;
+    }
+    if (statusFilter) {
+      countConditions.push(`o.status = $${cn}`);
+      countParams.push(statusFilter);
+      cn += 1;
+    }
+    let countQuery = 'SELECT COUNT(*)::int FROM orders o LEFT JOIN users u ON o.user_id = u.id';
+    if (countConditions.length) {
+      countQuery += ' WHERE ' + countConditions.join(' AND ');
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
     const total = countResult.rows[0].count;
 
     return { items: result.rows, total, page, limit, totalPages: Math.ceil(total / limit) };
