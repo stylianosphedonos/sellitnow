@@ -409,6 +409,62 @@ function renderProductCardMarkup(p) {
   `;
 }
 
+/** Populated in `loadCategories` for section titles when filtering by category. */
+const sellitnowCategoryLabels = new Map();
+
+function applyProductsBrowseMode(categoryId, categoryLabel) {
+  const categoriesEl = document.getElementById('categories');
+  const browseBar = document.getElementById('productsBrowseBar');
+  const heading = document.getElementById('productsSectionHeading');
+  const inCategory =
+    categoryId != null && Number.isFinite(categoryId) && categoryId > 0;
+
+  if (categoriesEl) categoriesEl.hidden = inCategory;
+  if (browseBar) browseBar.hidden = !inCategory;
+
+  if (heading) {
+    if (inCategory) {
+      const label = categoryLabel != null && String(categoryLabel).trim() !== '' ? String(categoryLabel).trim() : '';
+      heading.textContent = label || 'Products';
+    } else {
+      heading.textContent = 'Trending Deals';
+    }
+  }
+}
+
+function bindCategoryGridNavigation() {
+  const grid = document.getElementById('categoryGrid');
+  if (!grid || grid.dataset.sellitnowCategoryNavBound === '1') return;
+  grid.dataset.sellitnowCategoryNavBound = '1';
+  grid.addEventListener('click', (ev) => {
+    const card = ev.target.closest('[data-category-id]');
+    if (!card) return;
+    const id = parseInt(card.getAttribute('data-category-id'), 10);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const url = new URL(location.href);
+    url.searchParams.set('category', String(id));
+    history.replaceState({}, '', url.pathname + url.search);
+    const label = sellitnowCategoryLabels.get(id);
+    applyProductsBrowseMode(id, label);
+    loadProducts(1, id);
+    document.querySelector('.products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function bindBackToCategories() {
+  const btn = document.getElementById('backToCategoriesBtn');
+  if (!btn || btn.dataset.sellitnowBound === '1') return;
+  btn.dataset.sellitnowBound = '1';
+  btn.addEventListener('click', () => {
+    const url = new URL(location.href);
+    url.searchParams.delete('category');
+    history.replaceState({}, '', url.pathname + url.search);
+    applyProductsBrowseMode(null);
+    loadProducts(1, null);
+    document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
 function bindLoadAllProductsFromCategorySection() {
   const btn = document.getElementById('loadAllProductsBtn');
   if (!btn) return;
@@ -416,6 +472,7 @@ function bindLoadAllProductsFromCategorySection() {
     const url = new URL(location.href);
     url.searchParams.delete('category');
     history.replaceState({}, '', url.pathname + url.search);
+    applyProductsBrowseMode(null);
     loadProducts(1, null);
   });
 }
@@ -436,6 +493,10 @@ async function loadCategories() {
       </button>`;
   try {
     const { categories } = await callApi('/categories');
+    sellitnowCategoryLabels.clear();
+    for (const c of categories) {
+      if (c && c.id != null) sellitnowCategoryLabels.set(c.id, c.name);
+    }
     grid.innerHTML =
       allProductsTile +
       categories
@@ -445,16 +506,19 @@ async function loadCategories() {
             ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
             : `<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🛒</span></div>`;
           return `
-      <a href="/products.html?category=${c.id}" class="category-card">
+      <button type="button" class="category-card" data-category-id="${c.id}">
         ${media}
         <span class="category-card__label">${escapeHtml(c.name)}</span>
-      </a>`;
+      </button>`;
         })
         .join('');
   } catch (err) {
+    sellitnowCategoryLabels.clear();
     grid.innerHTML = allProductsTile + '<p>No categories</p>';
   }
   bindLoadAllProductsFromCategorySection();
+  bindCategoryGridNavigation();
+  bindBackToCategories();
 }
 
 let currentProductSearch = '';
@@ -473,6 +537,26 @@ function getCurrentCategoryFromUrl() {
   if (!categoryRaw) return null;
   const categoryId = parseInt(categoryRaw, 10);
   return Number.isFinite(categoryId) ? categoryId : null;
+}
+
+function syncProductsBrowseChromeFromUrl() {
+  const cid = getCurrentCategoryFromUrl();
+  applyProductsBrowseMode(cid, cid != null ? sellitnowCategoryLabels.get(cid) : null);
+}
+
+let sellitnowHomePopstateBound = false;
+
+function initHomeBrowseHistory() {
+  if (sellitnowHomePopstateBound) return;
+  sellitnowHomePopstateBound = true;
+  window.addEventListener('popstate', () => {
+    if (!document.getElementById('productGrid')) return;
+    const q2 = new URLSearchParams(location.search).get('q') || '';
+    const searchInput2 = document.getElementById('searchInput');
+    if (searchInput2) searchInput2.value = q2;
+    syncProductsBrowseChromeFromUrl();
+    loadProducts(1, getCurrentCategoryFromUrl(), q2);
+  });
 }
 
 async function loadProducts(page = 1, categoryId = null, searchQuery) {
@@ -550,11 +634,8 @@ function initHomeSearch() {
 
   const runSearch = () => {
     const q = (input?.value || '').trim();
-    const params = new URLSearchParams(location.search);
-    const categoryRaw = params.get('category');
-    const categoryId = categoryRaw ? parseInt(categoryRaw, 10) : null;
     syncQueryInUrl(q);
-    loadProducts(1, categoryId, q);
+    loadProducts(1, getCurrentCategoryFromUrl(), q);
   };
 
   btn?.addEventListener('click', runSearch);
@@ -569,16 +650,17 @@ function initHomeSearch() {
 async function initHomePage() {
   updateNav();
   initLogout();
-  const params = new URLSearchParams(location.search);
-  const categoryId = params.get('category') ? parseInt(params.get('category'), 10) : null;
-  const q = params.get('q') || '';
+  const categoryId = getCurrentCategoryFromUrl();
+  const q = new URLSearchParams(location.search).get('q') || '';
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = q;
   initHomeSearch();
   initResponsiveProductPageSizeReload();
+  initHomeBrowseHistory();
 
   await loadBrandSettings();
   await Promise.all([loadCartCount(), loadCategories(), loadProducts(1, categoryId, q)]);
+  syncProductsBrowseChromeFromUrl();
 }
 
 if (document.readyState === 'loading') {
@@ -589,10 +671,10 @@ if (document.readyState === 'loading') {
 
 window.addEventListener('pageshow', (e) => {
   if (!e.persisted || !document.getElementById('productGrid')) return;
-  const params = new URLSearchParams(location.search);
-  const categoryId = params.get('category') ? parseInt(params.get('category'), 10) : null;
-  const q = params.get('q') || '';
+  const categoryId = getCurrentCategoryFromUrl();
+  const q = new URLSearchParams(location.search).get('q') || '';
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = q;
+  syncProductsBrowseChromeFromUrl();
   void Promise.all([loadBrandSettings(), loadProducts(1, categoryId, q)]);
 });
