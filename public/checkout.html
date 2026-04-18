@@ -46,7 +46,7 @@
                     <span class="checkout-payment-option__hint">Secure checkout with Stripe on the next step.</span>
                   </span>
                 </label>
-                <label class="checkout-payment-option">
+                <label id="checkoutPayPodOption" class="checkout-payment-option">
                   <input type="radio" name="checkout_payment_method" value="pay_on_delivery">
                   <span class="checkout-payment-option__box">
                     <span class="checkout-payment-option__title">Pay on delivery</span>
@@ -118,12 +118,23 @@
     }
 
     let createdOrder = null;
+    /** After shopper clicks “Pay by card”, only the card box stays visible (POD hidden until they pick POD again). */
+    let checkoutCardOnly = false;
 
     function syncCheckoutPaymentUi() {
       const btn = document.getElementById('placeOrderBtn');
       const podSelected = document.querySelector('input[name="checkout_payment_method"][value="pay_on_delivery"]')?.checked;
       const cardSelected = !podSelected;
       if (btn) btn.textContent = cardSelected ? 'Continue to payment' : 'Place order';
+
+      const podWrap = document.getElementById('checkoutPayPodOption');
+      const legend = document.getElementById('checkoutPaymentLegend');
+      if (podWrap) {
+        podWrap.style.display = checkoutCardOnly && cardSelected ? 'none' : '';
+      }
+      if (legend) {
+        legend.textContent = checkoutCardOnly && cardSelected ? 'Paying by card' : 'How would you like to pay?';
+      }
 
       const phoneInput = document.getElementById('checkoutPhone');
       const phoneLabelOptional = document.getElementById('checkoutPhoneOptional');
@@ -146,8 +157,16 @@
       }
     }
 
+    function onPaymentMethodInteraction(el) {
+      if (el.value === 'pay_on_delivery' && el.checked) checkoutCardOnly = false;
+      if (el.value === 'card' && el.checked) checkoutCardOnly = true;
+      syncCheckoutPaymentUi();
+    }
     document.querySelectorAll('input[name="checkout_payment_method"]').forEach((el) => {
-      el.addEventListener('change', syncCheckoutPaymentUi);
+      el.addEventListener('change', () => onPaymentMethodInteraction(el));
+      if (el.value === 'card') {
+        el.addEventListener('click', () => onPaymentMethodInteraction(el));
+      }
     });
     syncCheckoutPaymentUi();
 
