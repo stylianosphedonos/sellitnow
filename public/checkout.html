@@ -43,7 +43,16 @@
                   <input type="radio" name="checkout_payment_method" value="card" checked>
                   <span class="checkout-payment-option__box">
                     <span class="checkout-payment-option__title">Pay by card</span>
-                    <span class="checkout-payment-option__hint">Secure checkout with Stripe on the next step.</span>
+                    <span class="checkout-payment-option__hint">Visa, Mastercard, and other cards — secure checkout with Stripe on the next step.</span>
+                  </span>
+                </label>
+                <label class="checkout-payment-option checkout-payment-option--applepay">
+                  <input type="radio" name="checkout_payment_method" value="apple_pay">
+                  <span class="checkout-payment-option__box">
+                    <span class="checkout-payment-option__title checkout-payment-option__title--with-mark">
+                      <span class="checkout-apple-pay-wordmark">Apple Pay</span>
+                    </span>
+                    <span class="checkout-payment-option__hint">Wallet checkout on the next step when your device supports it (Stripe must have Apple Pay enabled for your domain).</span>
                   </span>
                 </label>
                 <label id="checkoutPayPodOption" class="checkout-payment-option">
@@ -86,7 +95,7 @@
           <h2 style="margin-top:0;font-size:18px">Payment</h2>
           <div id="stockWarningBanner" class="alert alert-warning" style="display:none;margin-bottom:16px" role="status"></div>
           <div id="paymentOrderBanner"></div>
-          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete your card details below. Items and options are fixed for this order.</p>
+          <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete payment below. Items and options are fixed for this order.</p>
           <form id="paymentForm">
             <div id="payment-element"></div>
             <div id="payment-message" class="alert alert-error" style="display:none;margin-top:12px"></div>
@@ -133,7 +142,7 @@
         podWrap.style.display = checkoutCardOnly && cardSelected ? 'none' : '';
       }
       if (legend) {
-        legend.textContent = checkoutCardOnly && cardSelected ? 'Paying by card' : 'How would you like to pay?';
+        legend.textContent = checkoutCardOnly && cardSelected ? 'Paying online' : 'How would you like to pay?';
       }
 
       const phoneInput = document.getElementById('checkoutPhone');
@@ -159,12 +168,12 @@
 
     function onPaymentMethodInteraction(el) {
       if (el.value === 'pay_on_delivery' && el.checked) checkoutCardOnly = false;
-      if (el.value === 'card' && el.checked) checkoutCardOnly = true;
+      if ((el.value === 'card' || el.value === 'apple_pay') && el.checked) checkoutCardOnly = true;
       syncCheckoutPaymentUi();
     }
     document.querySelectorAll('input[name="checkout_payment_method"]').forEach((el) => {
       el.addEventListener('change', () => onPaymentMethodInteraction(el));
-      if (el.value === 'card') {
+      if (el.value === 'card' || el.value === 'apple_pay') {
         el.addEventListener('click', () => onPaymentMethodInteraction(el));
       }
     });
@@ -231,6 +240,7 @@
           guest_order_token: data.guest_order_token || null,
           stock_warning: data.order.stock_warning || null,
           payment_method: data.order.payment_method || 'card',
+          preferApplePay: payChoice === 'apple_pay',
         };
 
         if (createdOrder.payment_method === 'pay_on_delivery') {
@@ -260,6 +270,12 @@
           createdOrder.order_number,
           createdOrder.total_amount
         );
+        const introEl = document.getElementById('paymentStepIntro');
+        if (introEl) {
+          introEl.textContent = createdOrder.preferApplePay
+            ? 'Use Apple Pay when it appears below, or enter your card. Items and options are fixed for this order.'
+            : 'Pay with Apple Pay or enter your card below. Items and options are fixed for this order.';
+        }
         document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
         initStripePayment();
         loadCartCount();
@@ -296,9 +312,13 @@
 
         const stripe = Stripe(publishableKey);
         const elements = stripe.elements({ clientSecret });
-        const paymentElement = elements.create('payment', {
-          wallets: { applePay: 'never', googlePay: 'never' },
-        });
+        const paymentOpts = {
+          wallets: { applePay: 'auto', googlePay: 'never' },
+        };
+        if (createdOrder.preferApplePay) {
+          paymentOpts.paymentMethodOrder = ['apple_pay', 'card'];
+        }
+        const paymentElement = elements.create('payment', paymentOpts);
         paymentElement.mount('#payment-element');
 
         const paymentForm = document.getElementById('paymentForm');
