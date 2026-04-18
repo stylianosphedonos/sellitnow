@@ -108,7 +108,8 @@ router.get('/products', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 100;
-    const result = await ProductService.adminList(page, limit);
+    const q = String(req.query.q || req.query.search || '').trim();
+    const result = await ProductService.adminList(page, limit, q);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

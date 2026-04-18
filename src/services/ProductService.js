@@ -42,15 +42,30 @@ class ProductService {
     return categoryIds;
   }
 
-  async adminList(page = 1, limit = 100) {
+  async adminList(page = 1, limit = 100, search = '') {
     const offset = (page - 1) * limit;
-    const countResult = await pool.query('SELECT COUNT(*)::int FROM products');
+    const term = search != null ? String(search).trim() : '';
+    const pattern = term ? `%${term}%` : null;
+
+    const countResult = pattern
+      ? await pool.query('SELECT COUNT(*)::int FROM products p WHERE p.title ILIKE $1', [pattern])
+      : await pool.query('SELECT COUNT(*)::int FROM products');
     const total = countResult.rows[0].count;
-    const result = await pool.query(
-      `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost
-       FROM products p ORDER BY p.id LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+
+    const result = pattern
+      ? await pool.query(
+          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost
+           FROM products p
+           WHERE p.title ILIKE $1
+           ORDER BY p.id
+           LIMIT $2 OFFSET $3`,
+          [pattern, limit, offset]
+        )
+      : await pool.query(
+          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost
+           FROM products p ORDER BY p.id LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        );
     const items = result.rows;
     const categoryMap = await this.getCategoryIdsByProductIds(items.map((x) => x.id));
     const mapped = items.map((row) => ({
