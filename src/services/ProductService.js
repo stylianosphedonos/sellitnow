@@ -47,7 +47,7 @@ class ProductService {
     const countResult = await pool.query('SELECT COUNT(*)::int FROM products');
     const total = countResult.rows[0].count;
     const result = await pool.query(
-      `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json
+      `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost
        FROM products p ORDER BY p.id LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
@@ -189,9 +189,12 @@ class ProductService {
       : (data.category_id ? [data.category_id] : []);
     const primaryCategoryId = categoryIds.length ? categoryIds[0] : null;
 
+    const deliveryCost =
+      data.delivery_cost !== undefined && data.delivery_cost !== null ? Number(data.delivery_cost) : null;
+
     const result = await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, options_json)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, options_json, delivery_cost)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         data.sku,
@@ -203,6 +206,7 @@ class ProductService {
         primaryCategoryId,
         data.status || 'draft',
         optionsJson,
+        deliveryCost != null && Number.isFinite(deliveryCost) ? deliveryCost : null,
       ]
     );
     const product = result.rows[0];
@@ -244,6 +248,14 @@ class ProductService {
     const category_id = normalizedCategoryIds.length ? normalizedCategoryIds[0] : null;
     const status = data.status !== undefined && data.status !== null ? data.status : product.status;
 
+    let delivery_cost = product.delivery_cost;
+    if (data.delivery_cost !== undefined) {
+      delivery_cost =
+        data.delivery_cost === null || data.delivery_cost === ''
+          ? null
+          : Number(data.delivery_cost);
+    }
+
     const optRow = await pool.query('SELECT options_json FROM products WHERE id = $1', [id]);
     let optionsJson = optRow.rows[0]?.options_json ?? null;
     if (data.options !== undefined) {
@@ -263,9 +275,10 @@ class ProductService {
         category_id = $8,
         status = $9,
         options_json = $10,
+        delivery_cost = $11,
         updated_at = NOW()
        WHERE id = $1`,
-      [id, sku, title, slug, description, price, stock_quantity, category_id, status, optionsJson]
+      [id, sku, title, slug, description, price, stock_quantity, category_id, status, optionsJson, delivery_cost]
     );
     await this.assignProductCategories(id, normalizedCategoryIds);
 

@@ -88,6 +88,18 @@ function normalizeProductPayload(data, { forUpdate = false } = {}) {
     if (!String(clean.sku || '').trim()) throw new Error('SKU is required.');
   }
 
+  if (data.delivery_cost !== undefined) {
+    if (data.delivery_cost === null || data.delivery_cost === '') {
+      clean.delivery_cost = null;
+    } else {
+      const d = Number(data.delivery_cost);
+      if (!Number.isFinite(d) || d < 0) {
+        throw new Error('Delivery cost must be a non-negative number when set.');
+      }
+      clean.delivery_cost = d;
+    }
+  }
+
   return clean;
 }
 
@@ -388,6 +400,7 @@ router.put('/brand', async (req, res) => {
       heroTitle,
       heroSubtitle,
       emailFrom,
+      defaultDeliveryCost,
     } = req.body;
     const updates = [
       primary != null && { key: 'primary', value: String(primary) },
@@ -412,6 +425,14 @@ router.put('/brand', async (req, res) => {
         return res.status(400).json({ error: 'Tax rate must be between 0 and 100 percent.' });
       }
       updates.push({ key: 'taxRatePercent', value: String(Math.round(t * 100) / 100) });
+    }
+
+    if (defaultDeliveryCost !== undefined && defaultDeliveryCost !== null && String(defaultDeliveryCost).trim() !== '') {
+      const d = parseFloat(defaultDeliveryCost);
+      if (!Number.isFinite(d) || d < 0) {
+        return res.status(400).json({ error: 'Default delivery cost must be a non-negative number.' });
+      }
+      updates.push({ key: 'defaultDeliveryCost', value: String(Math.round(d * 100) / 100) });
     }
 
     if (emailFrom !== undefined) {
@@ -496,7 +517,7 @@ router.get('/database/backup', async (req, res) => {
   try {
     const backup = await createFullBackup();
     const safeTs = String(backup?.createdAt || Date.now()).replace(/[:.]/g, '-');
-    res.setHeader('Content-Disposition', `attachment; filename="sellitnow-db-backup-${safeTs}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="3nitylab-db-backup-${safeTs}.json"`);
     res.json(backup);
   } catch (err) {
     res.status(500).json({ error: err.message });

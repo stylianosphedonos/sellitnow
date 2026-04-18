@@ -1,7 +1,8 @@
 const { v4: uuidv4 } = require('uuid');
-const config = require('../config');
 const { pool } = require('../database/db');
 const CartService = require('./CartService');
+const { getBrandSettings } = require('../routes/brand');
+const { computeShippingTotal } = require('../lib/shipping');
 const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
 const { createGuestOrderToken, verifyGuestOrderToken } = require('../lib/guestOrderToken');
@@ -67,7 +68,8 @@ class OrderService {
 
     const subtotal = cartData.subtotal;
     const taxAmount = cartData.tax_amount;
-    const shippingCost = config.app.shippingCost;
+    const brand = await getBrandSettings();
+    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items);
     const totalAmount = subtotal + taxAmount + shippingCost;
 
     const orderNumber = this.generateOrderNumber();
@@ -100,6 +102,10 @@ class OrderService {
         slug: product.slug,
         color: item.color || '',
         size: item.size || '',
+        delivery_cost:
+          product.delivery_cost != null && product.delivery_cost !== ''
+            ? Number(product.delivery_cost)
+            : null,
       };
       await pool.query(
         `INSERT INTO order_items (order_id, product_id, product_snapshot, quantity, unit_price, total_price)

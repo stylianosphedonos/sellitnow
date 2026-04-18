@@ -243,6 +243,9 @@ function runSchemaMigrations(db) {
   if (!productCols.some((c) => c.name === 'options_json')) {
     db.exec('ALTER TABLE products ADD COLUMN options_json TEXT');
   }
+  if (!productCols.some((c) => c.name === 'delivery_cost')) {
+    db.exec('ALTER TABLE products ADD COLUMN delivery_cost REAL');
+  }
 
   const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!orderCols.includes('stock_warning')) {
@@ -291,6 +294,9 @@ async function ensureDb() {
       await dbMod.pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
       await dbMod.pool.query(
         `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'card'`
+      );
+      await dbMod.pool.query(
+        'ALTER TABLE products ADD COLUMN IF NOT EXISTS delivery_cost DOUBLE PRECISION'
       );
       await dbMod.pool.query(
         `INSERT INTO product_categories (product_id, category_id)

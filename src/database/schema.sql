@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS products (
   category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
   options_json TEXT,
+  delivery_cost REAL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

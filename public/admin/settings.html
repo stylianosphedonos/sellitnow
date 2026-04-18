@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings - Admin - Sellitnow</title>
+  <title>Settings - Admin - 3nitylab</title>
   <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -22,7 +22,7 @@
     </aside>
     <main class="admin-content">
       <h1>Settings</h1>
-      <p style="margin-bottom:24px;color:var(--text-muted)">Store currency, tax, and the sender address used for outbound email (order confirmations, admin alerts, etc.).</p>
+      <p style="margin-bottom:24px;color:var(--text-muted)">Store currency, tax, delivery defaults, and the sender address used for outbound email (order confirmations, admin alerts, etc.).</p>
 
       <div id="alert" class="alert" style="display:none;margin-bottom:24px"></div>
 
@@ -61,6 +61,19 @@
           </div>
           <p id="currencyPreview" style="margin-top:12px;font-size:14px;color:var(--text-muted)"></p>
           <button type="button" id="saveCurrencyTax" class="btn" style="margin-top:16px;max-width:240px">Save currency &amp; tax</button>
+        </section>
+
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:8px">Delivery</h2>
+          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;line-height:1.5">Default shipping charge applied to each order. Products can override their own per-unit delivery in the product editor; overrides adjust this base (for example, a product set to 0 can reduce shipping when mixed with the default).</p>
+          <div style="display:grid;gap:20px;max-width:420px">
+            <div class="form-group">
+              <label for="defaultDeliveryCost">Default delivery cost</label>
+              <input type="number" id="defaultDeliveryCost" min="0" step="0.01" style="width:100%;max-width:200px;padding:10px;border:1px solid var(--border);border-radius:8px">
+              <small style="color:var(--text-muted);display:block;margin-top:6px">If you never save this field, the server uses <code style="font-size:12px">SHIPPING_COST</code> from the environment.</small>
+            </div>
+          </div>
+          <button type="button" id="saveDelivery" class="btn" style="margin-top:8px;max-width:220px">Save delivery default</button>
         </section>
 
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
@@ -107,6 +120,7 @@
 
     const alertEl = document.getElementById('alert');
     const saveCurrencyTaxBtn = document.getElementById('saveCurrencyTax');
+    const saveDeliveryBtn = document.getElementById('saveDelivery');
     const saveSenderEmailBtn = document.getElementById('saveSenderEmail');
     const createDbBackupBtn = document.getElementById('createDbBackupBtn');
     const restoreDbBackupBtn = document.getElementById('restoreDbBackupBtn');
@@ -150,6 +164,11 @@
         }
         const fromEl = document.getElementById('senderEmailFrom');
         if (fromEl) fromEl.value = data.emailFrom != null && data.emailFrom !== '' ? data.emailFrom : '';
+        const delEl = document.getElementById('defaultDeliveryCost');
+        if (delEl) {
+          const v = data.defaultDeliveryCost;
+          delEl.value = v != null && v !== '' && Number.isFinite(Number(v)) ? String(v) : '';
+        }
         updateCurrencyPreview();
       } catch (err) {
         showAlert('Failed to load settings.', true);
@@ -171,6 +190,26 @@
       }
       saveSenderEmailBtn.disabled = false;
       saveSenderEmailBtn.textContent = 'Save sender email';
+    });
+
+    saveDeliveryBtn?.addEventListener('click', async () => {
+      saveDeliveryBtn.disabled = true;
+      saveDeliveryBtn.textContent = 'Saving...';
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({
+            defaultDeliveryCost: document.getElementById('defaultDeliveryCost').value
+          })
+        });
+        showAlert('Delivery default saved.');
+        await loadBrandSettings();
+        await loadSettings();
+      } catch (err) {
+        showAlert(err.message || 'Failed to save.', true);
+      }
+      saveDeliveryBtn.disabled = false;
+      saveDeliveryBtn.textContent = 'Save delivery default';
     });
 
     saveCurrencyTaxBtn.addEventListener('click', async () => {

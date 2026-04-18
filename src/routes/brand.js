@@ -64,12 +64,22 @@ async function getOutboundEmailFrom() {
   return config.email.from;
 }
 
+function defaultDeliveryCostFromStored(stored) {
+  if (stored.defaultDeliveryCost == null || String(stored.defaultDeliveryCost).trim() === '') return undefined;
+  const n = parseFloat(stored.defaultDeliveryCost);
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  return Math.round(n * 100) / 100;
+}
+
 async function getBrandSettings() {
   const result = await pool.query('SELECT key, value FROM brand_settings');
   const stored = rowToObj(result.rows);
   const taxOverride = taxPercentFromStored(stored);
   const taxRatePercent = taxOverride !== undefined ? taxOverride : defaultTaxPercentFromConfig();
   const currency = normalizeCurrency(stored.currency) || DEFAULTS.currency;
+  const deliveryOverride = defaultDeliveryCostFromStored(stored);
+  const defaultDeliveryCost =
+    deliveryOverride !== undefined ? deliveryOverride : config.app.shippingCost;
 
   const heroTitle =
     stored.heroTitle !== undefined && stored.heroTitle !== null
@@ -102,6 +112,7 @@ async function getBrandSettings() {
     heroTitle,
     heroSubtitle,
     emailFrom,
+    defaultDeliveryCost,
   };
 }
 
@@ -122,3 +133,4 @@ module.exports.getOutboundEmailFrom = getOutboundEmailFrom;
 module.exports.normalizeEmailFromInput = normalizeEmailFromInput;
 module.exports.DEFAULTS = DEFAULTS;
 module.exports.normalizeCurrency = normalizeCurrency;
+module.exports.defaultDeliveryCostFromStored = defaultDeliveryCostFromStored;

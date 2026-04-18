@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Products - Admin - Sellitnow</title>
+  <title>Products - Admin - 3nitylab</title>
   <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -41,6 +41,11 @@
           <div class="form-group">
             <label>Price *</label>
             <input type="number" step="0.01" name="price" required>
+          </div>
+          <div class="form-group">
+            <label>Delivery cost (optional)</label>
+            <input type="number" step="0.01" min="0" name="delivery_cost" placeholder="Store default">
+            <small style="color:#666">Override per SKU; leave blank to use Settings → default delivery.</small>
           </div>
           <div class="form-group">
             <label>Stock Quantity</label>
@@ -117,6 +122,9 @@
       const formData = new FormData(form);
       const data = Object.fromEntries(formData);
       data.stock_quantity = parseInt(data.stock_quantity) || 0;
+      const dRaw = String(data.delivery_cost || '').trim();
+      if (dRaw === '') delete data.delivery_cost;
+      else data.delivery_cost = parseFloat(dRaw);
       data.category_ids = Array.from(form.category_ids.selectedOptions || [])
         .map((opt) => parseInt(opt.value, 10))
         .filter((x) => Number.isInteger(x));

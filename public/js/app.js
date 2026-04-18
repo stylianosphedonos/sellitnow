@@ -10,7 +10,9 @@ function mediaUrl(u) {
 
 function readCachedBrandSettings() {
   try {
-    return JSON.parse(localStorage.getItem('sellitnow.brand') || 'null');
+    const raw =
+      localStorage.getItem('3nitylab.brand') || localStorage.getItem('sellitnow.brand');
+    return JSON.parse(raw || 'null');
   } catch {
     return null;
   }
@@ -18,7 +20,7 @@ function readCachedBrandSettings() {
 
 function persistBrandSettings(data) {
   try {
-    localStorage.setItem('sellitnow.brand', JSON.stringify({
+    localStorage.setItem('3nitylab.brand', JSON.stringify({
       primary: data.primary || '',
       primaryDark: data.primaryDark || '',
       secondary: data.secondary || '',
@@ -97,7 +99,7 @@ function sellitnowCsrfCookieName() {
   if (typeof window !== 'undefined' && window.__SELLITNOW_CSRF_COOKIE__ != null) {
     return String(window.__SELLITNOW_CSRF_COOKIE__);
   }
-  return 'sellitnow_csrf';
+  return '3nitylab_csrf';
 }
 
 function clearSellitnowCsrfCache() {
@@ -229,10 +231,10 @@ async function loadBrandSettings() {
         el.innerHTML = '';
         const img = document.createElement('img');
         img.src = mediaUrl(data.logo);
-        img.alt = 'Sellitnow';
+        img.alt = '3nitylab';
         el.appendChild(img);
       } else {
-        el.textContent = 'Sellitnow';
+        el.textContent = '3nitylab';
       }
     });
   } catch (_) {}
@@ -301,10 +303,10 @@ function showToast(message, options = {}) {
   const duration = options.duration ?? (type === 'error' ? 5200 : 4000);
   const action = options.action;
 
-  let host = document.getElementById('sellitnow-toast-host');
+  let host = document.getElementById('3nitylab-toast-host');
   if (!host) {
     host = document.createElement('div');
-    host.id = 'sellitnow-toast-host';
+    host.id = '3nitylab-toast-host';
     host.className = 'toast-host';
     host.setAttribute('aria-live', 'polite');
     host.setAttribute('aria-atomic', 'true');

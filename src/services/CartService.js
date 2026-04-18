@@ -4,6 +4,7 @@ const { pool } = require('../database/db');
 const { getBrandSettings } = require('../routes/brand');
 const ProductService = require('./ProductService');
 const { validateVariantForProduct } = require('../lib/productOptions');
+const { computeShippingTotal } = require('../lib/shipping');
 
 class CartService {
   /**
@@ -50,7 +51,7 @@ class CartService {
   async getCart(userId = null, sessionId = null) {
     const cart = await this.getOrCreateCart(userId, sessionId);
     const itemsResult = await pool.query(
-      `SELECT ci.id, ci.product_id, ci.quantity, ci.color, ci.size, p.title, p.price, p.stock_quantity, p.sku,
+      `SELECT ci.id, ci.product_id, ci.quantity, ci.color, ci.size, p.title, p.price, p.stock_quantity, p.sku, p.delivery_cost,
               (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
@@ -62,6 +63,7 @@ class CartService {
     const items = itemsResult.rows.map((r) => {
       const lineTotal = parseFloat(r.price) * r.quantity;
       subtotal += lineTotal;
+      const dc = r.delivery_cost;
       return {
         id: r.id,
         product_id: r.product_id,
@@ -74,13 +76,15 @@ class CartService {
         image_url: r.image_url,
         sku: r.sku,
         line_total: lineTotal,
+        delivery_cost: dc != null && dc !== '' ? Number(dc) : null,
       };
     });
 
     const brand = await getBrandSettings();
     const taxRate = Number(brand.taxRatePercent) / 100;
     const taxAmount = subtotal * (Number.isFinite(taxRate) ? taxRate : 0);
-    const shippingCost = config.app.shippingCost;
+    const defaultDelivery = brand.defaultDeliveryCost;
+    const shippingCost = computeShippingTotal(defaultDelivery, items);
     const total = subtotal + taxAmount + shippingCost;
 
     return {
@@ -89,6 +93,7 @@ class CartService {
       items,
       subtotal,
       tax_amount: taxAmount,
+      default_delivery_cost: defaultDelivery,
       shipping_estimate: shippingCost,
       total,
       item_count: items.reduce((s, i) => s + i.quantity, 0),

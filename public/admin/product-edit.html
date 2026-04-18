@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Edit Product - Admin - Sellitnow</title>
+  <title>Edit Product - Admin - 3nitylab</title>
   <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -85,6 +85,11 @@
           <div class="form-group">
             <label>Price *</label>
             <input type="number" step="0.01" name="price" value="${product.price || ''}" required>
+          </div>
+          <div class="form-group">
+            <label>Delivery cost (optional)</label>
+            <input type="number" step="0.01" min="0" name="delivery_cost" placeholder="Uses store default" value="${product.delivery_cost != null && product.delivery_cost !== '' ? escapeHtml(String(product.delivery_cost)) : ''}">
+            <small style="color:#666">Leave blank to use the default from <a href="/admin/settings.html">Settings</a>. If set, each unit of this product adjusts the order delivery total relative to that default.</small>
           </div>
           <div class="form-group">
             <label>Stock Quantity</label>
@@ -240,6 +245,19 @@
         .map((opt) => parseInt(opt.value, 10))
         .filter((x) => Number.isInteger(x));
 
+      const rawDel = (form.delivery_cost && form.delivery_cost.value != null) ? String(form.delivery_cost.value).trim() : '';
+      let delivery_cost = null;
+      if (rawDel !== '') {
+        delivery_cost = parseFloat(rawDel);
+        if (!Number.isFinite(delivery_cost) || delivery_cost < 0) {
+          errEl.textContent = 'Delivery cost must be a non-negative number.';
+          errEl.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Save Changes';
+          return;
+        }
+      }
+
       const productData = {
         title: form.title.value,
         sku: form.sku.value,
@@ -248,6 +266,7 @@
         stock_quantity: parseInt(form.stock_quantity.value, 10) || 0,
         category_ids: selectedCategories,
         status: form.status.value,
+        delivery_cost,
         options: { colors: [...editColors], sizes: [...editSizes] }
       };
 
