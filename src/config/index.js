@@ -42,6 +42,11 @@ module.exports = {
     secretKey: process.env.STRIPE_SECRET_KEY,
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    /** ISO country for Stripe.js Payment Request (Apple Pay); should match your Stripe account / business. */
+    paymentRequestCountry: (() => {
+      const c = (process.env.STRIPE_PAYMENT_REQUEST_COUNTRY || 'US').trim().toUpperCase();
+      return /^[A-Z]{2}$/.test(c) ? c : 'US';
+    })(),
   },
   email: {
     host: process.env.SMTP_HOST,

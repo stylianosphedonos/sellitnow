@@ -52,7 +52,7 @@
                     <span class="checkout-payment-option__title checkout-payment-option__title--with-mark">
                       <span class="checkout-apple-pay-wordmark">Apple Pay</span>
                     </span>
-                    <span class="checkout-payment-option__hint">Wallet checkout on the next step when your device supports it (Stripe must have Apple Pay enabled for your domain).</span>
+                    <span class="checkout-payment-option__hint">On the next step you’ll confirm with Apple Pay from your Wallet.</span>
                   </span>
                 </label>
                 <label id="checkoutPayPodOption" class="checkout-payment-option">
@@ -96,9 +96,15 @@
           <div id="stockWarningBanner" class="alert alert-warning" style="display:none;margin-bottom:16px" role="status"></div>
           <div id="paymentOrderBanner"></div>
           <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete payment below. Items and options are fixed for this order.</p>
+          <div id="apple-wallet-checkout" style="display:none;margin-bottom:16px">
+            <div id="payment-request-button" class="checkout-pr-mount"></div>
+            <button type="button" class="btn btn-secondary" id="switchToCardPaymentBtn" style="display:none;margin-top:12px;max-width:260px">
+              Pay with card instead
+            </button>
+          </div>
+          <div id="payment-message" class="alert alert-error" style="display:none;margin-top:12px"></div>
           <form id="paymentForm">
             <div id="payment-element"></div>
-            <div id="payment-message" class="alert alert-error" style="display:none;margin-top:12px"></div>
             <button type="submit" class="btn" id="payBtn" style="margin-top:24px;max-width:200px">Pay now</button>
           </form>
           <p style="margin-top:20px;font-size:14px">
@@ -270,12 +276,6 @@
           createdOrder.order_number,
           createdOrder.total_amount
         );
-        const introEl = document.getElementById('paymentStepIntro');
-        if (introEl) {
-          introEl.textContent = createdOrder.preferApplePay
-            ? 'Use Apple Pay when it appears below, or enter your card. Items and options are fixed for this order.'
-            : 'Pay with Apple Pay or enter your card below. Items and options are fixed for this order.';
-        }
         document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
         initStripePayment();
         loadCartCount();
@@ -289,12 +289,71 @@
     async function initStripePayment() {
       const payBtn = document.getElementById('payBtn');
       const cancelLink = document.getElementById('cancelPaymentLink');
+      const paymentForm = document.getElementById('paymentForm');
+      const messageEl = document.getElementById('payment-message');
+      const introEl = document.getElementById('paymentStepIntro');
+      const appleWrap = document.getElementById('apple-wallet-checkout');
+      const prMount = document.getElementById('payment-request-button');
+      const switchToCardBtn = document.getElementById('switchToCardPaymentBtn');
+      const paymentElHost = document.getElementById('payment-element');
+
       if (!createdOrder) return;
 
+      const returnUrl =
+        window.location.origin +
+        '/order-confirm.html?id=' +
+        createdOrder.id +
+        '&number=' +
+        encodeURIComponent(createdOrder.order_number);
+
+      function setPaymentIntro(text) {
+        if (introEl) introEl.textContent = text;
+      }
+
+      function bindCardFormSubmit(stripe, elements) {
+        paymentForm.onsubmit = async (e) => {
+          e.preventDefault();
+          messageEl.style.display = 'none';
+          messageEl.textContent = '';
+          payBtn.disabled = true;
+
+          const { error: submitError } = await elements.submit();
+          if (submitError) {
+            messageEl.textContent = submitError.message || 'Please check your payment details';
+            messageEl.style.display = 'block';
+            payBtn.disabled = false;
+            return;
+          }
+
+          const { error } = await stripe.confirmPayment({
+            elements,
+            confirmParams: { return_url: returnUrl },
+            redirect: 'if_required',
+          });
+
+          if (error) {
+            messageEl.textContent = error.message || 'Payment failed';
+            messageEl.style.display = 'block';
+            payBtn.disabled = false;
+            return;
+          }
+          window.location.assign(returnUrl);
+        };
+      }
+
       try {
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+        paymentElHost.innerHTML = '';
+        prMount.innerHTML = '';
+        appleWrap.style.display = 'none';
+        switchToCardBtn.style.display = 'none';
+        paymentForm.style.display = 'block';
+        payBtn.style.display = '';
+
         const configRes = await fetch(sellitnowApiUrl('/payments/config'));
         if (!configRes.ok) throw new Error('Payment is not configured');
-        const { publishableKey } = await configRes.json();
+        const { publishableKey, currency, paymentRequestCountry } = await configRes.json();
         if (!publishableKey) throw new Error('Payment is not configured');
 
         const intentPayload = { order_id: createdOrder.id };
@@ -312,58 +371,124 @@
 
         const stripe = Stripe(publishableKey);
         const elements = stripe.elements({ clientSecret });
-        const paymentOpts = {
-          wallets: { applePay: 'auto', googlePay: 'never' },
-        };
-        if (createdOrder.preferApplePay) {
-          paymentOpts.paymentMethodOrder = ['apple_pay', 'card'];
+        const amountCents = Math.round(Number(createdOrder.total_amount) * 100);
+        const currencyLower = String(currency || 'usd')
+          .trim()
+          .toLowerCase();
+        const prCountry = String(paymentRequestCountry || 'US')
+          .trim()
+          .toUpperCase()
+          .slice(0, 2);
+
+        cancelLink.href =
+          '/checkout-cancel.html?order_id=' +
+          createdOrder.id +
+          '&number=' +
+          encodeURIComponent(createdOrder.order_number);
+
+        if (!createdOrder.preferApplePay) {
+          setPaymentIntro('Enter your card below. Your items are locked in for this order.');
+          const paymentElement = elements.create('payment', {
+            wallets: { applePay: 'auto', googlePay: 'never' },
+          });
+          paymentElement.mount('#payment-element');
+          bindCardFormSubmit(stripe, elements);
+          return;
         }
-        const paymentElement = elements.create('payment', paymentOpts);
-        paymentElement.mount('#payment-element');
 
-        const paymentForm = document.getElementById('paymentForm');
-        const messageEl = document.getElementById('payment-message');
+        setPaymentIntro('Complete your purchase with Apple Pay.');
+        const paymentRequest = stripe.paymentRequest({
+          country: prCountry,
+          currency: currencyLower,
+          total: {
+            label: 'Order ' + createdOrder.order_number,
+            amount: amountCents,
+          },
+          requestPayerName: true,
+          requestPayerEmail: true,
+        });
 
-        paymentForm.onsubmit = async (e) => {
-          e.preventDefault();
-          messageEl.style.display = 'none';
-          messageEl.textContent = '';
-          payBtn.disabled = true;
+        const can = await paymentRequest.canMakePayment();
 
-          const { error: submitError } = await elements.submit();
-          if (submitError) {
-            messageEl.textContent = submitError.message || 'Please check your payment details';
-            messageEl.style.display = 'block';
-            payBtn.disabled = false;
-            return;
-          }
+        if (can && can.applePay === true) {
+          paymentForm.style.display = 'none';
+          payBtn.style.display = 'none';
+          appleWrap.style.display = 'block';
+          switchToCardBtn.style.display = 'block';
 
-          const returnUrl =
-            window.location.origin +
-            '/order-confirm.html?id=' +
-            createdOrder.id +
-            '&number=' +
-            encodeURIComponent(createdOrder.order_number);
-          const { error } = await stripe.confirmPayment({
-            elements,
-            confirmParams: { return_url: returnUrl },
-            redirect: 'if_required',
+          const prButton = elements.create('paymentRequestButton', {
+            paymentRequest,
+            style: {
+              paymentRequestButton: {
+                type: 'buy',
+                theme: 'dark',
+                height: '48px',
+              },
+            },
+          });
+          prButton.mount('#payment-request-button');
+
+          paymentRequest.on('paymentmethod', async (ev) => {
+            messageEl.style.display = 'none';
+            messageEl.textContent = '';
+            try {
+              const { error, paymentIntent } = await stripe.confirmCardPayment(
+                clientSecret,
+                { payment_method: ev.paymentMethod.id },
+                { handleActions: true }
+              );
+              if (error) {
+                ev.complete('fail');
+                messageEl.textContent = error.message || 'Payment failed';
+                messageEl.style.display = 'block';
+                return;
+              }
+              if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
+                ev.complete('success');
+                window.location.assign(returnUrl);
+                return;
+              }
+              ev.complete('fail');
+              messageEl.textContent = 'Could not complete this payment. Please try again or use a card.';
+              messageEl.style.display = 'block';
+            } catch (err) {
+              try {
+                ev.complete('fail');
+              } catch (_) {}
+              messageEl.textContent = err.message || 'Payment failed';
+              messageEl.style.display = 'block';
+            }
           });
 
-          if (error) {
-            messageEl.textContent = error.message || 'Payment failed';
-            messageEl.style.display = 'block';
-            payBtn.disabled = false;
-            return;
-          }
-          window.location.assign(returnUrl);
-        };
+          switchToCardBtn.onclick = () => {
+            try {
+              prButton.unmount();
+            } catch (_) {}
+            appleWrap.style.display = 'none';
+            switchToCardBtn.style.display = 'none';
+            paymentForm.style.display = 'block';
+            payBtn.style.display = '';
+            setPaymentIntro('Enter your card to complete this order.');
+            paymentElHost.innerHTML = '';
+            const paymentElement = elements.create('payment', {
+              wallets: { applePay: 'auto', googlePay: 'never' },
+            });
+            paymentElement.mount('#payment-element');
+            bindCardFormSubmit(stripe, elements);
+          };
+          return;
+        }
 
-        cancelLink.href = '/checkout-cancel.html?order_id=' + createdOrder.id + '&number=' + encodeURIComponent(createdOrder.order_number);
+        setPaymentIntro('Apple Pay isn’t available on this device or browser. You can pay with a card below.');
+        const paymentElement = elements.create('payment', {
+          wallets: { applePay: 'auto', googlePay: 'never' },
+        });
+        paymentElement.mount('#payment-element');
+        bindCardFormSubmit(stripe, elements);
       } catch (err) {
-        document.getElementById('payment-message').textContent = err.message || 'Payment could not be loaded';
-        document.getElementById('payment-message').style.display = 'block';
-        document.getElementById('payment-element').innerHTML = '<p>Unable to load payment form. <a href="/cart.html">Return to cart</a>.</p>';
+        messageEl.textContent = err.message || 'Payment could not be loaded';
+        messageEl.style.display = 'block';
+        paymentElHost.innerHTML = '<p>Unable to load payment form. <a href="/cart.html">Return to cart</a>.</p>';
         payBtn.style.display = 'none';
       }
     }

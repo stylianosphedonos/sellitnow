@@ -159,10 +159,19 @@ const paymentLimiter = rateLimit({
   max: 30,
   message: { error: 'Too many payment attempts, try again later' },
 });
-paymentsRouter.get('/config', (req, res) => {
+paymentsRouter.get('/config', async (req, res) => {
   const key = config.stripe?.publishableKey;
   if (!key) return res.status(503).json({ error: 'Stripe not configured' });
-  res.json({ publishableKey: key });
+  try {
+    const settings = await brandRoutes.getBrandSettings();
+    res.json({
+      publishableKey: key,
+      currency: settings.currency || 'usd',
+      paymentRequestCountry: config.stripe.paymentRequestCountry || 'US',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Could not load payment config' });
+  }
 });
 paymentsRouter.use(optionalAuth);
 paymentsRouter.use(paymentLimiter);
