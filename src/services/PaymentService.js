@@ -12,6 +12,11 @@ if (config.stripe.secretKey) {
   stripe = new Stripe(config.stripe.secretKey, { apiVersion: '2023-10-16' });
 }
 
+/** Card-only checkout: no Bancontact, MB WAY, iDEAL, etc. from automatic_payment_methods. */
+const CARD_ONLY_INTENT = {
+  payment_method_types: ['card'],
+};
+
 class PaymentService {
   assertOrderAccess(order, { userId = null, guestToken = null } = {}) {
     if (order.user_id) {
@@ -67,7 +72,7 @@ class PaymentService {
         currency: stripeCurrency,
         payment_method: paymentMethodId,
         confirm: true,
-        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        ...CARD_ONLY_INTENT,
         metadata: { order_id: order.id.toString(), order_number: order.order_number },
       });
 
@@ -137,7 +142,7 @@ class PaymentService {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: stripeCurrency,
-      automatic_payment_methods: { enabled: true },
+      ...CARD_ONLY_INTENT,
       metadata: { order_id: order.id.toString(), order_number: order.order_number },
     });
 

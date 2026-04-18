@@ -296,7 +296,9 @@
 
         const stripe = Stripe(publishableKey);
         const elements = stripe.elements({ clientSecret });
-        const paymentElement = elements.create('payment');
+        const paymentElement = elements.create('payment', {
+          wallets: { applePay: 'never', googlePay: 'never' },
+        });
         paymentElement.mount('#payment-element');
 
         const paymentForm = document.getElementById('paymentForm');
