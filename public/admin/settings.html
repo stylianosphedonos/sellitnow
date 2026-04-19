@@ -88,6 +88,18 @@
           </div>
           <button type="button" id="saveSenderEmail" class="btn" style="margin-top:8px;max-width:220px">Save sender email</button>
 
+          <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+            <h3 style="font-size:16px;margin-bottom:8px">Send test email</h3>
+            <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;line-height:1.5">Send a short test message using your <strong>saved</strong> From address (save above if you changed it) and the server’s SMTP settings.</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;max-width:560px">
+              <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
+                <label for="testEmailRecipient">Recipient</label>
+                <input type="email" id="testEmailRecipient" autocomplete="email" placeholder="you@example.com" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              </div>
+              <button type="button" id="sendTestEmailBtn" class="btn" style="max-width:200px;margin-bottom:2px">Send test email</button>
+            </div>
+          </div>
+
           <div style="margin-top:28px;padding-top:24px;border-top:1px solid var(--border)">
             <h3 style="font-size:16px;margin-bottom:10px">Microsoft 365 / Outlook (SMTP)</h3>
             <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px;line-height:1.5">This app uses Nodemailer with SMTP credentials from the environment (not stored in the database). Typical values for Microsoft-hosted business mail:</p>
@@ -135,6 +147,7 @@
     const saveCurrencyTaxBtn = document.getElementById('saveCurrencyTax');
     const saveDeliveryBtn = document.getElementById('saveDelivery');
     const saveSenderEmailBtn = document.getElementById('saveSenderEmail');
+    const sendTestEmailBtn = document.getElementById('sendTestEmailBtn');
     const createDbBackupBtn = document.getElementById('createDbBackupBtn');
     const restoreDbBackupBtn = document.getElementById('restoreDbBackupBtn');
     const dbBackupFileInput = document.getElementById('dbBackupFile');
@@ -203,6 +216,29 @@
       }
       saveSenderEmailBtn.disabled = false;
       saveSenderEmailBtn.textContent = 'Save sender email';
+    });
+
+    sendTestEmailBtn?.addEventListener('click', async () => {
+      const to = (document.getElementById('testEmailRecipient')?.value || '').trim();
+      if (!to) {
+        showAlert('Enter a recipient email address.', true);
+        return;
+      }
+      sendTestEmailBtn.disabled = true;
+      const prev = sendTestEmailBtn.textContent;
+      sendTestEmailBtn.textContent = 'Sending...';
+      try {
+        const data = await callApi('/admin/email/test-send', {
+          method: 'POST',
+          body: JSON.stringify({ to }),
+        });
+        const fromBit = data.from ? ` From: ${data.from}.` : '';
+        showAlert((data.message || 'Test email sent.') + fromBit);
+      } catch (err) {
+        showAlert(err.message || 'Failed to send test email.', true);
+      }
+      sendTestEmailBtn.disabled = false;
+      sendTestEmailBtn.textContent = prev;
     });
 
     saveDeliveryBtn?.addEventListener('click', async () => {

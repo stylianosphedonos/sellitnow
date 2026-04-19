@@ -54,6 +54,47 @@ class EmailService {
     }
   }
 
+  /**
+   * Send a one-off message to verify SMTP and the resolved From address (admin settings).
+   * @param {string} to — plain recipient email
+   */
+  async sendTestOutbound(to) {
+    const addr = String(to || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) {
+      return { success: false, error: 'Enter a valid recipient email address.' };
+    }
+    const from = await getOutboundEmailFrom();
+    if (!this.transporter) {
+      return {
+        success: false,
+        error:
+          'SMTP is not configured on this server. Set SMTP_HOST, SMTP_USER, and SMTP_PASS (see Settings page for typical Outlook / Microsoft 365 values).',
+        from,
+      };
+    }
+    const subject = 'Sellitnow — test email';
+    const safeFrom = escapeHtml(from);
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;line-height:1.6;color:#111">
+        <p style="font-size:17px;font-weight:600;margin:0 0 12px">Test email</p>
+        <p style="margin:0 0 12px">If you are reading this, your store’s <strong>outbound email</strong> is working.</p>
+        <p style="margin:0 0 8px;font-size:14px;color:#444"><strong>From (configured):</strong> ${safeFrom}</p>
+        <p style="margin:0;font-size:14px;color:#444"><strong>To:</strong> ${escapeHtml(addr)}</p>
+        <p style="margin:20px 0 0;font-size:13px;color:#666">This message was sent from the Sellitnow admin “Send test email” action.</p>
+      </div>
+    `;
+    const text = [
+      'Sellitnow test email',
+      '',
+      'If you received this, outbound email is working.',
+      `From (configured): ${from}`,
+      `To: ${addr}`,
+    ].join('\n');
+    const r = await this.send({ to: addr, subject, html, text });
+    if (!r.success) return { success: false, error: r.error || 'Send failed', from };
+    return { success: true, from, to: addr };
+  }
+
   async sendWelcome(user) {
     return this.send({
       to: user.email,

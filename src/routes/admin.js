@@ -16,6 +16,7 @@ const {
 } = require('../middleware/upload');
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
+const EmailService = require('../services/EmailService');
 const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
 const { createFullBackup, restoreFullBackup } = require('../services/DatabaseBackupService');
@@ -470,6 +471,23 @@ router.put('/brand', async (req, res) => {
 
     const settings = await getBrandSettings();
     res.json(settings);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/email/test-send', async (req, res) => {
+  try {
+    const result = await EmailService.sendTestOutbound(req.body?.to);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error, from: result.from });
+    }
+    res.json({
+      success: true,
+      message: 'Test email sent.',
+      from: result.from,
+      to: result.to,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
