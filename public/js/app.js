@@ -31,6 +31,7 @@ function persistBrandSettings(data) {
       allProductsImage: data.allProductsImage || '',
       heroTitle: data.heroTitle,
       heroSubtitle: data.heroSubtitle,
+      heroBannerOverlay: data.heroBannerOverlay,
     }));
   } catch (_) {}
 }
@@ -41,6 +42,40 @@ function applyHeroCopy(data) {
   const sub = document.getElementById('heroSubtitle');
   if (h1 && data.heroTitle !== undefined) h1.textContent = data.heroTitle;
   if (sub && data.heroSubtitle !== undefined) sub.textContent = data.heroSubtitle;
+}
+
+const DEFAULT_HERO_BANNER_OVERLAY = 0.35;
+
+function parseHeroBannerOverlay(data) {
+  const raw = data && data.heroBannerOverlay;
+  if (raw == null || String(raw).trim() === '') return DEFAULT_HERO_BANNER_OVERLAY;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_HERO_BANNER_OVERLAY;
+  return Math.min(0.85, Math.max(0, n));
+}
+
+/** Hero section on index: stacked gradient + image + letterbox (only when data.banner is set). */
+function applyHeroBannerBackground(data) {
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const banner = data && data.banner;
+  if (banner) {
+    const b = mediaUrl(banner);
+    const overlay = parseHeroBannerOverlay(data);
+    hero.classList.add('hero--has-image');
+    const topLayer =
+      overlay > 0
+        ? `linear-gradient(135deg, rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay}))`
+        : 'linear-gradient(135deg, transparent, transparent)';
+    hero.style.backgroundImage = [
+      topLayer,
+      `url(${JSON.stringify(b)})`,
+      'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
+    ].join(', ');
+  } else {
+    hero.classList.remove('hero--has-image');
+    hero.style.backgroundImage = '';
+  }
 }
 
 function applyBrandTheme(data, persist = false) {
@@ -204,27 +239,13 @@ async function loadBrandSettings() {
     const cached = readCachedBrandSettings();
     if (cached) applyBrandTheme(cached, false);
     applyHeroCopy(cached);
+    applyHeroBannerBackground(cached);
     const res = await fetch(apiPrefix() + '/brand');
     if (!res.ok) return;
     const data = await res.json();
     applyBrandTheme(data, true);
     applyHeroCopy(data);
-    const hero = document.querySelector('.hero');
-    if (hero) {
-      if (data.banner) {
-        const b = mediaUrl(data.banner);
-        hero.classList.add('hero--has-image');
-        /* Top: readability overlay; middle: image (sized via .hero--has-image contain); bottom: brand gradient fills letterbox */
-        hero.style.backgroundImage = [
-          'linear-gradient(135deg, rgba(0,0,0,0.35), rgba(0,0,0,0.35))',
-          `url(${JSON.stringify(b)})`,
-          'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
-        ].join(', ');
-      } else {
-        hero.classList.remove('hero--has-image');
-        hero.style.backgroundImage = '';
-      }
-    }
+    applyHeroBannerBackground(data);
     const logos = document.querySelectorAll('.logo');
     logos.forEach((el) => {
       if (data.logo) {

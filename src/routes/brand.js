@@ -15,6 +15,8 @@ const DEFAULTS = {
   currency: 'usd',
   heroTitle: 'Up to 90% Off',
   heroSubtitle: 'Discover amazing deals on electronics, fashion & more',
+  /** Black overlay on hero photo (0 = brightest, ~0.35 = previous default) */
+  heroBannerOverlay: 0.35,
 };
 
 function rowToObj(rows) {
@@ -132,6 +134,12 @@ async function getBrandSettings() {
       ? String(stored.heroSubtitle)
       : DEFAULTS.heroSubtitle;
 
+  let heroBannerOverlay = DEFAULTS.heroBannerOverlay;
+  if (stored.heroBannerOverlay != null && String(stored.heroBannerOverlay).trim() !== '') {
+    const o = parseFloat(stored.heroBannerOverlay);
+    if (Number.isFinite(o)) heroBannerOverlay = Math.min(0.85, Math.max(0, o));
+  }
+
   let emailFrom = null;
   try {
     if (stored.emailFrom != null && String(stored.emailFrom).trim() !== '') {
@@ -160,6 +168,7 @@ async function getBrandSettings() {
     taxRatePercent,
     heroTitle,
     heroSubtitle,
+    heroBannerOverlay,
     emailFrom,
     defaultDeliveryCost,
     smtpConfiguredViaEnv: smtpEnvHostSet(),

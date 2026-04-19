@@ -90,10 +90,20 @@
             <label for="heroSubtitleInput">Subheading</label>
             <textarea id="heroSubtitleInput" rows="2" maxlength="400" placeholder="Supporting line under the headline" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
           </div>
-          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px;max-width:200px">Save hero text</button>
+          <div class="form-group" style="margin-bottom:16px">
+            <label for="heroBannerOverlayRange" id="heroBannerOverlayLabel">Banner dimming (for headline readability)</label>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
+              <span style="font-size:13px;color:var(--text-muted);min-width:5rem">Brighter</span>
+              <input type="range" id="heroBannerOverlayRange" min="0" max="85" value="35" step="5" style="flex:1;min-width:160px;max-width:360px" aria-labelledby="heroBannerOverlayLabel">
+              <span style="font-size:13px;color:var(--text-muted);min-width:5rem;text-align:right">Darker</span>
+            </div>
+            <small id="heroBannerOverlayHint" style="color:var(--text-muted);display:block;margin-top:8px">Overlay strength: <strong id="heroBannerOverlayPct">35%</strong>. Lower values make the photo brighter; higher values improve text contrast.</small>
+          </div>
+          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px;max-width:220px">Save hero settings</button>
           <div id="bannerPreview" style="width:100%;background:linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);border-radius:8px;margin-bottom:16px;overflow:hidden;position:relative;aspect-ratio:21/9;min-height:140px">
             <span id="bannerPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.9);font-size:16px;text-align:center;padding:16px;z-index:1">Current banner or gradient</span>
-            <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;object-position:center;position:absolute;inset:0">
+            <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;object-position:center;position:absolute;inset:0;z-index:0">
+            <div id="bannerDimPreview" aria-hidden="true" style="display:none;position:absolute;inset:0;pointer-events:none;background:rgba(0,0,0,0.35);z-index:2"></div>
           </div>
           <div class="form-group">
             <label>Upload New Banner Image</label>
@@ -161,6 +171,24 @@
     }
     ['primary', 'primaryDark', 'secondary', 'accent'].forEach(syncColorInputs);
 
+    function syncBannerDimUi() {
+      const rangeEl = document.getElementById('heroBannerOverlayRange');
+      const pctEl = document.getElementById('heroBannerOverlayPct');
+      const dimPrev = document.getElementById('bannerDimPreview');
+      const bannerImg = document.getElementById('bannerImg');
+      const v = Number(rangeEl.value);
+      const safe = Number.isFinite(v) ? Math.min(85, Math.max(0, v)) : 35;
+      pctEl.textContent = `${safe}%`;
+      if (bannerImg.style.display === 'block') {
+        dimPrev.style.display = 'block';
+        dimPrev.style.background = `rgba(0,0,0,${safe / 100})`;
+      } else {
+        dimPrev.style.display = 'none';
+      }
+    }
+
+    document.getElementById('heroBannerOverlayRange').addEventListener('input', syncBannerDimUi);
+
     async function loadBrand() {
       try {
         const data = await callApi('/admin/brand');
@@ -178,6 +206,15 @@
           data.heroTitle != null ? data.heroTitle : '';
         document.getElementById('heroSubtitleInput').value =
           data.heroSubtitle != null ? data.heroSubtitle : '';
+
+        const overlayRaw = data.heroBannerOverlay;
+        let overlayPct = 35;
+        if (overlayRaw != null && String(overlayRaw).trim() !== '') {
+          const o = Number(overlayRaw);
+          if (Number.isFinite(o)) overlayPct = Math.round(Math.min(0.85, Math.max(0, o)) * 100);
+        }
+        const rangeEl = document.getElementById('heroBannerOverlayRange');
+        rangeEl.value = String(Math.min(85, Math.max(0, overlayPct)));
 
         const logoImg = document.getElementById('logoImg');
         const logoPlaceholder = document.getElementById('logoPlaceholder');
@@ -202,6 +239,7 @@
           bannerImg.style.display = 'none';
           placeholder.style.display = 'block';
         }
+        syncBannerDimUi();
 
         const allProductsImg = document.getElementById('allProductsImg');
         const allProductsPlaceholder = document.getElementById('allProductsPlaceholder');
@@ -225,19 +263,22 @@
       btn.disabled = true;
       btn.textContent = 'Saving...';
       try {
+        const pct = Number(document.getElementById('heroBannerOverlayRange').value);
+        const overlay = Number.isFinite(pct) ? Math.min(0.85, Math.max(0, pct / 100)) : 0.35;
         await callApi('/admin/brand', {
           method: 'PUT',
           body: JSON.stringify({
             heroTitle: document.getElementById('heroTitleInput').value,
             heroSubtitle: document.getElementById('heroSubtitleInput').value,
+            heroBannerOverlay: overlay,
           }),
         });
-        showAlert('Hero text saved. Refresh the store home page to confirm.');
+        showAlert('Hero settings saved. Refresh the store home page to confirm.');
       } catch (err) {
-        showAlert(err.message || 'Failed to save hero text.', true);
+        showAlert(err.message || 'Failed to save hero settings.', true);
       }
       btn.disabled = false;
-      btn.textContent = 'Save hero text';
+      btn.textContent = 'Save hero settings';
     });
 
     saveColorsBtn.addEventListener('click', async () => {
@@ -282,6 +323,7 @@
           typeof mediaUrl === 'function' ? mediaUrl(data.banner) : data.banner;
         document.getElementById('bannerImg').style.display = 'block';
         document.getElementById('bannerPlaceholder').style.display = 'none';
+        syncBannerDimUi();
         bannerFile.value = '';
         uploadBannerBtn.disabled = true;
         showAlert('Banner uploaded successfully.');

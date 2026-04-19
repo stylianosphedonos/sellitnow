@@ -414,6 +414,7 @@ router.put('/brand', async (req, res) => {
       taxRatePercent,
       heroTitle,
       heroSubtitle,
+      heroBannerOverlay,
       emailFrom,
       defaultDeliveryCost,
     } = req.body;
@@ -428,6 +429,14 @@ router.put('/brand', async (req, res) => {
       heroTitle !== undefined && { key: 'heroTitle', value: String(heroTitle) },
       heroSubtitle !== undefined && { key: 'heroSubtitle', value: String(heroSubtitle) },
     ].filter(Boolean);
+
+    if (heroBannerOverlay !== undefined && heroBannerOverlay !== null && String(heroBannerOverlay).trim() !== '') {
+      const o = parseFloat(heroBannerOverlay);
+      if (!Number.isFinite(o) || o < 0 || o > 0.85) {
+        return res.status(400).json({ error: 'Hero banner dimming must be between 0 and 0.85.' });
+      }
+      updates.push({ key: 'heroBannerOverlay', value: String(Math.round(o * 1000) / 1000) });
+    }
 
     if (currency !== undefined && currency !== null && String(currency).trim() !== '') {
       const cur = normalizeCurrency(currency);
