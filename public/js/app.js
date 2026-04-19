@@ -99,7 +99,7 @@ function sellitnowCsrfCookieName() {
   if (typeof window !== 'undefined' && window.__SELLITNOW_CSRF_COOKIE__ != null) {
     return String(window.__SELLITNOW_CSRF_COOKIE__);
   }
-  return '3nitylab_csrf';
+  return 'sellitnow_csrf';
 }
 
 function clearSellitnowCsrfCache() {

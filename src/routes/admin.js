@@ -480,16 +480,21 @@ router.post('/email/test-send', async (req, res) => {
   try {
     const result = await EmailService.sendTestOutbound(req.body?.to);
     if (!result.success) {
-      return res.status(400).json({ error: result.error, from: result.from });
+      return res.status(400).json({
+        error: result.error,
+        from: result.from,
+        smtp: result.smtp || EmailService.smtpDiagnostics(),
+      });
     }
     res.json({
       success: true,
-      message: 'Test email sent.',
+      message: 'Test email sent. Check the inbox and spam folder.',
       from: result.from,
       to: result.to,
+      smtp: result.smtp || EmailService.smtpDiagnostics(),
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message, smtp: EmailService.smtpDiagnostics() });
   }
 });
 

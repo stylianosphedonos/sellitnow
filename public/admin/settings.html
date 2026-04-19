@@ -228,12 +228,36 @@
       const prev = sendTestEmailBtn.textContent;
       sendTestEmailBtn.textContent = 'Sending...';
       try {
-        const data = await callApi('/admin/email/test-send', {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = getToken();
+        if (token && token !== 'cookie-session') headers['Authorization'] = `Bearer ${token}`;
+        const csrf = await getCsrfTokenForMutations();
+        if (csrf) headers['X-CSRF-Token'] = csrf;
+        headers['X-Cart-Session'] = getCartSession();
+
+        const res = await fetch(apiPrefix() + '/admin/email/test-send', {
           method: 'POST',
+          headers,
+          credentials: 'include',
           body: JSON.stringify({ to }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          let msg = data.error || res.statusText || 'Request failed';
+          if (data.from) msg += ` — From: ${data.from}`;
+          if (data.smtp && typeof data.smtp === 'object') {
+            const h = data.smtp.hostConfigured ? 'yes' : 'no';
+            const c = data.smtp.credentialsConfigured ? 'yes' : 'no';
+            msg += ` (SMTP_HOST set: ${h}, SMTP_USER/PASS set: ${c})`;
+          }
+          if (res.status === 403 && /csrf/i.test(String(data.error || ''))) {
+            msg += ' Try logging out and back in, or set window.__SELLITNOW_CSRF_COOKIE__ to match CSRF_COOKIE_NAME on the server.';
+          }
+          showAlert(msg, true);
+          return;
+        }
         const fromBit = data.from ? ` From: ${data.from}.` : '';
-        showAlert((data.message || 'Test email sent.') + fromBit);
+        showAlert((data.message || 'Test email sent.') + fromBit + ' Check spam if you do not see it.');
       } catch (err) {
         showAlert(err.message || 'Failed to send test email.', true);
       }

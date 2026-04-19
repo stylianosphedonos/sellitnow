@@ -17,19 +17,52 @@ function parseFromAddress(from) {
   return raw.includes('@') ? raw : null;
 }
 
+function smtpHostConfigured() {
+  return Boolean(config.email.host && String(config.email.host).trim());
+}
+
+function smtpCredentialsConfigured() {
+  const u = config.email.user != null && String(config.email.user).trim() !== '';
+  const p = config.email.pass != null && String(config.email.pass) !== '';
+  return u && p;
+}
+
+/** Nodemailer options tuned for Microsoft 365 / Outlook (STARTTLS on 587). */
+function createSmtpTransportOptions() {
+  const host = config.email.host != null ? String(config.email.host).trim() : '';
+  if (!host) return null;
+  const port = Number(config.email.port) || 587;
+  const secure = config.email.secure === true;
+  const opts = {
+    host,
+    port,
+    secure,
+    tls: { minVersion: 'TLSv1.2' },
+  };
+  if (smtpCredentialsConfigured()) {
+    opts.auth = {
+      user: String(config.email.user).trim(),
+      pass: String(config.email.pass),
+    };
+  }
+  if (!secure && port === 587) {
+    opts.requireTLS = true;
+  }
+  return opts;
+}
+
+function formatSmtpError(err) {
+  if (!err) return 'Unknown error';
+  const bits = [err.message].filter(Boolean);
+  if (err.response) bits.push(String(err.response).trim());
+  if (err.code) bits.push(`(${err.code})`);
+  return bits.join(' — ');
+}
+
 class EmailService {
   constructor() {
-    this.transporter = config.email.host
-      ? nodemailer.createTransport({
-          host: config.email.host,
-          port: config.email.port,
-          secure: config.email.secure,
-          auth: {
-            user: config.email.user,
-            pass: config.email.pass,
-          },
-        })
-      : null;
+    const smtpOpts = createSmtpTransportOptions();
+    this.transporter = smtpOpts ? nodemailer.createTransport(smtpOpts) : null;
   }
 
   async send({ to, subject, html, text }) {
@@ -50,8 +83,15 @@ class EmailService {
       return { success: true };
     } catch (err) {
       console.error('Email send error:', err);
-      return { success: false, error: err.message };
+      return { success: false, error: formatSmtpError(err) };
     }
+  }
+
+  smtpDiagnostics() {
+    return {
+      hostConfigured: smtpHostConfigured(),
+      credentialsConfigured: smtpCredentialsConfigured(),
+    };
   }
 
   /**
@@ -64,15 +104,44 @@ class EmailService {
       return { success: false, error: 'Enter a valid recipient email address.' };
     }
     const from = await getOutboundEmailFrom();
-    if (!this.transporter) {
+    if (!smtpHostConfigured()) {
       return {
         success: false,
         error:
-          'SMTP is not configured on this server. Set SMTP_HOST, SMTP_USER, and SMTP_PASS (see Settings page for typical Outlook / Microsoft 365 values).',
+          'SMTP_HOST is not set on this server. Add SMTP_HOST (e.g. smtp.office365.com), SMTP_PORT=587, SMTP_SECURE=false, SMTP_USER, and SMTP_PASS.',
         from,
+        smtp: this.smtpDiagnostics(),
       };
     }
-    const subject = 'Sellitnow — test email';
+    if (!smtpCredentialsConfigured()) {
+      return {
+        success: false,
+        error:
+          'SMTP_USER and SMTP_PASS must both be set (use an app password if your Microsoft account has MFA).',
+        from,
+        smtp: this.smtpDiagnostics(),
+      };
+    }
+    if (!this.transporter) {
+      return {
+        success: false,
+        error: 'Could not initialize the mail transport. Check SMTP_HOST and port.',
+        from,
+        smtp: this.smtpDiagnostics(),
+      };
+    }
+    try {
+      await this.transporter.verify();
+    } catch (err) {
+      console.error('[Email] SMTP verify failed:', err);
+      return {
+        success: false,
+        error: `SMTP connection or login failed: ${formatSmtpError(err)}`,
+        from,
+        smtp: this.smtpDiagnostics(),
+      };
+    }
+    const subject = 'Sellitnow - test email';
     const safeFrom = escapeHtml(from);
     const html = `
       <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;line-height:1.6;color:#111">
@@ -80,7 +149,7 @@ class EmailService {
         <p style="margin:0 0 12px">If you are reading this, your store’s <strong>outbound email</strong> is working.</p>
         <p style="margin:0 0 8px;font-size:14px;color:#444"><strong>From (configured):</strong> ${safeFrom}</p>
         <p style="margin:0;font-size:14px;color:#444"><strong>To:</strong> ${escapeHtml(addr)}</p>
-        <p style="margin:20px 0 0;font-size:13px;color:#666">This message was sent from the Sellitnow admin “Send test email” action.</p>
+        <p style="margin:20px 0 0;font-size:13px;color:#666">This message was sent from the Sellitnow admin Send test email action.</p>
       </div>
     `;
     const text = [
@@ -91,8 +160,15 @@ class EmailService {
       `To: ${addr}`,
     ].join('\n');
     const r = await this.send({ to: addr, subject, html, text });
-    if (!r.success) return { success: false, error: r.error || 'Send failed', from };
-    return { success: true, from, to: addr };
+    if (!r.success) {
+      return {
+        success: false,
+        error: r.error || 'Send failed',
+        from,
+        smtp: this.smtpDiagnostics(),
+      };
+    }
+    return { success: true, from, to: addr, smtp: this.smtpDiagnostics() };
   }
 
   async sendWelcome(user) {
