@@ -78,22 +78,16 @@ class EmailService {
     });
   }
 
-  async sendOrderConfirmation(order, items) {
-    const email = order.guest_email || (order.user_email || '');
+  /** Customer-facing address for an order row (+ optional user_email). */
+  resolveCustomerTo(order) {
+    const to = String(order.guest_email || order.user_email || '').trim();
+    return to.includes('@') ? to : null;
+  }
+
+  async buildOrderItemsTableHtml(items) {
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
-    const stockNote =
-      order.stock_warning
-        ? `<p style="color:#b45309;background:#fffbeb;padding:12px;border-radius:6px;border:1px solid #fcd34d"><strong>Stock notice:</strong> ${String(order.stock_warning)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')}</p>`
-        : '';
-    const payOnDeliveryNote =
-      order.payment_method === 'pay_on_delivery'
-        ? '<p><strong>Payment:</strong> Pay on delivery — please have the exact amount or agreed payment method ready when your order arrives.</p>'
-        : '';
-    const itemsList = items
+    return (items || [])
       .map((i) => {
         let snap = i.product_snapshot;
         try {
@@ -103,49 +97,146 @@ class EmailService {
         }
         const variant =
           snap?.color || snap?.size
-            ? ` <small>(${[snap.color, snap.size].filter(Boolean).join(' · ')})</small>`
+            ? ` <span style="color:#666;font-size:13px">(${[snap.color, snap.size].filter(Boolean).join(' · ')})</span>`
             : '';
-        return `<tr><td>${snap?.title || 'Item'}${variant}</td><td>${i.quantity}</td><td>${fmt(i.unit_price)}</td><td>${fmt(i.total_price)}</td></tr>`;
+        const title = escapeHtml(snap?.title || 'Item');
+        return `<tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee">${title}${variant}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:center">${i.quantity}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right">${fmt(i.unit_price)}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right">${fmt(i.total_price)}</td>
+        </tr>`;
       })
       .join('');
-    return this.send({
-      to: email,
-      subject: `Order Confirmation #${order.order_number}`,
-      html: `
-        <h2>Order Confirmation</h2>
-        <p>Order Number: <strong>${order.order_number}</strong></p>
-        <p>Total: ${fmt(order.total_amount)}</p>
-        ${payOnDeliveryNote}
-        ${stockNote}
-        <table border="1" cellpadding="8">
-          <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>
-          ${itemsList}
+  }
+
+  /**
+   * Sent when checkout is complete from the customer's perspective:
+   * card payment succeeded, or pay-on-delivery order placed.
+   */
+  async sendOrderReceivedAndProcessing(order, items) {
+    const to = this.resolveCustomerTo(order);
+    if (!to) {
+      console.log('[Email] No customer address for order received mail:', order.order_number);
+      return { success: true };
+    }
+    const { currency } = await getBrandSettings();
+    const fmt = (a) => formatMoney(a, currency);
+    const itemsRows = await this.buildOrderItemsTableHtml(items);
+    const stockNote =
+      order.stock_warning
+        ? `<p style="color:#b45309;background:#fffbeb;padding:14px 16px;border-radius:8px;border:1px solid #fcd34d;margin:20px 0;line-height:1.5"><strong>Stock notice:</strong> ${escapeHtml(order.stock_warning)}</p>`
+        : '';
+    const paidOnline = order.payment_method !== 'pay_on_delivery' && order.payment_status === 'paid';
+    const intro = paidOnline
+      ? `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your purchase. We have safely received your <strong>payment</strong> and your order is now in our queue to be <strong>processed and prepared</strong> for shipment.</p>`
+      : `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your order. We have received it and will <strong>process and prepare</strong> your items for shipment. <strong>Payment will be collected on delivery</strong> — please have the agreed amount or payment method ready when your parcel arrives.</p>`;
+
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;color:#111">
+        <p style="font-size:18px;font-weight:600;margin:0 0 8px">We have your order</p>
+        ${intro}
+        <table style="width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;background:#fafafa;border-radius:8px;overflow:hidden">
+          <tr><td style="padding:12px 16px;border-bottom:1px solid #eee"><strong>Order number</strong></td><td style="padding:12px 16px;border-bottom:1px solid #eee">${escapeHtml(order.order_number)}</td></tr>
+          <tr><td style="padding:12px 16px"><strong>Order total</strong></td><td style="padding:12px 16px">${fmt(order.total_amount)}</td></tr>
         </table>
-        <p>Thank you for your order!</p>
-      `,
+        ${stockNote}
+        <p style="font-size:15px;margin:8px 0 12px;font-weight:600">Items</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:28px">
+          <thead><tr style="background:#f0f0f0"><th style="text-align:left;padding:10px 12px">Product</th><th style="padding:10px 12px">Qty</th><th style="text-align:right;padding:10px 12px">Price</th><th style="text-align:right;padding:10px 12px">Total</th></tr></thead>
+          <tbody>${itemsRows}</tbody>
+        </table>
+        <p style="font-size:14px;line-height:1.6;color:#444">If you have any questions, simply reply to this email and our team will help you.</p>
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:16px">Thank you for shopping with us,<br><span style="color:#666">Sellitnow</span></p>
+      </div>
+    `;
+
+    const payLine = paidOnline
+      ? 'Payment received — we will process your order shortly.'
+      : 'Pay on delivery — payment is due when your order arrives.';
+    const text = `We have your order #${order.order_number}. Total: ${fmt(order.total_amount)}. ${payLine} Thank you for shopping with Sellitnow.`;
+
+    return this.send({
+      to,
+      subject: `We received your order #${order.order_number}`,
+      html,
+      text,
     });
   }
 
-  async sendOrderShipped(order, trackingNumber) {
-    const email = order.guest_email || (order.user_email || '');
-    return this.send({
-      to: email,
-      subject: `Your order #${order.order_number} has shipped`,
-      html: `
-        <p>Your order <strong>#${order.order_number}</strong> has been shipped.</p>
-        ${trackingNumber ? `<p>Tracking number: <strong>${trackingNumber}</strong></p>` : ''}
-        <p>Thank you for shopping with Sellitnow!</p>
-      `,
-    });
+  /**
+   * Suggested customer email after an admin changes fulfillment status.
+   * @returns {null | { to: string, subject: string, html: string, text: string }}
+   */
+  async buildOrderStatusUpdateDraft(order, { previousStatus, newStatus, trackingNumber } = {}) {
+    const to = this.resolveCustomerTo(order);
+    if (!to) return null;
+
+    const on = escapeHtml(order.order_number);
+    const prev = escapeHtml(String(previousStatus || '—'));
+    const next = String(newStatus || '').toLowerCase();
+    const track = trackingNumber != null && String(trackingNumber).trim() ? escapeHtml(String(trackingNumber).trim()) : '';
+
+    let subject = `Update on your order #${order.order_number}`;
+    let headline = 'Order update';
+    let bodyHtml = '';
+    let bodyText = '';
+
+    switch (next) {
+      case 'pending':
+        headline = 'Your order is pending';
+        bodyHtml = `<p style="font-size:16px;line-height:1.6">Your order <strong>#${on}</strong> is currently <strong>pending</strong>. We will notify you as soon as it moves to the next step.</p>`;
+        bodyText = `Your order #${order.order_number} is pending. We will keep you updated.`;
+        break;
+      case 'processing':
+        subject = `We're preparing order #${order.order_number}`;
+        headline = 'We are processing your order';
+        bodyHtml = `<p style="font-size:16px;line-height:1.6">Good news — we are now <strong>processing</strong> order <strong>#${on}</strong>. Our team is preparing your items for shipment.</p>`;
+        bodyText = `We are processing your order #${order.order_number}.`;
+        break;
+      case 'shipped':
+        subject = `Your order #${order.order_number} is on the way`;
+        headline = 'Your order has shipped';
+        bodyHtml = `<p style="font-size:16px;line-height:1.6">Order <strong>#${on}</strong> has been <strong>shipped</strong>.</p>${
+          track
+            ? `<p style="font-size:16px;line-height:1.6">Tracking number: <strong>${track}</strong></p>`
+            : '<p style="font-size:15px;line-height:1.6;color:#555">A tracking number was not added to this update. If you need tracking details, reply to this email.</p>'
+        }`;
+        bodyText = `Order #${order.order_number} has shipped.${track ? ` Tracking: ${trackingNumber}.` : ''}`;
+        break;
+      case 'delivered':
+        subject = `Your order #${order.order_number} has been delivered`;
+        headline = 'Delivered';
+        bodyHtml = `<p style="font-size:16px;line-height:1.6">Your order <strong>#${on}</strong> is marked as <strong>delivered</strong>. We hope everything looks great — if something is not right, reply to this email and we will help.</p>`;
+        bodyText = `Your order #${order.order_number} has been delivered. Thank you!`;
+        break;
+      case 'cancelled':
+        subject = `Order #${order.order_number} has been cancelled`;
+        headline = 'Order cancelled';
+        bodyHtml = `<p style="font-size:16px;line-height:1.6">Your order <strong>#${on}</strong> has been <strong>cancelled</strong>. If you did not request this or have questions, please reply to this email.</p>`;
+        bodyText = `Your order #${order.order_number} has been cancelled. Contact us if you have questions.`;
+        break;
+      default:
+        headline = 'Order status update';
+        bodyHtml = `<p style="font-size:16px;line-height:1.6">The status of your order <strong>#${on}</strong> has been updated to <strong>${escapeHtml(next)}</strong>.</p>`;
+        bodyText = `Your order #${order.order_number} status is now ${newStatus}.`;
+    }
+
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;color:#111">
+        <p style="font-size:18px;font-weight:600;margin:0 0 8px">${headline}</p>
+        <p style="font-size:13px;color:#666;margin:0 0 20px">Previous status: ${prev} → New status: ${escapeHtml(next)}</p>
+        ${bodyHtml}
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:24px">Thank you,<br><span style="color:#666">Sellitnow</span></p>
+      </div>
+    `;
+
+    return { to, subject, html, text: bodyText };
   }
 
-  async sendOrderDelivered(order) {
-    const email = order.guest_email || (order.user_email || '');
-    return this.send({
-      to: email,
-      subject: `Your order #${order.order_number} has been delivered`,
-      html: `<p>Your order <strong>#${order.order_number}</strong> has been delivered. We hope you enjoy your purchase!</p>`,
-    });
+  async sendDraft(draft) {
+    if (!draft?.to || !draft.subject) return { success: false, error: 'Invalid draft' };
+    return this.send({ to: draft.to, subject: draft.subject, html: draft.html, text: draft.text });
   }
 
   /**

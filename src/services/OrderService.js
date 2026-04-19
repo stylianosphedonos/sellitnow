@@ -139,8 +139,11 @@ class OrderService {
       [order.id]
     );
     const orderWithEmail = { ...order, user_email: userEmail };
-    await EmailService.sendOrderConfirmation(orderWithEmail, items.rows);
     await EmailService.sendAdminNewOrder(orderWithEmail, items.rows);
+    // Card checkout: customer email is sent only after payment succeeds (see PaymentService).
+    if (pm === 'pay_on_delivery') {
+      await EmailService.sendOrderReceivedAndProcessing(orderWithEmail, items.rows);
+    }
 
     const result = { order, items: items.rows };
     if (!userId && email) {
@@ -317,11 +320,30 @@ class OrderService {
   }
 
   /**
-   * Admin: update order status
+   * Order row with guest or account email for outbound customer mail.
    */
-  async updateOrderStatus(orderId, status, trackingNumber = null) {
+  async getOrderWithCustomerEmail(orderId) {
+    const result = await pool.query(
+      `SELECT o.*, u.email as user_email
+       FROM orders o
+       LEFT JOIN users u ON o.user_id = u.id
+       WHERE o.id = $1`,
+      [orderId]
+    );
+    if (!result.rows.length) throw new Error('Order not found');
+    return result.rows[0];
+  }
+
+  /**
+   * Admin: update order status
+   * @param {{ sendCustomerEmail?: boolean }} [options]
+   * @returns {{ order: object, customerEmailDraft: object|null, customerEmailSent: boolean }}
+   */
+  async updateOrderStatus(orderId, status, trackingNumber = null, options = {}) {
+    const sendCustomerEmail = Boolean(options.sendCustomerEmail);
     const client = await pool.connect();
     let order;
+    let previousStatus;
     try {
       await client.query('BEGIN');
       const currentResult = await client.query(
@@ -330,6 +352,7 @@ class OrderService {
       );
       if (!currentResult.rows.length) throw new Error('Order not found');
       const currentOrder = currentResult.rows[0];
+      previousStatus = currentOrder.status;
 
       const inventoryReserved =
         ['paid', 'refunded'].includes(currentOrder.payment_status)
@@ -354,22 +377,22 @@ class OrderService {
       client.release();
     }
 
-    if (status === 'shipped' && (order.guest_email || order.user_id)) {
-      const u = order.user_id ? await pool.query('SELECT email FROM users WHERE id = $1', [order.user_id]) : { rows: [] };
-      const email = order.guest_email || (u.rows[0]?.email);
-      if (email) {
-        await EmailService.sendOrderShipped({ ...order, user_email: email }, order.tracking_number);
-      }
-    }
-    if (status === 'delivered') {
-      const u = order.user_id ? await pool.query('SELECT email FROM users WHERE id = $1', [order.user_id]) : { rows: [] };
-      const email = order.guest_email || (u.rows[0]?.email);
-      if (email) {
-        await EmailService.sendOrderDelivered({ ...order, user_email: email });
-      }
+    const orderForMail = await this.getOrderWithCustomerEmail(orderId);
+    const customerEmailDraft = await EmailService.buildOrderStatusUpdateDraft(orderForMail, {
+      previousStatus,
+      newStatus: status,
+      trackingNumber: orderForMail.tracking_number,
+    });
+
+    let customerEmailSent = false;
+    let customerEmailError = null;
+    if (sendCustomerEmail && customerEmailDraft) {
+      const r = await EmailService.sendDraft(customerEmailDraft);
+      customerEmailSent = Boolean(r.success);
+      if (!r.success) customerEmailError = r.error || 'Email could not be sent';
     }
 
-    return order;
+    return { order, customerEmailDraft, customerEmailSent, customerEmailError };
   }
 
   /**
@@ -377,7 +400,8 @@ class OrderService {
    */
   async cancelOrder(orderId, userId = null, guestAccessToken = null) {
     const order = await this.getOrderById(orderId, userId, guestAccessToken);
-    return this.updateOrderStatus(order.id, 'cancelled');
+    const { order: updated } = await this.updateOrderStatus(order.id, 'cancelled');
+    return updated;
   }
 }
 

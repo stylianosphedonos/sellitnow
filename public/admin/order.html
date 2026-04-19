@@ -85,12 +85,64 @@
           <p style="margin-top:8px;color:#444"><strong>Payment:</strong> ${order.payment_method === 'pay_on_delivery' ? 'Pay on delivery' : 'Card'} · <strong>Status:</strong> ${order.payment_status}</p>
           <h3 style="margin-top:24px">Update Status</h3>
           <form id="statusForm" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select name="status"><option value="pending" ${order.status==='pending'?'selected':''}>Pending</option><option value="processing" ${order.status==='processing'?'selected':''}>Processing</option><option value="shipped" ${order.status==='shipped'?'selected':''}>Shipped</option><option value="delivered" ${order.status==='delivered'?'selected':''}>Delivered</option><option value="cancelled" ${order.status==='cancelled'?'selected':''}>Cancelled</option></select>
+            <select name="status" id="orderStatusSelect"><option value="pending" ${order.status==='pending'?'selected':''}>Pending</option><option value="processing" ${order.status==='processing'?'selected':''}>Processing</option><option value="shipped" ${order.status==='shipped'?'selected':''}>Shipped</option><option value="delivered" ${order.status==='delivered'?'selected':''}>Delivered</option><option value="cancelled" ${order.status==='cancelled'?'selected':''}>Cancelled</option></select>
             <input type="text" name="tracking_number" placeholder="Tracking #" value="${order.tracking_number||''}" style="width:200px;padding:8px">
             <button type="submit" class="btn" style="max-width:150px">Update</button>
           </form>
+          <label style="display:flex;align-items:center;gap:10px;margin-top:12px;font-size:14px;color:#333">
+            <input type="checkbox" id="notifyCustomer" style="width:18px;height:18px">
+            <span>Email the customer with the suggested update below (uses your configured sender in Settings).</span>
+          </label>
+          <div id="emailDraftPanel" style="display:none;margin-top:20px;padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;max-width:720px">
+            <h4 style="margin:0 0 12px;font-size:15px">Suggested customer email</h4>
+            <p id="emailDraftMeta" style="margin:0 0 12px;font-size:13px;color:#475569"></p>
+            <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b">Subject</p>
+            <pre id="emailDraftSubject" style="margin:0 0 14px;padding:10px;background:#fff;border-radius:6px;font-size:13px;white-space:pre-wrap;border:1px solid #e2e8f0"></pre>
+            <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b">Plain text (for copying into Outlook, etc.)</p>
+            <pre id="emailDraftText" style="margin:0 0 12px;padding:12px;background:#fff;border-radius:6px;font-size:13px;white-space:pre-wrap;max-height:220px;overflow:auto;border:1px solid #e2e8f0"></pre>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn" id="copyDraftSubject" style="max-width:200px">Copy subject</button>
+              <button type="button" class="btn" id="copyDraftText" style="max-width:200px">Copy body</button>
+            </div>
+          </div>
           <button class="btn" style="margin-top:16px" onclick="downloadInvoice()">Download Invoice PDF</button>
         `;
+        const notifyEl = document.getElementById('notifyCustomer');
+        const statusSel = document.getElementById('orderStatusSelect');
+        function syncNotifyDefault() {
+          if (!notifyEl || !statusSel) return;
+          notifyEl.checked = ['shipped', 'delivered'].includes(statusSel.value);
+        }
+        statusSel?.addEventListener('change', syncNotifyDefault);
+        syncNotifyDefault();
+
+        function showEmailDraftPanel(draft, metaLine) {
+          const panel = document.getElementById('emailDraftPanel');
+          if (!panel || !draft) {
+            if (panel) panel.style.display = 'none';
+            return;
+          }
+          panel.style.display = 'block';
+          document.getElementById('emailDraftMeta').textContent = metaLine || '';
+          document.getElementById('emailDraftSubject').textContent = draft.subject || '';
+          const stripHtml = (h) => {
+            const t = document.createElement('div');
+            t.innerHTML = h || '';
+            return (t.textContent || t.innerText || '').replace(/\n\n+/g, '\n\n').trim();
+          };
+          document.getElementById('emailDraftText').textContent =
+            (draft.text && String(draft.text).trim()) || stripHtml(draft.html) || '';
+
+          document.getElementById('copyDraftSubject').onclick = () => {
+            navigator.clipboard.writeText(draft.subject || '');
+            showStatusMessage('Subject copied to clipboard.');
+          };
+          document.getElementById('copyDraftText').onclick = () => {
+            navigator.clipboard.writeText(document.getElementById('emailDraftText').textContent || '');
+            showStatusMessage('Body copied to clipboard.');
+          };
+        }
+
         document.getElementById('statusForm')?.addEventListener('submit', async (e) => {
           e.preventDefault();
           const form = e.target;
@@ -99,14 +151,34 @@
           const submitBtn = form.querySelector('button[type="submit"]');
           if (submitBtn) submitBtn.disabled = true;
           try {
-            const { order: updatedOrder } = await callApi('/admin/orders/' + id + '/status', {
+            const sendCustomer = Boolean(document.getElementById('notifyCustomer')?.checked);
+            const res = await callApi('/admin/orders/' + id + '/status', {
               method: 'PATCH',
-              body: JSON.stringify({ status: nextStatus, tracking_number: form.tracking_number.value || undefined })
+              body: JSON.stringify({
+                status: nextStatus,
+                tracking_number: form.tracking_number.value || undefined,
+                send_customer_email: sendCustomer,
+              }),
             });
+            const updatedOrder = res.order;
             currentOrder = updatedOrder;
             const statusEl = document.getElementById('currentOrderStatus');
             if (statusEl) statusEl.textContent = updatedOrder.status;
-            showStatusMessage(`Order status changed from "${prevStatus}" to "${updatedOrder.status}".`);
+
+            let msg = `Order status changed from "${prevStatus}" to "${updatedOrder.status}".`;
+            if (res.customerEmailSent) msg += ' Customer was emailed.';
+            else if (sendCustomer && res.customerEmailError) msg += ' Email failed: ' + res.customerEmailError;
+            else if (sendCustomer && !res.customerEmailDraft) msg += ' No customer email on file.';
+            showStatusMessage(msg, Boolean(res.customerEmailError));
+
+            let meta = '';
+            if (res.customerEmailDraft) {
+              meta = `To: ${res.customerEmailDraft.to}`;
+              if (res.customerEmailSent) meta += ' · Sent from the store';
+              else if (sendCustomer) meta += ' · Not sent (see message above)';
+              else meta += ' · Not sent — tick “email the customer” to send, or copy into Outlook';
+            }
+            showEmailDraftPanel(res.customerEmailDraft, meta);
           } catch (err) {
             showStatusMessage(err.message || 'Failed to update order status.', true);
           } finally {

@@ -240,9 +240,16 @@ router.get('/orders/:id', async (req, res) => {
 router.patch('/orders/:id/status', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { status, tracking_number } = req.body;
-    const order = await OrderService.updateOrderStatus(id, status, tracking_number);
-    res.json({ order });
+    const { status, tracking_number, send_customer_email } = req.body || {};
+    const result = await OrderService.updateOrderStatus(id, status, tracking_number, {
+      sendCustomerEmail: Boolean(send_customer_email),
+    });
+    res.json({
+      order: result.order,
+      customerEmailDraft: result.customerEmailDraft,
+      customerEmailSent: result.customerEmailSent,
+      customerEmailError: result.customerEmailError,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -263,7 +270,12 @@ router.patch('/orders/status/bulk', async (req, res) => {
     }
 
     const updates = await Promise.all(
-      ids.map(async (id) => OrderService.updateOrderStatus(id, status, tracking_number))
+      ids.map(async (id) => {
+        const r = await OrderService.updateOrderStatus(id, status, tracking_number, {
+          sendCustomerEmail: false,
+        });
+        return r.order;
+      })
     );
     res.json({ orders: updates, updated_count: updates.length });
   } catch (err) {

@@ -116,6 +116,10 @@ class PaymentService {
     for (const item of items.rows) {
       await ProductService.decrementStock(item.product_id, item.quantity);
     }
+
+    const orderForMail = await OrderService.getOrderWithCustomerEmail(orderId);
+    const itemRows = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
+    await EmailService.sendOrderReceivedAndProcessing(orderForMail, itemRows.rows);
   }
 
   /**
