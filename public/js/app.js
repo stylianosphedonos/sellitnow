@@ -629,7 +629,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
       pagination.innerHTML = '';
     }
     if (scrollToTop) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector('.products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   } catch (err) {
     grid.innerHTML = '<p>Failed to load products. Make sure the server is running.</p>';
