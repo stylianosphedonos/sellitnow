@@ -494,7 +494,8 @@ router.post('/email/test-send', async (req, res) => {
       smtp: result.smtp || EmailService.smtpDiagnostics(),
     });
   } catch (err) {
-    res.status(400).json({ error: err.message, smtp: EmailService.smtpDiagnostics() });
+    console.error('[admin] POST /email/test-send:', err);
+    res.status(500).json({ error: err.message || 'Unexpected server error', smtp: EmailService.smtpDiagnostics() });
   }
 });
 
