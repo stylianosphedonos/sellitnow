@@ -582,7 +582,7 @@ function initHomeBrowseHistory() {
   });
 }
 
-async function loadProducts(page = 1, categoryId = null, searchQuery) {
+async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTop = false) {
   const grid = document.getElementById('productGrid');
   const pagination = document.getElementById('pagination');
   if (!grid) return;
@@ -612,7 +612,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery) {
       if (data.page > 1) {
         const prev = document.createElement('button');
         prev.textContent = 'Prev';
-        prev.addEventListener('click', () => loadProducts(data.page - 1, categoryId));
+        prev.addEventListener('click', () => loadProducts(data.page - 1, categoryId, undefined, true));
         pagination.appendChild(prev);
       }
       const span = document.createElement('span');
@@ -622,11 +622,14 @@ async function loadProducts(page = 1, categoryId = null, searchQuery) {
       if (data.page < data.totalPages) {
         const next = document.createElement('button');
         next.textContent = 'Next';
-        next.addEventListener('click', () => loadProducts(data.page + 1, categoryId));
+        next.addEventListener('click', () => loadProducts(data.page + 1, categoryId, undefined, true));
         pagination.appendChild(next);
       }
     } else if (pagination) {
       pagination.innerHTML = '';
+    }
+    if (scrollToTop) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   } catch (err) {
     grid.innerHTML = '<p>Failed to load products. Make sure the server is running.</p>';
