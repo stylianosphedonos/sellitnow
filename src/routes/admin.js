@@ -462,6 +462,68 @@ router.put('/brand', async (req, res) => {
       }
     }
 
+    const smtpSettingKeys = ['smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass'];
+    if (req.body.smtpHost !== undefined) {
+      const rawHost = req.body.smtpHost;
+      if (rawHost === null || String(rawHost).trim() === '') {
+        const delPh = smtpSettingKeys.map((_, i) => `$${i + 1}`).join(', ');
+        await pool.query(`DELETE FROM brand_settings WHERE key IN (${delPh})`, smtpSettingKeys);
+      } else {
+        const host = String(rawHost).trim();
+        if (host.length > 253) {
+          return res.status(400).json({ error: 'SMTP host is too long.' });
+        }
+        await pool.query(
+          'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          ['smtpHost', host]
+        );
+      }
+    }
+
+    const smtpHostCleared =
+      req.body.smtpHost !== undefined && (req.body.smtpHost === null || String(req.body.smtpHost).trim() === '');
+
+    if (!smtpHostCleared) {
+      if (req.body.smtpPort !== undefined) {
+        if (req.body.smtpPort === null || String(req.body.smtpPort).trim() === '') {
+          await pool.query(`DELETE FROM brand_settings WHERE key = 'smtpPort'`);
+        } else {
+          const p = parseInt(req.body.smtpPort, 10);
+          if (!Number.isFinite(p) || p < 1 || p > 65535) {
+            return res.status(400).json({ error: 'SMTP port must be between 1 and 65535.' });
+          }
+          await pool.query(
+            'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+            ['smtpPort', String(p)]
+          );
+        }
+      }
+      if (req.body.smtpUser !== undefined) {
+        const u = req.body.smtpUser == null ? '' : String(req.body.smtpUser).trim();
+        await pool.query(
+          'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          ['smtpUser', u]
+        );
+      }
+      if (req.body.smtpSecure !== undefined) {
+        const sec = Boolean(req.body.smtpSecure);
+        await pool.query(
+          'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          ['smtpSecure', sec ? 'true' : 'false']
+        );
+      }
+      if (req.body.smtpPass !== undefined) {
+        if (req.body.smtpPass === null || req.body.smtpPass === '') {
+          await pool.query(`DELETE FROM brand_settings WHERE key = 'smtpPass'`);
+        } else {
+          await pool.query(
+            'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+            ['smtpPass', String(req.body.smtpPass)]
+          );
+        }
+      }
+    }
+
     for (const u of updates) {
       await pool.query(
         'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
@@ -483,7 +545,7 @@ router.post('/email/test-send', async (req, res) => {
       return res.status(400).json({
         error: result.error,
         from: result.from,
-        smtp: result.smtp || EmailService.smtpDiagnostics(),
+        smtp: result.smtp || (await EmailService.smtpDiagnostics()),
       });
     }
     res.json({
@@ -491,11 +553,14 @@ router.post('/email/test-send', async (req, res) => {
       message: 'Test email sent. Check the inbox and spam folder.',
       from: result.from,
       to: result.to,
-      smtp: result.smtp || EmailService.smtpDiagnostics(),
+      smtp: result.smtp || (await EmailService.smtpDiagnostics()),
     });
   } catch (err) {
     console.error('[admin] POST /email/test-send:', err);
-    res.status(500).json({ error: err.message || 'Unexpected server error', smtp: EmailService.smtpDiagnostics() });
+    res.status(500).json({
+      error: err.message || 'Unexpected server error',
+      smtp: await EmailService.smtpDiagnostics(),
+    });
   }
 });
 

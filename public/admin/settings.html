@@ -39,6 +39,43 @@
           </div>
           <button type="button" id="saveSenderEmail" class="btn" style="margin-top:8px;max-width:240px">Save from email</button>
 
+          <div id="smtpConfigBlock" style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+            <h3 style="font-size:16px;margin-bottom:8px">SMTP server (when not set on host)</h3>
+            <p id="smtpEnvBanner" style="display:none;margin-bottom:16px;padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:14px;color:#1e40af">
+              This deployment uses <strong>environment variables</strong> for SMTP (<code style="font-size:12px">SMTP_HOST</code> is set). The fields below are ignored until that is unset on the server.
+            </p>
+            <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px;line-height:1.5">If your host (e.g. some static or edge setups) cannot define <code style="font-size:12px">SMTP_HOST</code>, <code style="font-size:12px">SMTP_USER</code>, and <code style="font-size:12px">SMTP_PASS</code>, save them here instead. When <code style="font-size:12px">SMTP_HOST</code> exists in the environment, it always wins.</p>
+            <p style="color:#b45309;font-size:13px;margin-bottom:16px;line-height:1.5">The password is stored in the database. Prefer environment variables for production when your provider supports them.</p>
+            <div style="display:grid;gap:16px;max-width:520px">
+              <div class="form-group">
+                <label for="smtpHost">SMTP host</label>
+                <input type="text" id="smtpHost" autocomplete="off" placeholder="smtp.office365.com" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              </div>
+              <div class="form-group" style="max-width:220px">
+                <label for="smtpPort">Port</label>
+                <input type="number" id="smtpPort" min="1" max="65535" placeholder="587" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              </div>
+              <div class="form-group">
+                <label for="smtpUser">SMTP username</label>
+                <input type="text" id="smtpUser" autocomplete="username" placeholder="mailbox@company.com" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              </div>
+              <div class="form-group">
+                <label for="smtpPass">SMTP password</label>
+                <input type="password" id="smtpPass" autocomplete="new-password" placeholder="Leave blank to keep current password" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+                <small id="smtpPassHint" style="display:none;color:var(--text-muted);margin-top:6px">A password is already saved. Leave blank to keep it, or enter a new one.</small>
+              </div>
+              <label style="display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45">
+                <input type="checkbox" id="smtpSecure" style="width:18px;height:18px;margin-top:2px;flex-shrink:0">
+                <span>Use implicit SSL (e.g. port <strong>465</strong>). Leave off for STARTTLS on port <strong>587</strong> (typical for Microsoft 365).</span>
+              </label>
+            </div>
+            <p style="margin-top:12px;font-size:13px;color:var(--text-muted)">Clear the SMTP host field and save to remove all stored SMTP settings for this store.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+              <button type="button" id="saveSmtpBtn" class="btn" style="max-width:240px">Save SMTP settings</button>
+              <button type="button" id="smtpClearPasswordBtn" class="btn" style="max-width:260px">Clear saved SMTP password</button>
+            </div>
+          </div>
+
           <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
             <h3 style="font-size:16px;margin-bottom:8px">Send test email</h3>
             <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;line-height:1.5">Send a short test message using your <strong>saved</strong> From address (save above if you changed it) and the server’s SMTP settings.</p>
@@ -148,6 +185,8 @@
     const saveCurrencyTaxBtn = document.getElementById('saveCurrencyTax');
     const saveDeliveryBtn = document.getElementById('saveDelivery');
     const saveSenderEmailBtn = document.getElementById('saveSenderEmail');
+    const saveSmtpBtn = document.getElementById('saveSmtpBtn');
+    const smtpClearPasswordBtn = document.getElementById('smtpClearPasswordBtn');
     const sendTestEmailBtn = document.getElementById('sendTestEmailBtn');
     const createDbBackupBtn = document.getElementById('createDbBackupBtn');
     const restoreDbBackupBtn = document.getElementById('restoreDbBackupBtn');
@@ -169,6 +208,18 @@
     }
 
     document.getElementById('storeCurrency')?.addEventListener('change', updateCurrencyPreview);
+
+    function applySmtpEnvUi(data) {
+      const locked = Boolean(data.smtpConfiguredViaEnv);
+      const banner = document.getElementById('smtpEnvBanner');
+      if (banner) banner.style.display = locked ? 'block' : 'none';
+      ['smtpHost', 'smtpPort', 'smtpUser', 'smtpPass', 'smtpSecure'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = locked;
+      });
+      if (saveSmtpBtn) saveSmtpBtn.disabled = locked;
+      if (smtpClearPasswordBtn) smtpClearPasswordBtn.disabled = locked;
+    }
 
     async function loadSettings() {
       try {
@@ -197,6 +248,19 @@
           const v = data.defaultDeliveryCost;
           delEl.value = v != null && v !== '' && Number.isFinite(Number(v)) ? String(v) : '';
         }
+        const hostEl = document.getElementById('smtpHost');
+        if (hostEl) hostEl.value = data.smtpHost != null && String(data.smtpHost).trim() !== '' ? String(data.smtpHost).trim() : '';
+        const portEl = document.getElementById('smtpPort');
+        if (portEl) portEl.value = data.smtpPort != null && String(data.smtpPort).trim() !== '' ? String(data.smtpPort).trim() : '587';
+        const userEl = document.getElementById('smtpUser');
+        if (userEl) userEl.value = data.smtpUser != null && String(data.smtpUser).trim() !== '' ? String(data.smtpUser).trim() : '';
+        const passEl = document.getElementById('smtpPass');
+        if (passEl) passEl.value = '';
+        const secEl = document.getElementById('smtpSecure');
+        if (secEl) secEl.checked = Boolean(data.smtpSecure);
+        const passHint = document.getElementById('smtpPassHint');
+        if (passHint) passHint.style.display = data.smtpPassSet ? 'block' : 'none';
+        applySmtpEnvUi(data);
         updateCurrencyPreview();
       } catch (err) {
         showAlert('Failed to load settings.', true);
@@ -218,6 +282,48 @@
       }
       saveSenderEmailBtn.disabled = false;
       saveSenderEmailBtn.textContent = 'Save from email';
+    });
+
+    saveSmtpBtn?.addEventListener('click', async () => {
+      if (!saveSmtpBtn || saveSmtpBtn.disabled) return;
+      const prev = saveSmtpBtn.textContent;
+      saveSmtpBtn.textContent = 'Saving…';
+      saveSmtpBtn.disabled = true;
+      try {
+        const body = {
+          smtpHost: (document.getElementById('smtpHost')?.value || '').trim(),
+          smtpPort: (document.getElementById('smtpPort')?.value || '587').trim(),
+          smtpUser: (document.getElementById('smtpUser')?.value || '').trim(),
+          smtpSecure: Boolean(document.getElementById('smtpSecure')?.checked),
+        };
+        const pw = document.getElementById('smtpPass')?.value || '';
+        if (pw) body.smtpPass = pw;
+        await callApi('/admin/brand', { method: 'PUT', body: JSON.stringify(body) });
+        showAlert('SMTP settings saved.');
+        await loadSettings();
+      } catch (err) {
+        showAlert(err.message || 'Failed to save SMTP.', true);
+      } finally {
+        saveSmtpBtn.textContent = prev;
+        const locked = document.getElementById('smtpEnvBanner')?.style.display === 'block';
+        saveSmtpBtn.disabled = locked;
+      }
+    });
+
+    smtpClearPasswordBtn?.addEventListener('click', async () => {
+      if (!smtpClearPasswordBtn || smtpClearPasswordBtn.disabled) return;
+      if (!window.confirm('Remove the saved SMTP password from the database?')) return;
+      smtpClearPasswordBtn.disabled = true;
+      try {
+        await callApi('/admin/brand', { method: 'PUT', body: JSON.stringify({ smtpPass: '' }) });
+        showAlert('SMTP password removed.');
+        await loadSettings();
+      } catch (err) {
+        showAlert(err.message || 'Failed to clear password.', true);
+      } finally {
+        const locked = document.getElementById('smtpEnvBanner')?.style.display === 'block';
+        smtpClearPasswordBtn.disabled = locked;
+      }
     });
 
     sendTestEmailBtn?.addEventListener('click', async () => {
@@ -255,7 +361,8 @@
           if (data.smtp && typeof data.smtp === 'object') {
             const h = data.smtp.hostConfigured ? 'yes' : 'no';
             const c = data.smtp.credentialsConfigured ? 'yes' : 'no';
-            msg += ` (SMTP_HOST set: ${h}, SMTP_USER/PASS set: ${c})`;
+            const src = data.smtp.source ? String(data.smtp.source) : '?';
+            msg += ` (mail: ${src}; host ok: ${h}; user+pass ok: ${c})`;
           }
           if (res.status === 403 && /csrf/i.test(String(data.error || ''))) {
             msg += ' Try logging out and back in, or set window.__SELLITNOW_CSRF_COOKIE__ to match CSRF_COOKIE_NAME on the server.';

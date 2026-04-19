@@ -64,6 +64,48 @@ async function getOutboundEmailFrom() {
   return config.email.from;
 }
 
+function smtpEnvHostSet() {
+  return Boolean(config.email.host && String(config.email.host).trim());
+}
+
+/**
+ * Effective SMTP for Nodemailer: environment wins when SMTP_HOST is set; otherwise brand_settings.
+ * @returns {{ source: 'env'|'brand'|null, host: string, port: number, secure: boolean, user: string, pass: string }}
+ */
+async function getEffectiveSmtpConfig() {
+  if (smtpEnvHostSet()) {
+    return {
+      source: 'env',
+      host: String(config.email.host).trim(),
+      port: Number(config.email.port) || 587,
+      secure: config.email.secure === true,
+      user: config.email.user != null ? String(config.email.user).trim() : '',
+      pass: config.email.pass != null ? String(config.email.pass) : '',
+    };
+  }
+  const smtpKeys = ['smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass'];
+  const ph = smtpKeys.map((_, i) => `$${i + 1}`).join(', ');
+  const result = await pool.query(
+    `SELECT key, value FROM brand_settings WHERE key IN (${ph})`,
+    smtpKeys
+  );
+  const row = rowToObj(result.rows);
+  const host = row.smtpHost != null ? String(row.smtpHost).trim() : '';
+  if (!host) {
+    return { source: null, host: '', port: 587, secure: false, user: '', pass: '' };
+  }
+  const port = parseInt(row.smtpPort, 10);
+  const secure = String(row.smtpSecure || '').toLowerCase() === 'true';
+  return {
+    source: 'brand',
+    host,
+    port: Number.isFinite(port) && port > 0 ? port : 587,
+    secure,
+    user: row.smtpUser != null ? String(row.smtpUser).trim() : '',
+    pass: row.smtpPass != null ? String(row.smtpPass) : '',
+  };
+}
+
 function defaultDeliveryCostFromStored(stored) {
   if (stored.defaultDeliveryCost == null || String(stored.defaultDeliveryCost).trim() === '') return undefined;
   const n = parseFloat(stored.defaultDeliveryCost);
@@ -99,6 +141,13 @@ async function getBrandSettings() {
     emailFrom = null;
   }
 
+  const smtpHostStored = stored.smtpHost != null ? String(stored.smtpHost).trim() : '';
+  const smtpPortStored =
+    stored.smtpPort != null && String(stored.smtpPort).trim() !== '' ? String(stored.smtpPort).trim() : '';
+  const smtpUserStored = stored.smtpUser != null ? String(stored.smtpUser).trim() : '';
+  const smtpSecureStored = String(stored.smtpSecure || '').toLowerCase() === 'true';
+  const smtpPassSet = Boolean(stored.smtpPass != null && String(stored.smtpPass) !== '');
+
   return {
     primary: stored.primary || DEFAULTS.primary,
     primaryDark: stored.primaryDark || DEFAULTS.primaryDark,
@@ -113,6 +162,12 @@ async function getBrandSettings() {
     heroSubtitle,
     emailFrom,
     defaultDeliveryCost,
+    smtpConfiguredViaEnv: smtpEnvHostSet(),
+    smtpHost: smtpHostStored,
+    smtpPort: smtpPortStored,
+    smtpUser: smtpUserStored,
+    smtpSecure: smtpSecureStored,
+    smtpPassSet,
   };
 }
 
@@ -120,7 +175,16 @@ async function getBrandSettings() {
 router.get('/', async (req, res) => {
   try {
     const settings = await getBrandSettings();
-    const { emailFrom: _private, ...publicSettings } = settings;
+    const {
+      emailFrom: _private,
+      smtpConfiguredViaEnv: _e,
+      smtpHost: _h,
+      smtpPort: _p,
+      smtpUser: _u,
+      smtpSecure: _s,
+      smtpPassSet: _ps,
+      ...publicSettings
+    } = settings;
     res.json(publicSettings);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -130,6 +194,8 @@ router.get('/', async (req, res) => {
 module.exports = router;
 module.exports.getBrandSettings = getBrandSettings;
 module.exports.getOutboundEmailFrom = getOutboundEmailFrom;
+module.exports.getEffectiveSmtpConfig = getEffectiveSmtpConfig;
+module.exports.smtpEnvHostSet = smtpEnvHostSet;
 module.exports.normalizeEmailFromInput = normalizeEmailFromInput;
 module.exports.DEFAULTS = DEFAULTS;
 module.exports.normalizeCurrency = normalizeCurrency;

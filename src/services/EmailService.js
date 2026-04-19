@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
 const { pool } = require('../database/db');
-const { getBrandSettings, getOutboundEmailFrom } = require('../routes/brand');
+const { getBrandSettings, getOutboundEmailFrom, getEffectiveSmtpConfig } = require('../routes/brand');
 const { formatMoney } = require('../lib/formatMoney');
 
 function escapeHtml(s) {
@@ -17,33 +17,21 @@ function parseFromAddress(from) {
   return raw.includes('@') ? raw : null;
 }
 
-function smtpHostConfigured() {
-  return Boolean(config.email.host && String(config.email.host).trim());
-}
-
-function smtpCredentialsConfigured() {
-  const u = config.email.user != null && String(config.email.user).trim() !== '';
-  const p = config.email.pass != null && String(config.email.pass) !== '';
-  return u && p;
-}
-
-/** Nodemailer options tuned for Microsoft 365 / Outlook (STARTTLS on 587). */
-function createSmtpTransportOptions() {
-  const host = config.email.host != null ? String(config.email.host).trim() : '';
-  if (!host) return null;
-  const port = Number(config.email.port) || 587;
-  const secure = config.email.secure === true;
+/** Build Nodemailer transport options from merged env or brand_settings SMTP. */
+function buildNodemailerOptions(smtp) {
+  if (!smtp || !smtp.host) return null;
+  const port = Number(smtp.port) || 587;
+  const secure = smtp.secure === true;
   const opts = {
-    host,
+    host: String(smtp.host).trim(),
     port,
     secure,
     tls: { minVersion: 'TLSv1.2' },
   };
-  if (smtpCredentialsConfigured()) {
-    opts.auth = {
-      user: String(config.email.user).trim(),
-      pass: String(config.email.pass),
-    };
+  const user = smtp.user != null ? String(smtp.user).trim() : '';
+  const pass = smtp.pass != null ? String(smtp.pass) : '';
+  if (user && pass !== '') {
+    opts.auth = { user, pass };
   }
   if (!secure && port === 587) {
     opts.requireTLS = true;
@@ -60,20 +48,20 @@ function formatSmtpError(err) {
 }
 
 class EmailService {
-  constructor() {
-    const smtpOpts = createSmtpTransportOptions();
-    this.transporter = smtpOpts ? nodemailer.createTransport(smtpOpts) : null;
-  }
+  constructor() {}
 
   async send({ to, subject, html, text }) {
     const from = await getOutboundEmailFrom();
-    if (!this.transporter) {
+    const smtp = await getEffectiveSmtpConfig();
+    const opts = buildNodemailerOptions(smtp);
+    if (!opts) {
       console.log('[Email] (no SMTP configured) Would send:', { from, to, subject });
       return { success: true };
     }
 
+    const transporter = nodemailer.createTransport(opts);
     try {
-      await this.transporter.sendMail({
+      await transporter.sendMail({
         from,
         to,
         subject,
@@ -87,10 +75,16 @@ class EmailService {
     }
   }
 
-  smtpDiagnostics() {
+  async smtpDiagnostics() {
+    const smtp = await getEffectiveSmtpConfig();
+    const hostConfigured = Boolean(smtp.host);
+    const credentialsConfigured = Boolean(
+      smtp.user && String(smtp.user).trim() && smtp.pass != null && String(smtp.pass) !== ''
+    );
     return {
-      hostConfigured: smtpHostConfigured(),
-      credentialsConfigured: smtpCredentialsConfigured(),
+      hostConfigured,
+      credentialsConfigured,
+      source: smtp.source || 'none',
     };
   }
 
@@ -104,41 +98,52 @@ class EmailService {
       return { success: false, error: 'Enter a valid recipient email address.' };
     }
     const from = await getOutboundEmailFrom();
-    if (!smtpHostConfigured()) {
+    const smtp = await getEffectiveSmtpConfig();
+    const diag = {
+      hostConfigured: Boolean(smtp.host),
+      credentialsConfigured: Boolean(
+        smtp.user && String(smtp.user).trim() && smtp.pass != null && String(smtp.pass) !== ''
+      ),
+      source: smtp.source || 'none',
+    };
+
+    if (!smtp.host) {
       return {
         success: false,
         error:
-          'SMTP_HOST is not set on this server. Add SMTP_HOST (e.g. smtp.office365.com), SMTP_PORT=587, SMTP_SECURE=false, SMTP_USER, and SMTP_PASS.',
+          'No SMTP server is configured. Set SMTP_HOST (and related variables) on your hosting, or enter SMTP under Settings (SMTP server section) and save.',
         from,
-        smtp: this.smtpDiagnostics(),
+        smtp: diag,
       };
     }
-    if (!smtpCredentialsConfigured()) {
+    if (!diag.credentialsConfigured) {
       return {
         success: false,
         error:
-          'SMTP_USER and SMTP_PASS must both be set (use an app password if your Microsoft account has MFA).',
+          'SMTP username and password are required (Microsoft 365: use an app password if MFA is on).',
         from,
-        smtp: this.smtpDiagnostics(),
+        smtp: diag,
       };
     }
-    if (!this.transporter) {
+    const opts = buildNodemailerOptions(smtp);
+    if (!opts.auth) {
       return {
         success: false,
-        error: 'Could not initialize the mail transport. Check SMTP_HOST and port.',
+        error: 'SMTP username and password are required for this server.',
         from,
-        smtp: this.smtpDiagnostics(),
+        smtp: diag,
       };
     }
+    const transporter = nodemailer.createTransport(opts);
     try {
-      await this.transporter.verify();
+      await transporter.verify();
     } catch (err) {
       console.error('[Email] SMTP verify failed:', err);
       return {
         success: false,
         error: `SMTP connection or login failed: ${formatSmtpError(err)}`,
         from,
-        smtp: this.smtpDiagnostics(),
+        smtp: diag,
       };
     }
     const subject = 'Sellitnow - test email';
@@ -160,15 +165,16 @@ class EmailService {
       `To: ${addr}`,
     ].join('\n');
     const r = await this.send({ to: addr, subject, html, text });
+    const diagAfter = await this.smtpDiagnostics();
     if (!r.success) {
       return {
         success: false,
         error: r.error || 'Send failed',
         from,
-        smtp: this.smtpDiagnostics(),
+        smtp: diagAfter,
       };
     }
-    return { success: true, from, to: addr, smtp: this.smtpDiagnostics() };
+    return { success: true, from, to: addr, smtp: diagAfter };
   }
 
   async sendWelcome(user) {
