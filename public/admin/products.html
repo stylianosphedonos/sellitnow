@@ -125,7 +125,12 @@
                 <td>${formatStoreMoney(p.price)}</td>
                 <td>${p.stock_quantity}</td>
                 <td>${p.status}</td>
-                <td><button class="btn" style="padding:6px 12px;font-size:12px" onclick="editProduct(${p.id})">Edit</button></td>
+                <td style="white-space:nowrap">
+                  <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <button type="button" class="btn" style="padding:6px 12px;font-size:12px;width:auto" onclick="editProduct(${p.id})">Edit</button>
+                    <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;width:auto;margin-top:0;background:#b91c1c" onclick="deleteProduct(${p.id})">Delete</button>
+                  </div>
+                </td>
               </tr>
             `).join('') : '<tr><td colspan="7" style="padding:16px;color:var(--text-muted)">No products to show.</td></tr>'}
           </table>
@@ -194,6 +199,16 @@
 
     function editProduct(id) {
       window.location.href = '/admin/product-edit.html?id=' + id;
+    }
+
+    async function deleteProduct(id) {
+      if (!confirm('Delete this product? This cannot be undone.')) return;
+      try {
+        await callApi('/admin/products/' + id, { method: 'DELETE' });
+        loadProducts();
+      } catch (err) {
+        alert(err.message || 'Delete failed');
+      }
     }
 
     loadCategories().then(loadProducts);
