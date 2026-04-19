@@ -22,11 +22,50 @@
     </aside>
     <main class="admin-content">
       <h1>Settings</h1>
-      <p style="margin-bottom:24px;color:var(--text-muted)">Store currency, tax, delivery defaults, outbound email (customer order mail and admin alerts), and database tools.</p>
+      <p style="margin-bottom:24px;color:var(--text-muted)"><strong>From email</strong> for all store messages is configured in the first section below (then save). Currency, tax, delivery, and database tools follow.</p>
 
       <div id="alert" class="alert" style="display:none;margin-bottom:24px"></div>
 
       <div style="display:grid;gap:32px;max-width:800px">
+        <section id="from-email" style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid rgba(238,77,45,0.25)">
+          <h2 style="font-size:18px;margin-bottom:8px">From email &amp; outbound mail</h2>
+          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;line-height:1.5">This is where you set the <strong>From</strong> address customers see on order emails, password resets, and admin notifications. It must be an address your mail provider allows (often the same mailbox as <code style="font-size:12px">SMTP_USER</code> on the server).</p>
+          <div style="display:grid;gap:20px;max-width:520px">
+            <div class="form-group">
+              <label for="senderEmailFrom">From email (displayed to customers)</label>
+              <input type="text" id="senderEmailFrom" autocomplete="off" placeholder="Your Shop &lt;orders@yourdomain.com&gt;" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              <small style="color:var(--text-muted);display:block;margin-top:8px;line-height:1.45">Examples: <code style="font-size:12px">orders@company.com</code> or <code style="font-size:12px">My Store &lt;sales@company.com&gt;</code>. Leave blank and save to use the server default <code style="font-size:12px">EMAIL_FROM</code>.</small>
+            </div>
+          </div>
+          <button type="button" id="saveSenderEmail" class="btn" style="margin-top:8px;max-width:240px">Save from email</button>
+
+          <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
+            <h3 style="font-size:16px;margin-bottom:8px">Send test email</h3>
+            <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;line-height:1.5">Send a short test message using your <strong>saved</strong> From address (save above if you changed it) and the server’s SMTP settings.</p>
+            <p style="color:var(--text-muted);font-size:13px;margin:-8px 0 16px;line-height:1.5">If the browser console shows <code style="font-size:12px">400</code> for this request, that is intentional: it means the server could not send mail and returned a JSON error. Open the request in the Network tab → <strong>Response</strong>, or check the red message below and the console for <code style="font-size:12px">[Sellitnow] Test email failed</code>.</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;max-width:560px">
+              <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
+                <label for="testEmailRecipient">Recipient</label>
+                <input type="email" id="testEmailRecipient" autocomplete="email" placeholder="you@example.com" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              </div>
+              <button type="button" id="sendTestEmailBtn" class="btn" style="max-width:200px;margin-bottom:2px">Send test email</button>
+            </div>
+          </div>
+
+          <div style="margin-top:28px;padding-top:24px;border-top:1px solid var(--border)">
+            <h3 style="font-size:16px;margin-bottom:10px">Microsoft 365 / Outlook (SMTP)</h3>
+            <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px;line-height:1.5">The mailbox login is set on the server with environment variables (not in this form). Typical values for Microsoft-hosted business mail:</p>
+            <ul style="margin:0 0 16px 18px;color:var(--text-muted);font-size:14px;line-height:1.65">
+              <li><code style="font-size:12px">SMTP_HOST</code> — often <code style="font-size:12px">smtp.office365.com</code></li>
+              <li><code style="font-size:12px">SMTP_PORT</code> — <code style="font-size:12px">587</code></li>
+              <li><code style="font-size:12px">SMTP_SECURE</code> — <code style="font-size:12px">false</code> (STARTTLS on 587)</li>
+              <li><code style="font-size:12px">SMTP_USER</code> / <code style="font-size:12px">SMTP_PASS</code> — your mailbox sign-in (app password if MFA is on)</li>
+              <li><code style="font-size:12px">EMAIL_FROM</code> — fallback sender if the From field above is empty</li>
+            </ul>
+            <p style="color:var(--text-muted);font-size:13px;line-height:1.5">SMTP must allow “authenticated send as” the address you configure. If messages fail, check your tenant’s SMTP AUTH and mailbox permissions in the Microsoft 365 admin center.</p>
+          </div>
+        </section>
+
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
           <h2 style="font-size:18px;margin-bottom:8px">Currency &amp; tax</h2>
           <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;line-height:1.5">Storefront prices and Stripe checkout use this currency. Tax is applied to the cart subtotal before shipping.</p>
@@ -74,45 +113,6 @@
             </div>
           </div>
           <button type="button" id="saveDelivery" class="btn" style="margin-top:8px;max-width:220px">Save delivery default</button>
-        </section>
-
-        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-          <h2 style="font-size:18px;margin-bottom:8px">Outbound email</h2>
-          <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;line-height:1.5">Customers receive order confirmations and status updates from this store. Set the visible <strong>From</strong> address here; the mail server itself is configured on the host with environment variables (see Microsoft 365 / Outlook below).</p>
-          <div style="display:grid;gap:20px;max-width:520px">
-            <div class="form-group">
-              <label for="senderEmailFrom">From address (shown to customers)</label>
-              <input type="text" id="senderEmailFrom" autocomplete="off" placeholder="Your Shop &lt;orders@yourdomain.com&gt;" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
-              <small style="color:var(--text-muted);display:block;margin-top:8px;line-height:1.45">Use the same mailbox you send from in Outlook if possible (e.g. <code style="font-size:12px">Sales &lt;sales@company.com&gt;</code>). Plain email is fine. Leave blank and save to use <code style="font-size:12px">EMAIL_FROM</code> on the server.</small>
-            </div>
-          </div>
-          <button type="button" id="saveSenderEmail" class="btn" style="margin-top:8px;max-width:220px">Save sender email</button>
-
-          <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
-            <h3 style="font-size:16px;margin-bottom:8px">Send test email</h3>
-            <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;line-height:1.5">Send a short test message using your <strong>saved</strong> From address (save above if you changed it) and the server’s SMTP settings.</p>
-            <p style="color:var(--text-muted);font-size:13px;margin:-8px 0 16px;line-height:1.5">If the browser console shows <code style="font-size:12px">400</code> for this request, that is intentional: it means the server could not send mail and returned a JSON error. Open the request in the Network tab → <strong>Response</strong>, or check the red message below and the console for <code style="font-size:12px">[Sellitnow] Test email failed</code>.</p>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;max-width:560px">
-              <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
-                <label for="testEmailRecipient">Recipient</label>
-                <input type="email" id="testEmailRecipient" autocomplete="email" placeholder="you@example.com" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
-              </div>
-              <button type="button" id="sendTestEmailBtn" class="btn" style="max-width:200px;margin-bottom:2px">Send test email</button>
-            </div>
-          </div>
-
-          <div style="margin-top:28px;padding-top:24px;border-top:1px solid var(--border)">
-            <h3 style="font-size:16px;margin-bottom:10px">Microsoft 365 / Outlook (SMTP)</h3>
-            <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px;line-height:1.5">This app uses Nodemailer with SMTP credentials from the environment (not stored in the database). Typical values for Microsoft-hosted business mail:</p>
-            <ul style="margin:0 0 16px 18px;color:var(--text-muted);font-size:14px;line-height:1.65">
-              <li><code style="font-size:12px">SMTP_HOST</code> — often <code style="font-size:12px">smtp.office365.com</code></li>
-              <li><code style="font-size:12px">SMTP_PORT</code> — <code style="font-size:12px">587</code></li>
-              <li><code style="font-size:12px">SMTP_SECURE</code> — <code style="font-size:12px">false</code> (STARTTLS on 587)</li>
-              <li><code style="font-size:12px">SMTP_USER</code> / <code style="font-size:12px">SMTP_PASS</code> — your mailbox sign-in (app password if MFA is on)</li>
-              <li><code style="font-size:12px">EMAIL_FROM</code> — fallback sender if the field above is empty</li>
-            </ul>
-            <p style="color:var(--text-muted);font-size:13px;line-height:1.5">SMTP must allow “authenticated send as” the address you configure. If messages fail, check your tenant’s SMTP AUTH and mailbox permissions in the Microsoft 365 admin center.</p>
-          </div>
         </section>
 
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
@@ -205,19 +205,19 @@
 
     saveSenderEmailBtn?.addEventListener('click', async () => {
       saveSenderEmailBtn.disabled = true;
-      saveSenderEmailBtn.textContent = 'Saving...';
+      saveSenderEmailBtn.textContent = 'Saving…';
       try {
         await callApi('/admin/brand', {
           method: 'PUT',
           body: JSON.stringify({ emailFrom: document.getElementById('senderEmailFrom').value }),
         });
-        showAlert('Sender email saved.');
+        showAlert('From email saved.');
         await loadSettings();
       } catch (err) {
         showAlert(err.message || 'Failed to save.', true);
       }
       saveSenderEmailBtn.disabled = false;
-      saveSenderEmailBtn.textContent = 'Save sender email';
+      saveSenderEmailBtn.textContent = 'Save from email';
     });
 
     sendTestEmailBtn?.addEventListener('click', async () => {
