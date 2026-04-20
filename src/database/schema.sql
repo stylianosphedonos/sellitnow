@@ -34,12 +34,13 @@ CREATE TABLE IF NOT EXISTS categories (
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
   image_url TEXT,
+  display_order INTEGER,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS products (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  sku TEXT UNIQUE NOT NULL,
+  sku TEXT UNIQUE,
   title TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS products (
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
   options_json TEXT,
   delivery_cost REAL,
+  display_order INTEGER,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

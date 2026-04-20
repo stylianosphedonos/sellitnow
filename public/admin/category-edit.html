@@ -65,6 +65,10 @@
             <textarea name="description" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(category.description || '')}</textarea>
           </div>
           <div class="form-group">
+            <label>Order number (optional)</label>
+            <input type="number" name="display_order" step="1" min="0" value="${category.display_order ?? ''}" placeholder="Lower number shows first">
+          </div>
+          <div class="form-group">
             <label>Current image</label>
             <div id="categoryCurrentImage" style="margin-bottom:12px">
               ${category.image_url
@@ -138,7 +142,8 @@
       const slugTrim = form.slug.value.trim();
       const payload = {
         name: form.name.value.trim(),
-        description: form.description.value.trim() === '' ? null : form.description.value
+        description: form.description.value.trim() === '' ? null : form.description.value,
+        display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10)
       };
       if (slugTrim) payload.slug = slugTrim;
 

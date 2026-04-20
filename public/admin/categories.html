@@ -39,6 +39,10 @@
             <textarea name="description" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px"></textarea>
           </div>
           <div class="form-group">
+            <label>Order number (optional)</label>
+            <input type="number" name="display_order" step="1" min="0" placeholder="Lower number shows first">
+          </div>
+          <div class="form-group">
             <label>Category image</label>
             <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
             <small style="color:#666">JPEG, PNG, WebP or GIF. Max 5MB.</small>
@@ -60,10 +64,11 @@
         const { categories } = await callApi('/categories?_=' + Date.now(), { cache: 'no-store' });
         document.getElementById('categories').innerHTML = `
           <table class="table">
-            <tr><th>ID</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr>
+            <tr><th>ID</th><th>Order</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr>
             ${(categories || []).map(c => `
               <tr>
                 <td>${c.id}</td>
+                <td>${c.display_order ?? '-'}</td>
                 <td>${c.name}</td>
                 <td>${c.slug}</td>
                 <td>${(c.description || '').slice(0, 50)}</td>
@@ -85,7 +90,8 @@
       const descTrim = form.description.value.trim();
       const payload = {
         name,
-        description: descTrim === '' ? null : form.description.value
+        description: descTrim === '' ? null : form.description.value,
+        display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10)
       };
       if (slugTrim) payload.slug = slugTrim;
       const fileInput = form.querySelector('input[name="image"]');

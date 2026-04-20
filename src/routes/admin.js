@@ -86,7 +86,10 @@ function normalizeProductPayload(data, { forUpdate = false } = {}) {
 
   if (!forUpdate) {
     if (!String(clean.title || '').trim()) throw new Error('Title is required.');
-    if (!String(clean.sku || '').trim()) throw new Error('SKU is required.');
+  }
+
+  if (data.display_order !== undefined) {
+    clean.display_order = parseNullableInteger(data.display_order, 'Display order');
   }
 
   if (data.delivery_cost !== undefined) {

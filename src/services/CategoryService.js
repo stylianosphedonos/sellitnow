@@ -2,17 +2,31 @@ const slugify = require('slugify');
 const { pool } = require('../database/db');
 const { parseOptionsJson } = require('../lib/productOptions');
 
+function parseNullableInteger(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${fieldName} must be a whole number.`);
+  }
+  return parsed;
+}
+
 class CategoryService {
   async list() {
     const result = await pool.query(
-      'SELECT id, name, slug, description, image_url FROM categories ORDER BY id'
+      `SELECT id, name, slug, description, image_url, display_order
+       FROM categories
+       ORDER BY
+         CASE WHEN display_order IS NULL THEN 1 ELSE 0 END,
+         display_order ASC,
+         id ASC`
     );
     return result.rows;
   }
 
   async getById(id) {
     const result = await pool.query(
-      'SELECT id, name, slug, description, image_url FROM categories WHERE id = $1',
+      'SELECT id, name, slug, description, image_url, display_order FROM categories WHERE id = $1',
       [id]
     );
     if (!result.rows.length) throw new Error('Category not found');
@@ -21,7 +35,7 @@ class CategoryService {
 
   async getBySlug(slug) {
     const result = await pool.query(
-      'SELECT id, name, slug, description, image_url FROM categories WHERE slug = $1',
+      'SELECT id, name, slug, description, image_url, display_order FROM categories WHERE slug = $1',
       [slug]
     );
     if (!result.rows.length) throw new Error('Category not found');
@@ -62,7 +76,7 @@ class CategoryService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -73,12 +87,15 @@ class CategoryService {
                )
              )
              AND (p.title ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)
-           ORDER BY p.id
+           ORDER BY
+             CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
+             p.display_order ASC,
+             p.id ASC
            LIMIT $4 OFFSET $5`,
           [categoryId, 'active', pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -88,7 +105,10 @@ class CategoryService {
                  WHERE pc.product_id = p.id AND pc.category_id = $1
                )
              )
-           ORDER BY p.id
+           ORDER BY
+             CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
+             p.display_order ASC,
+             p.id ASC
            LIMIT $3 OFFSET $4`,
           [categoryId, 'active', limit, offset]
         );
@@ -127,11 +147,12 @@ class CategoryService {
     if (!name) throw new Error('Name is required');
     const slugRaw = data.slug != null ? String(data.slug).trim() : '';
     const slug = slugRaw ? slugRaw : slugify(name, { lower: true });
+    const displayOrder = parseNullableInteger(data.display_order, 'Display order');
     const result = await pool.query(
-      `INSERT INTO categories (name, slug, description, image_url)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, slug, description, image_url`,
-      [name, slug, data.description != null ? data.description : null, data.image_url || null]
+      `INSERT INTO categories (name, slug, description, image_url, display_order)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, slug, description, image_url, display_order`,
+      [name, slug, data.description != null ? data.description : null, data.image_url || null, displayOrder]
     );
     return result.rows[0];
   }
@@ -160,6 +181,10 @@ class CategoryService {
     if (data.slug !== undefined) {
       updates.push(`slug = $${i++}`);
       values.push(data.slug);
+    }
+    if (data.display_order !== undefined) {
+      updates.push(`display_order = $${i++}`);
+      values.push(parseNullableInteger(data.display_order, 'Display order'));
     }
 
     if (updates.length === 0) throw new Error('No fields to update');

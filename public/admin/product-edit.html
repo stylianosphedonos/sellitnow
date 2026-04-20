@@ -75,12 +75,12 @@
             <input type="text" name="title" value="${escapeHtml(product.title || '')}" required>
           </div>
           <div class="form-group">
-            <label>SKU *</label>
-            <input type="text" name="sku" value="${escapeHtml(product.sku || '')}" required>
-          </div>
-          <div class="form-group">
             <label>Description</label>
             <textarea name="description" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(product.description || '')}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Order number (optional)</label>
+            <input type="number" step="1" min="0" name="display_order" value="${product.display_order ?? ''}" placeholder="Lower number shows first">
           </div>
           <div class="form-group">
             <label>Price *</label>
@@ -260,13 +260,13 @@
 
       const productData = {
         title: form.title.value,
-        sku: form.sku.value,
         description: form.description.value,
         price: parseFloat(form.price.value) || 0,
         stock_quantity: parseInt(form.stock_quantity.value, 10) || 0,
         category_ids: selectedCategories,
         status: form.status.value,
         delivery_cost,
+        display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
         options: { colors: [...editColors], sizes: [...editSizes] }
       };
 

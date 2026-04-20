@@ -5,6 +5,16 @@ const { parseOptionsJson, stringifyOptionsJson } = require('../lib/productOption
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 
 class ProductService {
+  normalizeSku(value) {
+    const sku = value == null ? '' : String(value).trim();
+    return sku || null;
+  }
+
+  generateFallbackSku(title) {
+    const base = slugify(String(title || 'product'), { lower: true, strict: true }) || 'product';
+    return `AUTO-${base}-${Date.now()}`;
+  }
+
   async getCategoryIdsByProductIds(productIds) {
     if (!Array.isArray(productIds) || productIds.length === 0) return new Map();
     const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
@@ -54,16 +64,24 @@ class ProductService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost
+          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order
            FROM products p
            WHERE p.title ILIKE $1
-           ORDER BY p.id
+           ORDER BY
+             CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
+             p.display_order ASC,
+             p.id ASC
            LIMIT $2 OFFSET $3`,
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost
-           FROM products p ORDER BY p.id LIMIT $1 OFFSET $2`,
+          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order
+           FROM products p
+           ORDER BY
+             CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
+             p.display_order ASC,
+             p.id ASC
+           LIMIT $1 OFFSET $2`,
           [limit, offset]
         );
     const items = result.rows;
@@ -93,21 +111,27 @@ class ProductService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
              AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)
-           ORDER BY p.id
+           ORDER BY
+             CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
+             p.display_order ASC,
+             p.id ASC
            LIMIT $2 OFFSET $3`,
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
-           ORDER BY p.id
+           ORDER BY
+             CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
+             p.display_order ASC,
+             p.id ASC
            LIMIT $1 OFFSET $2`,
           [limit, offset]
         );
@@ -207,12 +231,15 @@ class ProductService {
     const deliveryCost =
       data.delivery_cost !== undefined && data.delivery_cost !== null ? Number(data.delivery_cost) : null;
 
+    const normalizedSku = this.normalizeSku(data.sku) || this.generateFallbackSku(data.title);
+    const displayOrder = data.display_order !== undefined ? data.display_order : null;
+
     const result = await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, options_json, delivery_cost)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, options_json, delivery_cost, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
-        data.sku,
+        normalizedSku,
         data.title,
         slug,
         data.description || null,
@@ -222,6 +249,7 @@ class ProductService {
         data.status || 'draft',
         optionsJson,
         deliveryCost != null && Number.isFinite(deliveryCost) ? deliveryCost : null,
+        displayOrder,
       ]
     );
     const product = result.rows[0];
@@ -244,8 +272,9 @@ class ProductService {
     const product = await this.getById(id);
     const slug = data.title ? slugify(data.title, { lower: true }) : product.slug;
 
-    const sku = data.sku !== undefined && data.sku !== null ? data.sku : product.sku;
     const title = data.title !== undefined && data.title !== null ? data.title : product.title;
+    const rawSku = data.sku !== undefined ? data.sku : product.sku;
+    const sku = this.normalizeSku(rawSku) || this.generateFallbackSku(title);
     const description = data.description !== undefined ? data.description : product.description;
     const price = data.price !== undefined && data.price !== null ? data.price : product.price;
     const stock_quantity = data.stock_quantity !== undefined && data.stock_quantity !== null ? data.stock_quantity : product.stock_quantity;
@@ -271,6 +300,11 @@ class ProductService {
           : Number(data.delivery_cost);
     }
 
+    let display_order = product.display_order ?? null;
+    if (data.display_order !== undefined) {
+      display_order = data.display_order === null || data.display_order === '' ? null : Number(data.display_order);
+    }
+
     const optRow = await pool.query('SELECT options_json FROM products WHERE id = $1', [id]);
     let optionsJson = optRow.rows[0]?.options_json ?? null;
     if (data.options !== undefined) {
@@ -291,9 +325,10 @@ class ProductService {
         status = $9,
         options_json = $10,
         delivery_cost = $11,
+        display_order = $12,
         updated_at = NOW()
        WHERE id = $1`,
-      [id, sku, title, slug, description, price, stock_quantity, category_id, status, optionsJson, delivery_cost]
+      [id, sku, title, slug, description, price, stock_quantity, category_id, status, optionsJson, delivery_cost, display_order]
     );
     await this.assignProductCategories(id, normalizedCategoryIds);
 
