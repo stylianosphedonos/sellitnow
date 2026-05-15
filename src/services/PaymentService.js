@@ -119,7 +119,10 @@ class PaymentService {
 
     const orderForMail = await OrderService.getOrderWithCustomerEmail(orderId);
     const itemRows = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
-    await EmailService.sendOrderReceivedAndProcessing(orderForMail, itemRows.rows);
+    await EmailService.sendPaymentReceipt(orderForMail, itemRows.rows, {
+      stripeTransactionId,
+      amountPaid: amount,
+    });
   }
 
   /**
