@@ -27,6 +27,9 @@ function buildNodemailerOptions(smtp) {
     port,
     secure,
     tls: { minVersion: 'TLSv1.2' },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
   };
   const user = smtp.user != null ? String(smtp.user).trim() : '';
   const pass = smtp.pass != null ? String(smtp.pass) : '';

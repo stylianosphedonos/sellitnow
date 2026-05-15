@@ -343,12 +343,21 @@
         if (csrf) headers['X-CSRF-Token'] = csrf;
         headers['X-Cart-Session'] = getCartSession();
 
-        const res = await fetch(apiPrefix() + '/admin/email/test-send', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({ to }),
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
+        let res;
+        try {
+          res = await fetch(apiPrefix() + '/admin/email/test-send', {
+            method: 'POST',
+            headers,
+            credentials: 'include',
+            body: JSON.stringify({ to }),
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           console.warn('[Sellitnow] Test email failed — HTTP', res.status, '— server said:', data);
@@ -373,10 +382,15 @@
         const fromBit = data.from ? ` From: ${data.from}.` : '';
         showAlert((data.message || 'Test email sent.') + fromBit + ' Check spam if you do not see it.');
       } catch (err) {
-        showAlert(err.message || 'Failed to send test email.', true);
+        const msg =
+          err && err.name === 'AbortError'
+            ? 'Request timed out after 45 seconds. SMTP may be slow or unreachable — check Render env vars and Microsoft 365 SMTP settings.'
+            : err.message || 'Failed to send test email.';
+        showAlert(msg, true);
+      } finally {
+        sendTestEmailBtn.disabled = false;
+        sendTestEmailBtn.textContent = prev;
       }
-      sendTestEmailBtn.disabled = false;
-      sendTestEmailBtn.textContent = prev;
     });
 
     saveDeliveryBtn?.addEventListener('click', async () => {
