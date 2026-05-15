@@ -17,7 +17,7 @@
     </aside>
     <main class="admin-content">
       <h1>Order <span id="orderNumber"></span></h1>
-      <div id="statusMessage" style="display:none;padding:10px 12px;border-radius:6px;margin-bottom:12px"></div>
+      <div id="statusMessage" class="order-page-banner" style="display:none" role="status"></div>
       <div id="order"></div>
     </main>
   </div>
@@ -29,19 +29,226 @@
     const id = new URLSearchParams(location.search).get('id');
     if (!id) window.location.href = '/admin/orders.html';
     let currentOrder = null;
+    const emailActivityLog = [];
 
-    function showStatusMessage(message, isError = false, hideAfterMs = 2500) {
+    function esc(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function showBanner(message, isError = false, hideAfterMs = 0) {
       const el = document.getElementById('statusMessage');
       if (!el) return;
       el.textContent = message;
       el.style.display = 'block';
-      el.style.background = isError ? '#fee2e2' : '#dcfce7';
-      el.style.color = isError ? '#991b1b' : '#166534';
-      clearTimeout(window.statusMessageTimeout);
+      el.className = 'order-page-banner ' + (isError ? 'order-page-banner--error' : 'order-page-banner--success');
+      clearTimeout(window.orderBannerTimeout);
       if (!isError && hideAfterMs > 0) {
-        window.statusMessageTimeout = setTimeout(() => {
+        window.orderBannerTimeout = setTimeout(() => {
           el.style.display = 'none';
         }, hideAfterMs);
+      }
+    }
+
+    function logEmailActivity(entry) {
+      emailActivityLog.unshift(entry);
+      const list = document.getElementById('emailActivityList');
+      if (!list) return;
+      list.innerHTML = emailActivityLog
+        .slice(0, 8)
+        .map(
+          (e) =>
+            `<li class="order-activity-item order-activity-item--${e.ok ? 'ok' : 'err'}">
+              <span class="order-activity-item__time">${esc(e.time)}</span>
+              <strong>${esc(e.action)}</strong> — ${esc(e.detail)}
+            </li>`
+        )
+        .join('');
+    }
+
+    function setEmailPanelState(state, message) {
+      const panel = document.getElementById('orderEmailPanel');
+      const result = document.getElementById('emailActionResult');
+      const text = document.getElementById('emailActionResultText');
+      if (!text) return;
+      const states = ['is-sending', 'is-success', 'is-error', 'is-idle'];
+      if (panel) panel.classList.remove(...states.filter((s) => s !== 'is-idle'));
+      if (result) result.classList.remove(...states.filter((s) => s !== 'is-idle'));
+      if (state && state !== 'idle') {
+        if (panel) panel.classList.add('is-' + state);
+        if (result) result.classList.add('is-' + state);
+      }
+      text.textContent = message;
+      result?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function getFulfillmentFields() {
+      return {
+        status: document.getElementById('orderStatusSelect')?.value,
+        tracking_number: document.getElementById('trackingNumberInput')?.value?.trim() || '',
+      };
+    }
+
+    async function loadEmailPreview() {
+      const previewSubject = document.getElementById('emailPreviewSubject');
+      const previewBody = document.getElementById('emailPreviewBody');
+      const previewLabel = document.getElementById('emailPreviewLabel');
+      const type = document.querySelector('input[name="emailType"]:checked')?.value || 'payment_receipt';
+      const { status, tracking_number } = getFulfillmentFields();
+      if (!previewSubject || !previewBody) return;
+
+      previewSubject.textContent = 'Loading preview…';
+      previewBody.textContent = '';
+
+      try {
+        const q = new URLSearchParams({ type });
+        if (type === 'status_update') {
+          q.set('status', status || '');
+          q.set('tracking_number', tracking_number);
+        }
+        const data = await callApi('/admin/orders/' + id + '/email/preview?' + q.toString());
+        previewLabel.textContent = data.label || 'Email preview';
+        previewSubject.textContent = data.subject || '—';
+        previewBody.textContent = data.text || '—';
+        const receiptBtn = document.getElementById('sendReceiptBtn');
+        if (receiptBtn) {
+          receiptBtn.textContent =
+            data.payment_status === 'paid' ? 'Send payment receipt' : 'Send order confirmation';
+        }
+      } catch (err) {
+        previewSubject.textContent = 'Preview unavailable';
+        previewBody.textContent = err.message || 'Could not load preview.';
+      }
+    }
+
+    async function sendCustomerEmail(type) {
+      const clickedAt = new Date().toLocaleTimeString();
+      const sendBtn =
+        type === 'status_update'
+          ? document.getElementById('sendStatusEmailBtn')
+          : document.getElementById('sendReceiptBtn');
+      const label =
+        type === 'status_update'
+          ? 'Status update'
+          : document.getElementById('sendReceiptBtn')?.textContent || 'Receipt';
+
+      if (sendBtn) {
+        sendBtn.disabled = true;
+        sendBtn.dataset.prevText = sendBtn.textContent;
+        sendBtn.textContent = 'Sending…';
+      }
+
+      setEmailPanelState('sending', `Clicked at ${clickedAt} — sending ${label.toLowerCase()}…`);
+
+      try {
+        const { status, tracking_number } = getFulfillmentFields();
+        const body = { type };
+        if (type === 'status_update') {
+          body.status = status;
+          body.tracking_number = tracking_number;
+        }
+        const res = await callApi('/admin/orders/' + id + '/email/send', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        const doneAt = new Date().toLocaleTimeString();
+        setEmailPanelState('success', `✓ ${res.message || 'Email sent.'} (${doneAt})`);
+        showBanner(res.message || 'Email sent successfully.', false, 10000);
+        logEmailActivity({
+          ok: true,
+          time: doneAt,
+          action: res.label || label,
+          detail: res.message || 'Sent',
+        });
+        if (sendBtn) sendBtn.textContent = 'Sent ✓';
+      } catch (err) {
+        const doneAt = new Date().toLocaleTimeString();
+        const errMsg = err.message || 'Could not send email.';
+        setEmailPanelState('error', `✗ Failed at ${doneAt}. ${errMsg}`);
+        showBanner(errMsg, true, 0);
+        logEmailActivity({ ok: false, time: doneAt, action: label, detail: errMsg });
+        if (sendBtn && sendBtn.dataset.prevText) sendBtn.textContent = sendBtn.dataset.prevText;
+      } finally {
+        if (sendBtn) sendBtn.disabled = false;
+      }
+    }
+
+    function bindOrderPageHandlers() {
+      document.querySelectorAll('input[name="emailType"]').forEach((el) => {
+        el.addEventListener('change', () => loadEmailPreview());
+      });
+      document.getElementById('orderStatusSelect')?.addEventListener('change', () => {
+        const type = document.querySelector('input[name="emailType"]:checked')?.value;
+        if (type === 'status_update') loadEmailPreview();
+      });
+      document.getElementById('trackingNumberInput')?.addEventListener('input', () => {
+        const type = document.querySelector('input[name="emailType"]:checked')?.value;
+        if (type === 'status_update') {
+          clearTimeout(window.previewDebounce);
+          window.previewDebounce = setTimeout(loadEmailPreview, 400);
+        }
+      });
+      document.getElementById('refreshPreviewBtn')?.addEventListener('click', () => loadEmailPreview());
+      document.getElementById('sendReceiptBtn')?.addEventListener('click', () =>
+        sendCustomerEmail('payment_receipt')
+      );
+      document.getElementById('sendStatusEmailBtn')?.addEventListener('click', () =>
+        sendCustomerEmail('status_update')
+      );
+
+      document.getElementById('saveStatusBtn')?.addEventListener('click', () => updateOrderStatus(false));
+      document.getElementById('saveAndEmailBtn')?.addEventListener('click', () => updateOrderStatus(true));
+    }
+
+    async function updateOrderStatus(sendEmail) {
+      const form = document.getElementById('statusForm');
+      const btn = sendEmail
+        ? document.getElementById('saveAndEmailBtn')
+        : document.getElementById('saveStatusBtn');
+      if (!form || !btn) return;
+      btn.disabled = true;
+      const prev = btn.textContent;
+      btn.textContent = sendEmail ? 'Saving & sending…' : 'Saving…';
+      try {
+        const res = await callApi('/admin/orders/' + id + '/status', {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: form.status.value,
+            tracking_number: form.tracking_number.value || undefined,
+            send_customer_email: sendEmail,
+          }),
+        });
+        currentOrder = res.order;
+        document.getElementById('currentOrderStatus').textContent = res.order.status;
+        document.getElementById('currentPaymentStatus').textContent = res.order.payment_status;
+
+        let msg = `Order status updated to "${res.order.status}".`;
+        if (res.customerEmailSent) {
+          msg += ' Customer was emailed.';
+          logEmailActivity({
+            ok: true,
+            time: new Date().toLocaleTimeString(),
+            action: 'Status update (on save)',
+            detail: msg,
+          });
+        } else if (sendEmail && res.customerEmailError) {
+          msg += ' Email failed: ' + res.customerEmailError;
+          logEmailActivity({
+            ok: false,
+            time: new Date().toLocaleTimeString(),
+            action: 'Status update (on save)',
+            detail: res.customerEmailError,
+          });
+        }
+        showBanner(msg, Boolean(sendEmail && res.customerEmailError), sendEmail ? 10000 : 5000);
+        if (sendEmail) await loadEmailPreview();
+      } catch (err) {
+        showBanner(err.message || 'Failed to update order.', true, 0);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prev;
       }
     }
 
@@ -51,229 +258,147 @@
         const { order } = await callApi('/admin/orders/' + id);
         currentOrder = order;
         document.getElementById('orderNumber').textContent = order.order_number;
-        const addr = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : order.shipping_address;
-        const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const addr =
+          typeof order.shipping_address === 'string'
+            ? JSON.parse(order.shipping_address)
+            : order.shipping_address;
+        const customerEmail = order.guest_email || order.user_email || '';
         const stockAlert = order.stock_warning
-          ? `<div class="alert alert-warning" style="margin-bottom:20px" role="status"><strong>Stock:</strong> ${esc(order.stock_warning)}</div>`
+          ? `<div class="alert alert-warning order-stock-alert" role="status"><strong>Stock:</strong> ${esc(order.stock_warning)}</div>`
           : '';
+
         document.getElementById('order').innerHTML = `
           ${stockAlert}
-          <div style="display:grid;gap:24px;grid-template-columns:1fr 1fr">
-            <div style="background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <div class="order-admin-summary">
+            <div class="order-admin-card">
               <h3>Customer</h3>
-              <p>${order.guest_email || order.user_email || '-'}</p>
-              <p>${order.first_name || ''} ${order.last_name || ''}</p>
+              <p class="order-admin-card__primary">${esc(customerEmail || '—')}</p>
+              <p class="order-admin-card__muted">${esc(order.first_name || '')} ${esc(order.last_name || '')}</p>
             </div>
-            <div style="background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-              <h3>Shipping Address</h3>
-              <p>${addr?.address_line1 || '-'}<br>${addr?.city || ''} ${addr?.postal_code || ''} ${addr?.country || ''}</p>
-              ${addr?.phone ? `<p style="margin-top:12px"><strong>Phone</strong><br>${esc(addr.phone)}</p>` : ''}
+            <div class="order-admin-card">
+              <h3>Shipping</h3>
+              <p>${esc(addr?.address_line1 || '—')}<br>${esc([addr?.city, addr?.postal_code].filter(Boolean).join(' '))} ${esc(addr?.country || '')}</p>
+              ${addr?.phone ? `<p class="order-admin-card__muted" style="margin-top:10px"><strong>Phone</strong> ${esc(addr.phone)}</p>` : ''}
             </div>
-          </div>
-          <h3 style="margin-top:24px">Items</h3>
-          <table class="table">
-            <tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>
-            ${(order.items || []).map(i => {
-              const snap = typeof i.product_snapshot === 'string' ? JSON.parse(i.product_snapshot) : i.product_snapshot;
-              const v = [snap?.color, snap?.size].filter(Boolean).join(' · ');
-              const vCell = v ? `<br><span style="color:#666;font-size:13px">${v}</span>` : '';
-              return `<tr><td>${snap?.title || '-'}${vCell}</td><td>${i.quantity}</td><td>${formatStoreMoney(i.unit_price)}</td><td>${formatStoreMoney(i.total_price)}</td></tr>`;
-            }).join('')}
-          </table>
-          <p style="font-size:18px;font-weight:700;margin-top:16px">Total: ${formatStoreMoney(order.total_amount)}</p>
-          <p style="margin-top:8px;color:#444"><strong>Order Status:</strong> <span id="currentOrderStatus">${order.status}</span></p>
-          <p style="margin-top:8px;color:#444"><strong>Payment:</strong> ${order.payment_method === 'pay_on_delivery' ? 'Pay on delivery' : 'Card'} · <strong>Status:</strong> <span id="currentPaymentStatus">${order.payment_status}</span></p>
-          ${
-            order.payment_method !== 'pay_on_delivery'
-              ? `
-          <div id="resendReceiptPanel" class="resend-receipt-panel">
-            <h3 style="margin:0 0 10px;font-size:16px">Payment receipt email</h3>
-            <p style="margin:0 0 8px;font-size:14px;color:#334155"><strong>To:</strong> ${esc(order.guest_email || order.user_email || '—')}</p>
-            <p style="margin:0 0 14px;font-size:13px;color:#64748b;line-height:1.5">Resend the payment receipt. The <strong>Send status</strong> box below updates the moment you click.</p>
-            <button type="button" class="btn" id="resendReceiptBtn" style="max-width:280px"${
-              order.payment_status !== 'paid' ? ' disabled title="Order must be paid first"' : ''
-            }>Resend payment receipt</button>
-            <div id="resendReceiptStatus" class="resend-receipt-status" role="status" aria-live="assertive" aria-atomic="true">
-              <p class="resend-receipt-status__label">Send status</p>
-              <p id="resendReceiptStatusText" class="resend-receipt-status__text">Ready — click the button when payment is paid.</p>
+            <div class="order-admin-card">
+              <h3>Payment</h3>
+              <p><span class="order-badge order-badge--${esc(order.payment_status)}">${esc(order.payment_status)}</span></p>
+              <p class="order-admin-card__muted">${order.payment_method === 'pay_on_delivery' ? 'Pay on delivery' : 'Card online'}</p>
+              <p class="order-admin-card__primary" style="margin-top:8px">${formatStoreMoney(order.total_amount)}</p>
             </div>
-            ${
-              order.payment_status !== 'paid'
-                ? '<p style="margin:10px 0 0;font-size:12px;color:#b45309">Receipt can be sent after payment status is <strong>paid</strong> (Stripe webhook or successful checkout).</p>'
-                : ''
-            }
-          </div>
-          `
-              : ''
-          }
-          <h3 style="margin-top:24px">Update Status</h3>
-          <form id="statusForm" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select name="status" id="orderStatusSelect"><option value="pending" ${order.status==='pending'?'selected':''}>Pending</option><option value="processing" ${order.status==='processing'?'selected':''}>Processing</option><option value="shipped" ${order.status==='shipped'?'selected':''}>Shipped</option><option value="delivered" ${order.status==='delivered'?'selected':''}>Delivered</option><option value="cancelled" ${order.status==='cancelled'?'selected':''}>Cancelled</option></select>
-            <input type="text" name="tracking_number" placeholder="Tracking #" value="${order.tracking_number||''}" style="width:200px;padding:8px">
-            <button type="submit" class="btn" style="max-width:150px">Update</button>
-          </form>
-          <label style="display:flex;align-items:center;gap:10px;margin-top:12px;font-size:14px;color:#333">
-            <input type="checkbox" id="notifyCustomer" style="width:18px;height:18px">
-            <span>Email the customer with the suggested update below (uses your configured sender in Settings).</span>
-          </label>
-          <div id="emailDraftPanel" style="display:none;margin-top:20px;padding:20px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;max-width:720px">
-            <h4 style="margin:0 0 12px;font-size:15px">Suggested customer email</h4>
-            <p id="emailDraftMeta" style="margin:0 0 12px;font-size:13px;color:#475569"></p>
-            <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b">Subject</p>
-            <pre id="emailDraftSubject" style="margin:0 0 14px;padding:10px;background:#fff;border-radius:6px;font-size:13px;white-space:pre-wrap;border:1px solid #e2e8f0"></pre>
-            <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#64748b">Plain text (for copying into Outlook, etc.)</p>
-            <pre id="emailDraftText" style="margin:0 0 12px;padding:12px;background:#fff;border-radius:6px;font-size:13px;white-space:pre-wrap;max-height:220px;overflow:auto;border:1px solid #e2e8f0"></pre>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn" id="copyDraftSubject" style="max-width:200px">Copy subject</button>
-              <button type="button" class="btn" id="copyDraftText" style="max-width:200px">Copy body</button>
+            <div class="order-admin-card">
+              <h3>Fulfillment</h3>
+              <p><span class="order-badge">${esc(order.status)}</span></p>
+              ${order.tracking_number ? `<p class="order-admin-card__muted" style="margin-top:8px">Tracking: ${esc(order.tracking_number)}</p>` : ''}
             </div>
           </div>
-          <div style="margin-top:16px">
-            <button class="btn" type="button" onclick="downloadInvoice()">Download Invoice PDF</button>
+
+          <section class="order-section">
+            <h2 class="order-section__title">Line items</h2>
+            <table class="table">
+              <thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+              <tbody>
+                ${(order.items || [])
+                  .map((i) => {
+                    const snap =
+                      typeof i.product_snapshot === 'string'
+                        ? JSON.parse(i.product_snapshot)
+                        : i.product_snapshot;
+                    const v = [snap?.color, snap?.size].filter(Boolean).join(' · ');
+                    const vCell = v ? `<br><span class="order-admin-card__muted">${esc(v)}</span>` : '';
+                    return `<tr><td>${esc(snap?.title || '-')}${vCell}</td><td>${i.quantity}</td><td>${formatStoreMoney(i.unit_price)}</td><td>${formatStoreMoney(i.total_price)}</td></tr>`;
+                  })
+                  .join('')}
+              </tbody>
+            </table>
+            <p class="order-section__total">Order total: <strong>${formatStoreMoney(order.total_amount)}</strong></p>
+          </section>
+
+          <div class="order-workspace">
+            <section class="order-panel">
+              <h2 class="order-panel__title">Fulfillment</h2>
+              <p class="order-panel__intro">Update order status and tracking. Save only, or save and email the customer in one step.</p>
+              <form id="statusForm" class="order-fulfillment-form">
+                <div class="form-group">
+                  <label for="orderStatusSelect">Order status</label>
+                  <select name="status" id="orderStatusSelect" class="order-input">
+                    <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option>
+                    <option value="processing" ${order.status === 'processing' ? 'selected' : ''}>Processing</option>
+                    <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>Shipped</option>
+                    <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>Delivered</option>
+                    <option value="cancelled" ${order.status === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="trackingNumberInput">Tracking number</label>
+                  <input type="text" name="tracking_number" id="trackingNumberInput" class="order-input" placeholder="Optional" value="${esc(order.tracking_number || '')}">
+                </div>
+                <p class="order-admin-card__muted">Current: <span id="currentOrderStatus">${esc(order.status)}</span> · Payment: <span id="currentPaymentStatus">${esc(order.payment_status)}</span></p>
+                <div class="order-panel__actions">
+                  <button type="button" class="btn btn-secondary" id="saveStatusBtn">Save status only</button>
+                  <button type="button" class="btn" id="saveAndEmailBtn">Save &amp; email customer</button>
+                </div>
+              </form>
+            </section>
+
+            <section id="orderEmailPanel" class="order-panel order-panel--email">
+              <h2 class="order-panel__title">Customer email</h2>
+              <p class="order-panel__intro">Preview and send emails anytime. Configure SMTP in <a href="/admin/settings.html">Settings</a>.</p>
+              <p class="order-email-recipient"><strong>To:</strong> ${esc(customerEmail || '—')}</p>
+              ${!customerEmail ? '<p class="order-email-warning">No customer email on this order — emails cannot be sent.</p>' : ''}
+
+              <fieldset class="order-email-type" ${!customerEmail ? 'disabled' : ''}>
+                <legend class="order-email-type__legend">Email type</legend>
+                <label class="order-email-type__option">
+                  <input type="radio" name="emailType" value="payment_receipt" checked>
+                  <span>Payment receipt / order confirmation</span>
+                </label>
+                <label class="order-email-type__option">
+                  <input type="radio" name="emailType" value="status_update">
+                  <span>Status update (uses status &amp; tracking above)</span>
+                </label>
+              </fieldset>
+
+              <div class="order-email-preview">
+                <div class="order-email-preview__head">
+                  <span id="emailPreviewLabel" class="order-email-preview__label">Email preview</span>
+                  <button type="button" class="btn btn-secondary btn-sm" id="refreshPreviewBtn">Refresh preview</button>
+                </div>
+                <p class="order-preview-row"><strong>Subject</strong></p>
+                <p id="emailPreviewSubject" class="order-preview-box">—</p>
+                <p class="order-preview-row"><strong>Message (plain text)</strong></p>
+                <pre id="emailPreviewBody" class="order-preview-box order-preview-box--pre">—</pre>
+              </div>
+
+              <div class="order-panel__actions">
+                <button type="button" class="btn" id="sendReceiptBtn" ${!customerEmail ? 'disabled' : ''}>Send payment receipt</button>
+                <button type="button" class="btn btn-secondary" id="sendStatusEmailBtn" ${!customerEmail ? 'disabled' : ''}>Send status email only</button>
+              </div>
+
+              <div id="emailActionResult" class="order-email-result" role="status" aria-live="assertive">
+                <p class="order-email-result__label">Last action</p>
+                <p id="emailActionResultText" class="order-email-result__text">Ready — choose an email type, preview, then click send.</p>
+              </div>
+
+              <div class="order-activity">
+                <h3 class="order-activity__title">Activity log (this session)</h3>
+                <ul id="emailActivityList" class="order-activity__list">
+                  <li class="order-activity-item order-activity-item--idle">No emails sent yet this session.</li>
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <div class="order-panel__actions" style="margin-top:8px">
+            <button type="button" class="btn btn-secondary" onclick="downloadInvoice()">Download invoice PDF</button>
           </div>
         `;
-        const notifyEl = document.getElementById('notifyCustomer');
-        const statusSel = document.getElementById('orderStatusSelect');
-        function syncNotifyDefault() {
-          if (!notifyEl || !statusSel) return;
-          notifyEl.checked = ['shipped', 'delivered'].includes(statusSel.value);
-        }
-        statusSel?.addEventListener('change', syncNotifyDefault);
-        syncNotifyDefault();
 
-        function showEmailDraftPanel(draft, metaLine) {
-          const panel = document.getElementById('emailDraftPanel');
-          if (!panel || !draft) {
-            if (panel) panel.style.display = 'none';
-            return;
-          }
-          panel.style.display = 'block';
-          document.getElementById('emailDraftMeta').textContent = metaLine || '';
-          document.getElementById('emailDraftSubject').textContent = draft.subject || '';
-          const stripHtml = (h) => {
-            const t = document.createElement('div');
-            t.innerHTML = h || '';
-            return (t.textContent || t.innerText || '').replace(/\n\n+/g, '\n\n').trim();
-          };
-          document.getElementById('emailDraftText').textContent =
-            (draft.text && String(draft.text).trim()) || stripHtml(draft.html) || '';
-
-          document.getElementById('copyDraftSubject').onclick = () => {
-            navigator.clipboard.writeText(draft.subject || '');
-            showStatusMessage('Subject copied to clipboard.');
-          };
-          document.getElementById('copyDraftText').onclick = () => {
-            navigator.clipboard.writeText(document.getElementById('emailDraftText').textContent || '');
-            showStatusMessage('Body copied to clipboard.');
-          };
-        }
-
-        function setResendReceiptUi(state, message) {
-          const panel = document.getElementById('resendReceiptPanel');
-          const status = document.getElementById('resendReceiptStatus');
-          const text = document.getElementById('resendReceiptStatusText');
-          const btn = document.getElementById('resendReceiptBtn');
-          if (!text) return;
-
-          const states = ['is-sending', 'is-success', 'is-error'];
-          if (panel) panel.classList.remove(...states);
-          if (status) status.classList.remove(...states);
-          if (btn) btn.classList.remove(...states);
-
-          if (state && state !== 'idle') {
-            if (panel) panel.classList.add('is-' + state);
-            if (status) status.classList.add('is-' + state);
-            if (btn) btn.classList.add('is-' + state);
-          }
-
-          text.textContent = message;
-          status?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-
-        document.getElementById('resendReceiptBtn')?.addEventListener('click', async () => {
-          const btn = document.getElementById('resendReceiptBtn');
-          if (!btn) return;
-
-          const clickedAt = new Date().toLocaleTimeString();
-          if (btn.disabled) {
-            setResendReceiptUi(
-              'error',
-              'Button pressed at ' + clickedAt + ' — cannot send: payment status is not paid.'
-            );
-            return;
-          }
-
-          const prevLabel = 'Resend payment receipt';
-          btn.disabled = true;
-          btn.textContent = 'Sending…';
-          setResendReceiptUi('sending', 'Button pressed at ' + clickedAt + ' — sending email now…');
-          showStatusMessage('Sending payment receipt…', false, 0);
-
-          try {
-            const res = await callApi('/admin/orders/' + id + '/resend-payment-receipt', { method: 'POST' });
-            const doneAt = new Date().toLocaleTimeString();
-            const msg = res.message || 'Payment receipt sent successfully.';
-            setResendReceiptUi(
-              'success',
-              'EMAIL SENT at ' + doneAt + '. ' + msg + ' (You can resend again if needed.)'
-            );
-            showStatusMessage('Payment receipt sent at ' + doneAt, false, 12000);
-            btn.textContent = 'Sent ✓';
-            btn.disabled = false;
-          } catch (err) {
-            const doneAt = new Date().toLocaleTimeString();
-            const errMsg = err.message || 'Could not send payment receipt.';
-            setResendReceiptUi('error', 'FAILED at ' + doneAt + '. ' + errMsg);
-            showStatusMessage(errMsg, true, 0);
-            btn.textContent = prevLabel;
-            btn.disabled = false;
-          }
-        });
-
-        document.getElementById('statusForm')?.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const form = e.target;
-          const nextStatus = form.status.value;
-          const prevStatus = currentOrder?.status;
-          const submitBtn = form.querySelector('button[type="submit"]');
-          if (submitBtn) submitBtn.disabled = true;
-          try {
-            const sendCustomer = Boolean(document.getElementById('notifyCustomer')?.checked);
-            const res = await callApi('/admin/orders/' + id + '/status', {
-              method: 'PATCH',
-              body: JSON.stringify({
-                status: nextStatus,
-                tracking_number: form.tracking_number.value || undefined,
-                send_customer_email: sendCustomer,
-              }),
-            });
-            const updatedOrder = res.order;
-            currentOrder = updatedOrder;
-            const statusEl = document.getElementById('currentOrderStatus');
-            if (statusEl) statusEl.textContent = updatedOrder.status;
-
-            let msg = `Order status changed from "${prevStatus}" to "${updatedOrder.status}".`;
-            if (res.customerEmailSent) msg += ' Customer was emailed.';
-            else if (sendCustomer && res.customerEmailError) msg += ' Email failed: ' + res.customerEmailError;
-            else if (sendCustomer && !res.customerEmailDraft) msg += ' No customer email on file.';
-            showStatusMessage(msg, Boolean(res.customerEmailError));
-
-            let meta = '';
-            if (res.customerEmailDraft) {
-              meta = `To: ${res.customerEmailDraft.to}`;
-              if (res.customerEmailSent) meta += ' · Sent from the store';
-              else if (sendCustomer) meta += ' · Not sent (see message above)';
-              else meta += ' · Not sent — tick “email the customer” to send, or copy into Outlook';
-            }
-            showEmailDraftPanel(res.customerEmailDraft, meta);
-          } catch (err) {
-            showStatusMessage(err.message || 'Failed to update order status.', true);
-          } finally {
-            if (submitBtn) submitBtn.disabled = false;
-          }
-        });
+        bindOrderPageHandlers();
+        await loadEmailPreview();
       } catch (err) {
-        document.getElementById('order').innerHTML = '<p>Failed to load order.</p>';
+        document.getElementById('order').innerHTML =
+          '<p class="order-email-warning">Failed to load order.</p>';
       }
     }
 

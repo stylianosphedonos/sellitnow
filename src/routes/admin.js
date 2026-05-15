@@ -249,35 +249,140 @@ router.get('/orders/:id', async (req, res) => {
   }
 });
 
-router.post('/orders/:id/resend-payment-receipt', async (req, res) => {
+async function getOrderEmailBundle(orderId) {
+  const order = await OrderService.getOrderWithCustomerEmail(orderId);
+  const itemsResult = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
+  const txResult = await pool.query(
+    `SELECT stripe_transaction_id, amount FROM transactions
+     WHERE order_id = $1 AND status = 'succeeded'
+     ORDER BY id DESC LIMIT 1`,
+    [orderId]
+  );
+  return { order, items: itemsResult.rows, tx: txResult.rows[0] || null };
+}
+
+router.get('/orders/:id/email/preview', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const order = await OrderService.getOrderWithCustomerEmail(id);
-    if (order.payment_status !== 'paid') {
-      return res.status(400).json({
-        error: 'Order is not paid. Payment receipts are only sent after successful card payment.',
-      });
-    }
+    const type = String(req.query.type || 'payment_receipt').toLowerCase();
+    const { order, items, tx } = await getOrderEmailBundle(id);
     const to = EmailService.resolveCustomerTo(order);
     if (!to) {
       return res.status(400).json({ error: 'This order has no customer email address.' });
     }
-    const itemsResult = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [id]);
-    const txResult = await pool.query(
-      `SELECT stripe_transaction_id, amount FROM transactions
-       WHERE order_id = $1 AND status = 'succeeded'
-       ORDER BY id DESC LIMIT 1`,
-      [id]
-    );
-    const tx = txResult.rows[0];
-    const result = await EmailService.sendPaymentReceipt(order, itemsResult.rows, {
+
+    let draft = null;
+    let label = '';
+    if (type === 'status_update') {
+      const status = req.query.status != null ? String(req.query.status) : order.status;
+      const tracking =
+        req.query.tracking_number != null
+          ? String(req.query.tracking_number)
+          : order.tracking_number;
+      draft = await EmailService.buildOrderStatusUpdateDraft(order, {
+        previousStatus: order.status,
+        newStatus: status,
+        trackingNumber: tracking,
+      });
+      label = 'Status update email';
+    } else {
+      draft = await EmailService.buildPaymentReceiptDraft(order, items, {
+        stripeTransactionId: tx?.stripe_transaction_id || null,
+        amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
+      });
+      label = order.payment_status === 'paid' ? 'Payment receipt' : 'Order confirmation';
+    }
+
+    if (!draft) {
+      return res.status(400).json({ error: 'Could not build email preview.' });
+    }
+
+    res.json({
+      type,
+      label,
+      to: draft.to,
+      subject: draft.subject,
+      text: draft.text,
+      html: draft.html,
+      payment_status: order.payment_status,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/orders/:id/email/send', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const type = String(req.body?.type || 'payment_receipt').toLowerCase();
+    const { order, items, tx } = await getOrderEmailBundle(id);
+    const to = EmailService.resolveCustomerTo(order);
+    if (!to) {
+      return res.status(400).json({ error: 'This order has no customer email address.' });
+    }
+
+    let result;
+    let label = '';
+    if (type === 'status_update') {
+      const status = req.body?.status != null ? String(req.body.status) : order.status;
+      const tracking =
+        req.body?.tracking_number != null ? String(req.body.tracking_number) : order.tracking_number;
+      const draft = await EmailService.buildOrderStatusUpdateDraft(order, {
+        previousStatus: order.status,
+        newStatus: status,
+        trackingNumber: tracking,
+      });
+      if (!draft) {
+        return res.status(400).json({ error: 'Could not build status update email.' });
+      }
+      result = await EmailService.sendDraft(draft);
+      label = 'Status update email';
+    } else {
+      result = await EmailService.sendPaymentReceipt(order, items, {
+        stripeTransactionId: tx?.stripe_transaction_id || null,
+        amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
+      });
+      label = order.payment_status === 'paid' ? 'Payment receipt' : 'Order confirmation';
+    }
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Could not send email.', label, to });
+    }
+    res.json({
+      success: true,
+      message: `${label} sent to ${to}.`,
+      label,
+      to,
+      sent_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/orders/:id/resend-payment-receipt', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { order, items, tx } = await getOrderEmailBundle(id);
+    const to = EmailService.resolveCustomerTo(order);
+    if (!to) {
+      return res.status(400).json({ error: 'This order has no customer email address.' });
+    }
+    const result = await EmailService.sendPaymentReceipt(order, items, {
       stripeTransactionId: tx?.stripe_transaction_id || null,
       amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
     });
     if (!result.success) {
-      return res.status(400).json({ error: result.error || 'Could not send payment receipt.' });
+      return res.status(400).json({ error: result.error || 'Could not send email.' });
     }
-    res.json({ success: true, message: `Payment receipt sent to ${to}.` });
+    const label = order.payment_status === 'paid' ? 'Payment receipt' : 'Order confirmation';
+    res.json({
+      success: true,
+      message: `${label} sent to ${to}.`,
+      label,
+      to,
+      sent_at: new Date().toISOString(),
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

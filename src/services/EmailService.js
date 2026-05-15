@@ -260,15 +260,12 @@ class EmailService {
   }
 
   /**
-   * Payment receipt sent automatically when card payment succeeds (Stripe webhook / confirm).
-   * @param {{ stripeTransactionId: string, amountPaid: number }} payment
+   * Build payment receipt draft (does not send).
+   * @param {{ stripeTransactionId?: string, amountPaid?: number }} payment
    */
-  async sendPaymentReceipt(order, items, payment = {}) {
+  async buildPaymentReceiptDraft(order, items, payment = {}) {
     const to = this.resolveCustomerTo(order);
-    if (!to) {
-      console.log('[Email] No customer address for payment receipt:', order.order_number);
-      return { success: false, error: 'No customer email on this order.' };
-    }
+    if (!to) return null;
 
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
@@ -281,6 +278,7 @@ class EmailService {
     const stripeId = payment.stripeTransactionId
       ? escapeHtml(String(payment.stripeTransactionId))
       : '—';
+    const isPaid = order.payment_status === 'paid';
     const amountPaid =
       payment.amountPaid != null && Number.isFinite(Number(payment.amountPaid))
         ? fmt(payment.amountPaid)
@@ -297,18 +295,18 @@ class EmailService {
     const html = `
       <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;color:#111">
         <div style="background:linear-gradient(135deg,#1e3a5f 0%,#0f172a 100%);color:#fff;padding:28px 24px;border-radius:12px 12px 0 0">
-          <p style="margin:0 0 6px;font-size:13px;opacity:0.9;text-transform:uppercase;letter-spacing:0.06em">Payment receipt</p>
+          <p style="margin:0 0 6px;font-size:13px;opacity:0.9;text-transform:uppercase;letter-spacing:0.06em">${isPaid ? 'Payment receipt' : 'Order confirmation'}</p>
           <p style="margin:0;font-size:22px;font-weight:700">${escapeHtml(businessName)}</p>
-          <p style="margin:10px 0 0;font-size:15px;opacity:0.95">Thank you — your payment was successful.</p>
+          <p style="margin:10px 0 0;font-size:15px;opacity:0.95">${isPaid ? 'Thank you — your payment was successful.' : 'Thank you for your order.'}</p>
         </div>
 
         <div style="background:#fff;border:1px solid #e8e8e8;border-top:none;border-radius:0 0 12px 12px;padding:24px">
           <table style="width:100%;border-collapse:collapse;margin:0 0 20px;font-size:14px">
             <tr>
-              <td style="padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px" colspan="2">
-                <p style="margin:0 0 4px;font-size:13px;color:#166534;text-transform:uppercase;letter-spacing:0.04em">Amount paid</p>
-                <p style="margin:0;font-size:28px;font-weight:700;color:#15803d">${amountPaid}</p>
-                <p style="margin:8px 0 0;font-size:13px;color:#166534">Paid on ${escapeHtml(paidAt)} · Card (online)</p>
+              <td style="padding:16px;background:${isPaid ? '#f0fdf4' : '#fffbeb'};border:1px solid ${isPaid ? '#bbf7d0' : '#fcd34d'};border-radius:8px" colspan="2">
+                <p style="margin:0 0 4px;font-size:13px;color:${isPaid ? '#166534' : '#b45309'};text-transform:uppercase;letter-spacing:0.04em">${isPaid ? 'Amount paid' : 'Order total'}</p>
+                <p style="margin:0;font-size:28px;font-weight:700;color:${isPaid ? '#15803d' : '#b45309'}">${amountPaid}</p>
+                <p style="margin:8px 0 0;font-size:13px;color:${isPaid ? '#166534' : '#b45309'}">${isPaid ? `Paid on ${escapeHtml(paidAt)} · Card (online)` : `Payment: ${escapeHtml(order.payment_status || 'pending')}`}</p>
               </td>
             </tr>
           </table>
@@ -318,7 +316,7 @@ class EmailService {
             <tr><td style="padding:10px 14px;border-bottom:1px solid #eee;color:#555;width:40%">Receipt / order #</td><td style="padding:10px 14px;border-bottom:1px solid #eee;font-weight:600">${escapeHtml(order.order_number)}</td></tr>
             <tr><td style="padding:10px 14px;border-bottom:1px solid #eee;color:#555">Order ID</td><td style="padding:10px 14px;border-bottom:1px solid #eee">${order.id}</td></tr>
             <tr><td style="padding:10px 14px;border-bottom:1px solid #eee;color:#555">Transaction reference</td><td style="padding:10px 14px;border-bottom:1px solid #eee;font-family:ui-monospace,monospace;font-size:13px">${stripeId}</td></tr>
-            <tr><td style="padding:10px 14px;border-bottom:1px solid #eee;color:#555">Payment status</td><td style="padding:10px 14px;border-bottom:1px solid #eee"><span style="color:#15803d;font-weight:600">Paid</span></td></tr>
+            <tr><td style="padding:10px 14px;border-bottom:1px solid #eee;color:#555">Payment status</td><td style="padding:10px 14px;border-bottom:1px solid #eee"><span style="color:${isPaid ? '#15803d' : '#b45309'};font-weight:600">${escapeHtml(isPaid ? 'Paid' : order.payment_status || 'pending')}</span></td></tr>
             <tr><td style="padding:10px 14px;border-bottom:1px solid #eee;color:#555">Order status</td><td style="padding:10px 14px;border-bottom:1px solid #eee">${escapeHtml(order.status || 'processing')}</td></tr>
             <tr><td style="padding:10px 14px;color:#555">Customer email</td><td style="padding:10px 14px"><a href="mailto:${escapeHtml(customerEmail)}" style="color:#1e40af">${escapeHtml(customerEmail)}</a></td></tr>
           </table>
@@ -341,7 +339,7 @@ class EmailService {
             <tr><td style="padding:6px 8px;color:#555">Subtotal</td><td style="padding:6px 8px;text-align:right">${fmt(order.subtotal)}</td></tr>
             <tr><td style="padding:6px 8px;color:#555">Tax (VAT)</td><td style="padding:6px 8px;text-align:right">${fmt(order.tax_amount)}</td></tr>
             <tr><td style="padding:6px 8px;color:#555">Shipping</td><td style="padding:6px 8px;text-align:right">${fmt(order.shipping_cost)}</td></tr>
-            <tr><td style="padding:10px 8px 6px;font-weight:700;border-top:2px solid #111">Total charged</td><td style="padding:10px 8px 6px;text-align:right;font-weight:700;border-top:2px solid #111">${fmt(order.total_amount)}</td></tr>
+            <tr><td style="padding:10px 8px 6px;font-weight:700;border-top:2px solid #111">${isPaid ? 'Total charged' : 'Order total'}</td><td style="padding:10px 8px 6px;text-align:right;font-weight:700;border-top:2px solid #111">${fmt(order.total_amount)}</td></tr>
           </table>
 
           <p style="font-size:14px;line-height:1.65;color:#444;margin:28px 0 0;padding-top:20px;border-top:1px solid #eee">
@@ -358,12 +356,16 @@ class EmailService {
       .filter(Boolean)
       .join(', ');
 
+    const subject = isPaid
+      ? `Payment receipt — Order #${order.order_number}`
+      : `Order confirmation — #${order.order_number}`;
+
     const text = [
-      `${businessName} — Payment receipt`,
+      `${businessName} — ${isPaid ? 'Payment receipt' : 'Order confirmation'}`,
       '',
       `Order: ${order.order_number}`,
-      `Amount paid: ${amountPaid}`,
-      `Paid: ${paidAt}`,
+      isPaid ? `Amount paid: ${amountPaid}` : `Order total: ${amountPaid}`,
+      isPaid ? `Paid: ${paidAt}` : `Payment status: ${order.payment_status || 'pending'}`,
       `Transaction: ${payment.stripeTransactionId || '—'}`,
       `Customer email: ${customerEmail}`,
       plainAddr ? `Ship to: ${plainAddr}` : '',
@@ -378,13 +380,19 @@ class EmailService {
       .filter(Boolean)
       .join('\n');
 
-    return this.send({
-      to,
-      subject: `Payment receipt — Order #${order.order_number}`,
-      html,
-      text,
-      replyTo: supportEmail,
-    });
+    return { to, subject, html, text, replyTo: supportEmail };
+  }
+
+  /**
+   * Payment receipt sent automatically when card payment succeeds (Stripe webhook / confirm).
+   */
+  async sendPaymentReceipt(order, items, payment = {}) {
+    const draft = await this.buildPaymentReceiptDraft(order, items, payment);
+    if (!draft) {
+      console.log('[Email] No customer address for payment receipt:', order.order_number);
+      return { success: false, error: 'No customer email on this order.' };
+    }
+    return this.send(draft);
   }
 
   /**
