@@ -1178,6 +1178,22 @@ button.category-card:focus-visible {
   color: #b45309;
 }
 
+.order-badge--failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.order-badge--refunded {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.order-payment-form .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+}
+
 .order-section {
   margin-bottom: 28px;
 }

@@ -436,6 +436,20 @@ router.patch('/orders/:id/status', async (req, res) => {
   }
 });
 
+router.patch('/orders/:id/payment-status', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { payment_status } = req.body || {};
+    if (!payment_status || typeof payment_status !== 'string') {
+      return res.status(400).json({ error: 'payment_status is required' });
+    }
+    const result = await OrderService.updatePaymentStatus(id, payment_status);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.patch('/orders/status/bulk', async (req, res) => {
   try {
     const { order_ids, status, tracking_number } = req.body || {};

@@ -435,6 +435,79 @@ class OrderService {
   }
 
   /**
+   * Admin: update payment status (adjusts inventory when entering/leaving paid/refunded)
+   */
+  async updatePaymentStatus(orderId, paymentStatus) {
+    const allowed = new Set(['pending', 'paid', 'failed', 'refunded']);
+    const next = String(paymentStatus || '').trim().toLowerCase();
+    if (!allowed.has(next)) {
+      throw new Error('Invalid payment status');
+    }
+
+    const client = await pool.connect();
+    let order;
+    let previousPaymentStatus;
+    try {
+      await client.query('BEGIN');
+      const currentResult = await client.query(
+        'SELECT id, status, payment_status, payment_method FROM orders WHERE id = $1 FOR UPDATE',
+        [orderId]
+      );
+      if (!currentResult.rows.length) throw new Error('Order not found');
+      const current = currentResult.rows[0];
+      previousPaymentStatus = current.payment_status;
+
+      if (previousPaymentStatus === next) {
+        order = current;
+        await client.query('COMMIT');
+        return { order, previousPaymentStatus };
+      }
+
+      const inventoryWasReserved =
+        ['paid', 'refunded'].includes(previousPaymentStatus) ||
+        current.payment_method === 'pay_on_delivery';
+      const inventoryWillBeReserved =
+        ['paid', 'refunded'].includes(next) || current.payment_method === 'pay_on_delivery';
+
+      if (!inventoryWasReserved && inventoryWillBeReserved) {
+        const items = await client.query(
+          'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+          [orderId]
+        );
+        for (const item of items.rows) {
+          await ProductService.decrementStock(item.product_id, item.quantity);
+        }
+      } else if (inventoryWasReserved && !inventoryWillBeReserved) {
+        await this.releaseOrderItemsToStock(client, orderId);
+      }
+
+      const setClauses = ['payment_status = $1', 'updated_at = NOW()'];
+      const params = [next];
+      let n = 2;
+      if (next === 'paid' && current.status === 'pending') {
+        setClauses.push(`status = $${n}`);
+        params.push('processing');
+        n += 1;
+      }
+      params.push(orderId);
+
+      const result = await client.query(
+        `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${n} RETURNING *`,
+        params
+      );
+      order = result.rows[0];
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    return { order, previousPaymentStatus };
+  }
+
+  /**
    * Cancel order (user or guest)
    */
   async cancelOrder(orderId, userId = null, guestAccessToken = null) {

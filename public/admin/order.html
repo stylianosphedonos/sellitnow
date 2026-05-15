@@ -198,7 +198,60 @@
       }
     }
 
+    function updatePaymentStatusBadge(paymentStatus) {
+      const badge = document.getElementById('paymentStatusBadge');
+      if (!badge) return;
+      badge.textContent = paymentStatus;
+      badge.className = 'order-badge order-badge--' + paymentStatus;
+    }
+
+    async function updatePaymentStatus() {
+      const select = document.getElementById('paymentStatusSelect');
+      const btn = document.getElementById('savePaymentStatusBtn');
+      if (!select || !btn) return;
+      const nextStatus = select.value;
+      const prevStatus = currentOrder?.payment_status;
+      if (nextStatus === prevStatus) {
+        showBanner('Payment status is already "' + nextStatus + '".', false, 3000);
+        return;
+      }
+
+      btn.disabled = true;
+      const prevLabel = btn.textContent;
+      btn.textContent = 'Saving…';
+      try {
+        const res = await callApi('/admin/orders/' + id + '/payment-status', {
+          method: 'PATCH',
+          body: JSON.stringify({ payment_status: nextStatus }),
+        });
+        const prevFulfillmentStatus = currentOrder?.status;
+        currentOrder = { ...currentOrder, ...res.order };
+        updatePaymentStatusBadge(res.order.payment_status);
+        document.getElementById('currentPaymentStatus').textContent = res.order.payment_status;
+        const fulfillmentStatus = document.getElementById('currentOrderStatus');
+        if (fulfillmentStatus && res.order.status !== prevFulfillmentStatus) {
+          fulfillmentStatus.textContent = res.order.status;
+        }
+        const orderStatusSelect = document.getElementById('orderStatusSelect');
+        if (orderStatusSelect && orderStatusSelect.value !== res.order.status) {
+          orderStatusSelect.value = res.order.status;
+        }
+        showBanner(
+          `Payment status updated from "${res.previousPaymentStatus}" to "${res.order.payment_status}".`,
+          false,
+          5000
+        );
+        await loadEmailPreview();
+      } catch (err) {
+        showBanner(err.message || 'Failed to update payment status.', true, 0);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prevLabel;
+      }
+    }
+
     function bindOrderPageHandlers() {
+      document.getElementById('savePaymentStatusBtn')?.addEventListener('click', updatePaymentStatus);
       document.querySelectorAll('input[name="emailType"]').forEach((el) => {
         el.addEventListener('change', () => loadEmailPreview());
       });
@@ -294,9 +347,21 @@
             </div>
             <div class="order-admin-card">
               <h3>Payment</h3>
-              <p><span class="order-badge order-badge--${esc(order.payment_status)}">${esc(order.payment_status)}</span></p>
+              <p><span id="paymentStatusBadge" class="order-badge order-badge--${esc(order.payment_status)}">${esc(order.payment_status)}</span></p>
               <p class="order-admin-card__muted">${order.payment_method === 'pay_on_delivery' ? 'Pay on delivery' : 'Card online'}</p>
               <p class="order-admin-card__primary" style="margin-top:8px">${formatStoreMoney(order.total_amount)}</p>
+              <form id="paymentStatusForm" class="order-payment-form" style="margin-top:14px">
+                <div class="form-group" style="margin-bottom:10px">
+                  <label for="paymentStatusSelect" style="font-size:13px">Payment status</label>
+                  <select id="paymentStatusSelect" class="order-input">
+                    <option value="pending" ${order.payment_status === 'pending' ? 'selected' : ''}>Pending</option>
+                    <option value="paid" ${order.payment_status === 'paid' ? 'selected' : ''}>Paid</option>
+                    <option value="failed" ${order.payment_status === 'failed' ? 'selected' : ''}>Failed</option>
+                    <option value="refunded" ${order.payment_status === 'refunded' ? 'selected' : ''}>Refunded</option>
+                  </select>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="savePaymentStatusBtn">Update payment status</button>
+              </form>
             </div>
             <div class="order-admin-card">
               <h3>Fulfillment</h3>
