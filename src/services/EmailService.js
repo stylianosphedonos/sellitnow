@@ -80,17 +80,24 @@ class EmailService {
     }
   }
 
+  buildSmtpDiagnostics(smtp) {
+    const pass = smtp.pass != null ? String(smtp.pass) : '';
+    const user = smtp.user != null ? String(smtp.user).trim() : '';
+    return {
+      source: smtp.source || 'none',
+      host: smtp.host || '',
+      port: Number(smtp.port) || 587,
+      secure: smtp.secure === true,
+      user,
+      passLength: pass.length,
+      hostConfigured: Boolean(smtp.host),
+      credentialsConfigured: Boolean(user && pass !== ''),
+    };
+  }
+
   async smtpDiagnostics() {
     const smtp = await getEffectiveSmtpConfig();
-    const hostConfigured = Boolean(smtp.host);
-    const credentialsConfigured = Boolean(
-      smtp.user && String(smtp.user).trim() && smtp.pass != null && String(smtp.pass) !== ''
-    );
-    return {
-      hostConfigured,
-      credentialsConfigured,
-      source: smtp.source || 'none',
-    };
+    return this.buildSmtpDiagnostics(smtp);
   }
 
   /**
@@ -104,13 +111,7 @@ class EmailService {
     }
     const from = await getOutboundEmailFrom();
     const smtp = await getEffectiveSmtpConfig();
-    const diag = {
-      hostConfigured: Boolean(smtp.host),
-      credentialsConfigured: Boolean(
-        smtp.user && String(smtp.user).trim() && smtp.pass != null && String(smtp.pass) !== ''
-      ),
-      source: smtp.source || 'none',
-    };
+    const diag = this.buildSmtpDiagnostics(smtp);
 
     if (!smtp.host) {
       return {
