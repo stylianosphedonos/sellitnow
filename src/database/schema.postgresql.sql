@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS products (
   stock_quantity INTEGER DEFAULT 0,
   category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'archived')),
+  product_type TEXT DEFAULT 'simple' CHECK (product_type IN ('simple', 'bundle')),
   options_json TEXT,
   delivery_cost DOUBLE PRECISION,
   display_order INTEGER,
@@ -68,6 +69,15 @@ CREATE TABLE IF NOT EXISTS product_categories (
   category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (product_id, category_id)
+);
+
+CREATE TABLE IF NOT EXISTS bundle_items (
+  id SERIAL PRIMARY KEY,
+  bundle_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  component_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  display_order INTEGER DEFAULT 0,
+  UNIQUE(bundle_product_id, component_product_id)
 );
 
 CREATE TABLE IF NOT EXISTS cart (
@@ -159,6 +169,8 @@ CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
 CREATE INDEX IF NOT EXISTS idx_product_images_product_display ON product_images(product_id, display_order);
 CREATE INDEX IF NOT EXISTS idx_product_categories_category_id ON product_categories(category_id);
+CREATE INDEX IF NOT EXISTS idx_bundle_items_bundle ON bundle_items(bundle_product_id);
+CREATE INDEX IF NOT EXISTS idx_products_product_type ON products(product_type);
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);

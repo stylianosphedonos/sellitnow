@@ -414,15 +414,23 @@ function productCardNeedsOptions(p) {
 }
 
 function renderProductCardMarkup(p) {
-  const needOptions = productCardNeedsOptions(p) ? '1' : '0';
+  const isBundle = p.product_type === 'bundle';
+  const needOptions = !isBundle && productCardNeedsOptions(p) ? '1' : '0';
+  const offerBadge = isBundle ? '<span class="product-card__offer-badge">Offer</span>' : '';
+  const comparePrice =
+    isBundle && p.compare_at_price > p.price
+      ? `<div class="product-price-compare">${formatStoreMoney(p.compare_at_price)}</div>`
+      : '';
   return `
-    <article class="product-card product-card--compact" data-product-id="${p.id}">
+    <article class="product-card product-card--compact${isBundle ? ' product-card--offer' : ''}" data-product-id="${p.id}">
       <a href="/product.html?id=${p.id}" class="product-card__link">
         <div class="product-image">
+          ${offerBadge}
           ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}" loading="lazy" decoding="async">` : '📦'}
         </div>
         <div class="product-info">
           <div class="product-title">${escapeHtml(p.title)}</div>
+          ${comparePrice}
           <div class="product-price">${formatStoreMoney(p.price)}</div>
         </div>
       </a>

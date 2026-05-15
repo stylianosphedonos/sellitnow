@@ -23,7 +23,8 @@
     <main class="admin-content">
       <h1>Products</h1>
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px">
-        <button class="btn" style="max-width:150px" type="button" onclick="document.getElementById('productForm').style.display='block'">Add Product</button>
+        <button class="btn" style="max-width:150px" type="button" onclick="showProductForm('simple')">Add Product</button>
+        <button class="btn btn-secondary" style="max-width:170px" type="button" onclick="showProductForm('bundle')">Create Offer</button>
         <div class="form-group" style="margin:0;min-width:220px;flex:1;max-width:420px">
           <label for="productSearchTitle" style="display:block;margin-bottom:6px;font-size:14px">Search by title</label>
           <div style="display:flex;gap:8px;align-items:center">
@@ -57,13 +58,35 @@
             <small style="color:#666">Override per SKU; leave blank to use Settings → default delivery.</small>
           </div>
           <div class="form-group">
-            <label>Stock Quantity</label>
-            <input type="number" name="stock_quantity" value="0">
-          </div>
-          <div class="form-group">
             <label>Categories</label>
             <select id="createProductCategories" name="category_ids" multiple size="6"></select>
             <small style="color:#666">Hold Cmd/Ctrl to select multiple categories.</small>
+          </div>
+          <div class="form-group">
+            <label>Product type</label>
+            <select name="product_type" id="createProductType">
+              <option value="simple">Single product</option>
+              <option value="bundle">Offer (bundle)</option>
+            </select>
+          </div>
+          <div id="createBundleEditor" class="form-group" style="display:none;border:1px solid #eee;border-radius:8px;padding:16px;background:#fafafa">
+            <label>Included products</label>
+            <div id="createBundleItemsList" style="margin:8px 0 12px"></div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+              <div style="flex:1;min-width:200px">
+                <select id="createBundleProductPicker" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px">
+                  <option value="">Select a product…</option>
+                </select>
+              </div>
+              <div style="width:90px">
+                <input type="number" id="createBundleItemQty" min="1" value="1" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px" title="Quantity">
+              </div>
+              <button type="button" class="btn" id="btnCreateAddBundleItem" style="max-width:130px;padding:10px;margin-top:0">Add</button>
+            </div>
+          </div>
+          <div class="form-group" id="createStockGroup">
+            <label>Stock Quantity</label>
+            <input type="number" name="stock_quantity" value="0">
           </div>
           <div class="form-group">
             <label>Status</label>
@@ -86,6 +109,49 @@
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/products.html');
     let categories = [];
+    let pickableProducts = [];
+    let createBundleItems = [];
+
+    function showProductForm(type) {
+      const formWrap = document.getElementById('productForm');
+      formWrap.style.display = 'block';
+      const typeSelect = document.getElementById('createProductType');
+      if (typeSelect) typeSelect.value = type === 'bundle' ? 'bundle' : 'simple';
+      syncCreateBundleUi();
+    }
+
+    async function loadPickableProducts() {
+      try {
+        const data = await callApi('/admin/products?limit=500');
+        pickableProducts = (data.items || []).filter((p) => (p.product_type || 'simple') !== 'bundle');
+      } catch (_) {
+        pickableProducts = [];
+      }
+    }
+
+    function syncCreateBundleUi() {
+      const isBundle = document.getElementById('createProductType')?.value === 'bundle';
+      document.getElementById('createBundleEditor').style.display = isBundle ? 'block' : 'none';
+      document.getElementById('createStockGroup').style.display = isBundle ? 'none' : 'block';
+      const picker = document.getElementById('createBundleProductPicker');
+      const selected = new Set(createBundleItems.map((b) => b.component_product_id));
+      if (picker) {
+        picker.innerHTML = '<option value="">Select a product…</option>' + pickableProducts
+          .filter((p) => !selected.has(p.id))
+          .map((p) => `<option value="${p.id}">${escapeAttr(p.title)} (${formatStoreMoney(p.price)})</option>`)
+          .join('');
+      }
+      const list = document.getElementById('createBundleItemsList');
+      if (!list) return;
+      list.innerHTML = createBundleItems.length
+        ? createBundleItems.map((item, index) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:white;border:1px solid #eee;border-radius:8px;margin-bottom:6px">
+            <span>${escapeAttr(item.title)} × ${item.quantity}</span>
+            <button type="button" class="btn btn-secondary" data-create-bundle-remove="${index}" style="padding:2px 8px;font-size:12px;margin-top:0">Remove</button>
+          </div>
+        `).join('')
+        : '<p style="margin:0;color:#999;font-size:13px">Add products included in this offer.</p>';
+    }
 
     async function loadCategories() {
       try {
@@ -116,12 +182,13 @@
           : '';
         document.getElementById('products').innerHTML = hint + `
           <table class="table">
-            <tr><th>ID</th><th>Order</th><th>Title</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr>
+            <tr><th>ID</th><th>Order</th><th>Title</th><th>Type</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr>
             ${items.length ? items.map(p => `
               <tr>
                 <td>${p.id}</td>
                 <td>${p.display_order ?? '-'}</td>
                 <td>${p.title}</td>
+                <td>${p.product_type === 'bundle' ? 'Offer' : 'Product'}</td>
                 <td>${formatStoreMoney(p.price)}</td>
                 <td>${p.stock_quantity}</td>
                 <td>${p.status}</td>
@@ -132,7 +199,7 @@
                   </div>
                 </td>
               </tr>
-            `).join('') : '<tr><td colspan="7" style="padding:16px;color:var(--text-muted)">No products to show.</td></tr>'}
+            `).join('') : '<tr><td colspan="8" style="padding:16px;color:var(--text-muted)">No products to show.</td></tr>'}
           </table>
         `;
         document.getElementById('productSearchClear')?.addEventListener('click', () => {
@@ -174,6 +241,18 @@
       data.category_ids = Array.from(form.category_ids.selectedOptions || [])
         .map((opt) => parseInt(opt.value, 10))
         .filter((x) => Number.isInteger(x));
+      data.product_type = document.getElementById('createProductType')?.value || 'simple';
+      if (data.product_type === 'bundle') {
+        if (!createBundleItems.length) {
+          alert('Add at least one product to this offer.');
+          return;
+        }
+        data.bundle_items = createBundleItems.map((item) => ({
+          component_product_id: item.component_product_id,
+          quantity: item.quantity,
+        }));
+        data.stock_quantity = 0;
+      }
       try {
         const created = await callApi('/admin/products', { method: 'POST', body: JSON.stringify(data) });
         const productId = created?.product?.id;
@@ -193,6 +272,8 @@
         }
 
         form.reset();
+        createBundleItems = [];
+        syncCreateBundleUi();
         document.getElementById('productForm').style.display = 'none';
         loadProducts();
       } catch (err) {
@@ -214,7 +295,38 @@
       }
     }
 
-    loadCategories().then(loadProducts);
+    document.getElementById('createProductType')?.addEventListener('change', syncCreateBundleUi);
+    document.getElementById('btnCreateAddBundleItem')?.addEventListener('click', () => {
+      const picker = document.getElementById('createBundleProductPicker');
+      const qtyInput = document.getElementById('createBundleItemQty');
+      const productId = parseInt(picker?.value || '', 10);
+      const quantity = parseInt(qtyInput?.value || '1', 10) || 1;
+      if (!Number.isInteger(productId)) {
+        alert('Select a product to add.');
+        return;
+      }
+      const picked = pickableProducts.find((p) => p.id === productId);
+      if (!picked) return;
+      createBundleItems.push({
+        component_product_id: productId,
+        quantity,
+        title: picked.title,
+      });
+      if (picker) picker.value = '';
+      if (qtyInput) qtyInput.value = '1';
+      syncCreateBundleUi();
+    });
+    document.getElementById('createBundleItemsList')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-create-bundle-remove]');
+      if (!btn) return;
+      const index = parseInt(btn.getAttribute('data-create-bundle-remove'), 10);
+      if (Number.isInteger(index)) {
+        createBundleItems.splice(index, 1);
+        syncCreateBundleUi();
+      }
+    });
+
+    loadPickableProducts().then(() => loadCategories().then(loadProducts));
 
     window.addEventListener('pageshow', (e) => {
       if (e.persisted) loadCategories().then(loadProducts);

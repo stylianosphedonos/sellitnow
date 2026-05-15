@@ -76,7 +76,7 @@ class CategoryService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -95,7 +95,7 @@ class CategoryService {
           [categoryId, 'active', pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -134,12 +134,15 @@ class CategoryService {
       const { options_json: _o, ...rest } = row;
       return {
         ...rest,
+        product_type: rest.product_type || 'simple',
         category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
         options: opts,
       };
     });
+    const ProductService = require('./ProductService');
+    const enriched = await ProductService.enrichProductsList(items);
 
-    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async create(data) {

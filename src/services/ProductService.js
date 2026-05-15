@@ -3,8 +3,157 @@ const config = require('../config');
 const { pool } = require('../database/db');
 const { parseOptionsJson, stringifyOptionsJson } = require('../lib/productOptions');
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
+const {
+  normalizeBundleItemsInput,
+  computeStockFromBundleRows,
+  sumComponentPrices,
+} = require('../lib/bundleItems');
 
 class ProductService {
+  isBundle(product) {
+    return product && product.product_type === 'bundle';
+  }
+
+  normalizeProductType(value) {
+    const type = value == null ? 'simple' : String(value).trim().toLowerCase();
+    if (type === 'bundle' || type === 'offer') return 'bundle';
+    return 'simple';
+  }
+
+  async getBundleItems(bundleProductId) {
+    const result = await pool.query(
+      `SELECT bi.id, bi.bundle_product_id, bi.component_product_id, bi.quantity, bi.display_order,
+              p.title AS component_title, p.slug AS component_slug, p.price AS component_price,
+              p.stock_quantity AS component_stock_quantity, p.status AS component_status, p.product_type AS component_product_type,
+              (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) AS component_image_url
+       FROM bundle_items bi
+       JOIN products p ON p.id = bi.component_product_id
+       WHERE bi.bundle_product_id = $1
+       ORDER BY bi.display_order ASC, bi.id ASC`,
+      [bundleProductId]
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      component_product_id: row.component_product_id,
+      quantity: row.quantity,
+      display_order: row.display_order,
+      title: row.component_title,
+      slug: row.component_slug,
+      price: Number(row.component_price),
+      stock_quantity: row.component_stock_quantity,
+      status: row.component_status,
+      product_type: row.component_product_type,
+      image_url: row.component_image_url,
+    }));
+  }
+
+  async getBundleItemsByBundleIds(bundleIds) {
+    if (!Array.isArray(bundleIds) || bundleIds.length === 0) return new Map();
+    const placeholders = bundleIds.map((_, i) => `$${i + 1}`).join(', ');
+    const result = await pool.query(
+      `SELECT bi.bundle_product_id, bi.component_product_id, bi.quantity, bi.display_order,
+              p.title AS component_title, p.price AS component_price,
+              p.stock_quantity AS component_stock_quantity, p.status AS component_status,
+              (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) AS component_image_url
+       FROM bundle_items bi
+       JOIN products p ON p.id = bi.component_product_id
+       WHERE bi.bundle_product_id IN (${placeholders})
+       ORDER BY bi.bundle_product_id, bi.display_order ASC, bi.id ASC`,
+      bundleIds
+    );
+    const map = new Map();
+    for (const row of result.rows) {
+      if (!map.has(row.bundle_product_id)) map.set(row.bundle_product_id, []);
+      map.get(row.bundle_product_id).push({
+        component_product_id: row.component_product_id,
+        quantity: row.quantity,
+        display_order: row.display_order,
+        title: row.component_title,
+        price: Number(row.component_price),
+        stock_quantity: row.component_stock_quantity,
+        status: row.component_status,
+        image_url: row.component_image_url,
+      });
+    }
+    return map;
+  }
+
+  computeBundleStockFromItems(items) {
+    return computeStockFromBundleRows(items);
+  }
+
+  async validateBundleItems(bundleProductId, itemsInput) {
+    const items = normalizeBundleItemsInput(itemsInput);
+    if (!items.length) {
+      throw new Error('An offer must include at least one product.');
+    }
+    for (const item of items) {
+      if (bundleProductId && item.component_product_id === Number(bundleProductId)) {
+        throw new Error('An offer cannot include itself.');
+      }
+      const component = await this.getById(item.component_product_id);
+      if (this.isBundle(component)) {
+        throw new Error(`"${component.title}" is already an offer and cannot be included in another offer.`);
+      }
+    }
+    return items;
+  }
+
+  async setBundleItems(bundleProductId, itemsInput) {
+    const items = await this.validateBundleItems(bundleProductId, itemsInput);
+    await pool.query('DELETE FROM bundle_items WHERE bundle_product_id = $1', [bundleProductId]);
+    for (const item of items) {
+      await pool.query(
+        `INSERT INTO bundle_items (bundle_product_id, component_product_id, quantity, display_order)
+         VALUES ($1, $2, $3, $4)`,
+        [bundleProductId, item.component_product_id, item.quantity, item.display_order]
+      );
+    }
+    return this.getBundleItems(bundleProductId);
+  }
+
+  async enrichProduct(product) {
+    if (!product) return product;
+    product.product_type = product.product_type || 'simple';
+    if (!this.isBundle(product)) {
+      product.bundle_items = [];
+      product.compare_at_price = null;
+      return product;
+    }
+    const bundleItems = await this.getBundleItems(product.id);
+    product.bundle_items = bundleItems;
+    product.compare_at_price = sumComponentPrices(bundleItems);
+    product.stock_quantity = this.computeBundleStockFromItems(bundleItems);
+    return product;
+  }
+
+  async enrichProductsList(items) {
+    if (!Array.isArray(items) || !items.length) return items;
+    const bundleIds = items.filter((p) => p.product_type === 'bundle').map((p) => p.id);
+    if (!bundleIds.length) {
+      return items.map((p) => ({
+        ...p,
+        product_type: p.product_type || 'simple',
+        bundle_items: [],
+        compare_at_price: null,
+      }));
+    }
+    const bundleMap = await this.getBundleItemsByBundleIds(bundleIds);
+    return items.map((p) => {
+      const productType = p.product_type || 'simple';
+      if (productType !== 'bundle') {
+        return { ...p, product_type: productType, bundle_items: [], compare_at_price: null };
+      }
+      const bundleItems = bundleMap.get(p.id) || [];
+      return {
+        ...p,
+        product_type: productType,
+        bundle_items: bundleItems,
+        compare_at_price: sumComponentPrices(bundleItems),
+        stock_quantity: this.computeBundleStockFromItems(bundleItems),
+      };
+    });
+  }
   normalizeSku(value) {
     const sku = value == null ? '' : String(value).trim();
     return sku || null;
@@ -64,7 +213,7 @@ class ProductService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order
+          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order, p.product_type
            FROM products p
            WHERE p.title ILIKE $1
            ORDER BY
@@ -75,7 +224,7 @@ class ProductService {
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order
+          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order, p.product_type
            FROM products p
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
@@ -88,9 +237,11 @@ class ProductService {
     const categoryMap = await this.getCategoryIdsByProductIds(items.map((x) => x.id));
     const mapped = items.map((row) => ({
       ...row,
+      product_type: row.product_type || 'simple',
       category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
     }));
-    return { items: mapped, total, page, limit, totalPages: Math.ceil(total / limit) };
+    const enriched = await this.enrichProductsList(mapped);
+    return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async list(page = 1, limit = 20, search = '') {
@@ -111,7 +262,7 @@ class ProductService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
@@ -124,7 +275,7 @@ class ProductService {
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order,
+          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
@@ -142,12 +293,14 @@ class ProductService {
       const { options_json: _o, ...rest } = row;
       return {
         ...rest,
+        product_type: rest.product_type || 'simple',
         category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
         options: opts,
       };
     });
+    const enriched = await this.enrichProductsList(items);
 
-    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async getById(id) {
@@ -178,8 +331,9 @@ class ProductService {
     product.category_ids = catRows.rows.map((r) => r.category_id);
     product.category_names = catRows.rows.map((r) => r.name).filter(Boolean);
     product.options = parseOptionsJson(product.options_json);
+    product.product_type = product.product_type || 'simple';
     delete product.options_json;
-    return product;
+    return this.enrichProduct(product);
   }
 
   async getBySlug(slug) {
@@ -210,8 +364,9 @@ class ProductService {
     product.category_ids = catRows.rows.map((r) => r.category_id);
     product.category_names = catRows.rows.map((r) => r.name).filter(Boolean);
     product.options = parseOptionsJson(product.options_json);
+    product.product_type = product.product_type || 'simple';
     delete product.options_json;
-    return product;
+    return this.enrichProduct(product);
   }
 
   async create(data, imageFiles = []) {
@@ -233,10 +388,12 @@ class ProductService {
 
     const normalizedSku = this.normalizeSku(data.sku) || this.generateFallbackSku(data.title);
     const displayOrder = data.display_order !== undefined ? data.display_order : null;
+    const productType = this.normalizeProductType(data.product_type);
+    const stockQuantity = productType === 'bundle' ? 0 : (data.stock_quantity ?? 0);
 
     const result = await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, options_json, delivery_cost, display_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, product_type, options_json, delivery_cost, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         normalizedSku,
@@ -244,9 +401,10 @@ class ProductService {
         slug,
         data.description || null,
         data.price,
-        data.stock_quantity ?? 0,
+        stockQuantity,
         primaryCategoryId,
         data.status || 'draft',
+        productType,
         optionsJson,
         deliveryCost != null && Number.isFinite(deliveryCost) ? deliveryCost : null,
         displayOrder,
@@ -254,6 +412,12 @@ class ProductService {
     );
     const product = result.rows[0];
     await this.assignProductCategories(product.id, categoryIds);
+
+    if (productType === 'bundle' && data.bundle_items !== undefined) {
+      await this.setBundleItems(product.id, data.bundle_items);
+    } else if (productType === 'bundle') {
+      throw new Error('An offer must include at least one product.');
+    }
 
     if (imageFiles.length) {
       for (let i = 0; i < imageFiles.length; i++) {
@@ -277,7 +441,10 @@ class ProductService {
     const sku = this.normalizeSku(rawSku) || this.generateFallbackSku(title);
     const description = data.description !== undefined ? data.description : product.description;
     const price = data.price !== undefined && data.price !== null ? data.price : product.price;
-    const stock_quantity = data.stock_quantity !== undefined && data.stock_quantity !== null ? data.stock_quantity : product.stock_quantity;
+    let stock_quantity = data.stock_quantity !== undefined && data.stock_quantity !== null ? data.stock_quantity : product.stock_quantity;
+    if (productType === 'bundle') {
+      stock_quantity = 0;
+    }
     const category_ids =
       data.category_ids !== undefined
         ? data.category_ids
@@ -291,6 +458,10 @@ class ProductService {
     )];
     const category_id = normalizedCategoryIds.length ? normalizedCategoryIds[0] : null;
     const status = data.status !== undefined && data.status !== null ? data.status : product.status;
+    const productType =
+      data.product_type !== undefined && data.product_type !== null
+        ? this.normalizeProductType(data.product_type)
+        : (product.product_type || 'simple');
 
     let delivery_cost = product.delivery_cost;
     if (data.delivery_cost !== undefined) {
@@ -323,14 +494,25 @@ class ProductService {
         stock_quantity = $7,
         category_id = $8,
         status = $9,
-        options_json = $10,
-        delivery_cost = $11,
-        display_order = $12,
+        product_type = $10,
+        options_json = $11,
+        delivery_cost = $12,
+        display_order = $13,
         updated_at = NOW()
        WHERE id = $1`,
-      [id, sku, title, slug, description, price, stock_quantity, category_id, status, optionsJson, delivery_cost, display_order]
+      [id, sku, title, slug, description, price, stock_quantity, category_id, status, productType, optionsJson, delivery_cost, display_order]
     );
     await this.assignProductCategories(id, normalizedCategoryIds);
+
+    if (productType === 'bundle') {
+      if (data.bundle_items !== undefined) {
+        await this.setBundleItems(id, data.bundle_items);
+      } else if (!this.isBundle(product)) {
+        throw new Error('An offer must include at least one product.');
+      }
+    } else {
+      await pool.query('DELETE FROM bundle_items WHERE bundle_product_id = $1', [id]);
+    }
 
     if (imageFiles.length) {
       const existing = await pool.query('SELECT id FROM product_images WHERE product_id = $1', [id]);
@@ -384,6 +566,18 @@ class ProductService {
   }
 
   async decrementStock(productId, quantity) {
+    const product = await pool.query('SELECT id, product_type FROM products WHERE id = $1', [productId]);
+    if (!product.rows.length) return false;
+    if (product.rows[0].product_type === 'bundle') {
+      const items = await this.getBundleItems(productId);
+      for (const item of items) {
+        await pool.query(
+          'UPDATE products SET stock_quantity = stock_quantity - $2 WHERE id = $1',
+          [item.component_product_id, item.quantity * quantity]
+        );
+      }
+      return true;
+    }
     const result = await pool.query(
       'UPDATE products SET stock_quantity = stock_quantity - $2 WHERE id = $1 RETURNING id',
       [productId, quantity]
@@ -392,10 +586,34 @@ class ProductService {
   }
 
   async incrementStock(productId, quantity) {
+    const product = await pool.query('SELECT id, product_type FROM products WHERE id = $1', [productId]);
+    if (!product.rows.length) return;
+    if (product.rows[0].product_type === 'bundle') {
+      const items = await this.getBundleItems(productId);
+      for (const item of items) {
+        await pool.query(
+          'UPDATE products SET stock_quantity = stock_quantity + $2 WHERE id = $1',
+          [item.component_product_id, item.quantity * quantity]
+        );
+      }
+      return;
+    }
     await pool.query(
       'UPDATE products SET stock_quantity = stock_quantity + $2 WHERE id = $1',
       [productId, quantity]
     );
+  }
+
+  async getEffectiveStock(productOrId) {
+    const product =
+      typeof productOrId === 'object' && productOrId != null
+        ? productOrId
+        : await this.getById(productOrId);
+    if (this.isBundle(product)) {
+      const items = product.bundle_items || (await this.getBundleItems(product.id));
+      return this.computeBundleStockFromItems(items);
+    }
+    return Number(product.stock_quantity) || 0;
   }
 }
 

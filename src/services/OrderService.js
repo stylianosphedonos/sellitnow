@@ -14,10 +14,27 @@ class OrderService {
       [orderId]
     );
     for (const item of itemsResult.rows) {
-      await client.query(
-        'UPDATE products SET stock_quantity = stock_quantity + $2 WHERE id = $1',
-        [item.product_id, item.quantity]
+      const productResult = await client.query(
+        'SELECT product_type FROM products WHERE id = $1',
+        [item.product_id]
       );
+      if (productResult.rows[0]?.product_type === 'bundle') {
+        const bundleItems = await client.query(
+          'SELECT component_product_id, quantity FROM bundle_items WHERE bundle_product_id = $1',
+          [item.product_id]
+        );
+        for (const row of bundleItems.rows) {
+          await client.query(
+            'UPDATE products SET stock_quantity = stock_quantity + $2 WHERE id = $1',
+            [row.component_product_id, row.quantity * item.quantity]
+          );
+        }
+      } else {
+        await client.query(
+          'UPDATE products SET stock_quantity = stock_quantity + $2 WHERE id = $1',
+          [item.product_id, item.quantity]
+        );
+      }
     }
   }
 
@@ -44,9 +61,10 @@ class OrderService {
     const stockIssueLines = [];
     for (const item of cartData.items) {
       const product = await ProductService.getById(item.product_id);
-      if (Number(product.stock_quantity) < Number(item.quantity)) {
+      const available = await ProductService.getEffectiveStock(product);
+      if (available < Number(item.quantity)) {
         stockIssueLines.push(
-          `"${product.title}": ordered ${item.quantity}, available ${product.stock_quantity}`
+          `"${product.title}": ordered ${item.quantity}, available ${available}`
         );
       }
     }
@@ -95,12 +113,21 @@ class OrderService {
         sku: product.sku,
         title: product.title,
         slug: product.slug,
+        product_type: product.product_type || 'simple',
         color: item.color || '',
         size: item.size || '',
         delivery_cost:
           product.delivery_cost != null && product.delivery_cost !== ''
             ? Number(product.delivery_cost)
             : null,
+        bundle_items: Array.isArray(product.bundle_items)
+          ? product.bundle_items.map((b) => ({
+              product_id: b.component_product_id,
+              title: b.title,
+              quantity: b.quantity,
+              price: b.price,
+            }))
+          : [],
       };
       await pool.query(
         `INSERT INTO order_items (order_id, product_id, product_snapshot, quantity, unit_price, total_price)

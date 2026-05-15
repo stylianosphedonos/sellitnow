@@ -104,6 +104,14 @@ function normalizeProductPayload(data, { forUpdate = false } = {}) {
     }
   }
 
+  if (data.product_type !== undefined) {
+    clean.product_type = ProductService.normalizeProductType(data.product_type);
+  }
+
+  if (data.bundle_items !== undefined) {
+    clean.bundle_items = data.bundle_items;
+  }
+
   return clean;
 }
 

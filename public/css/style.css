@@ -422,7 +422,34 @@ button.category-card:focus-visible {
   font-size: 14px;
 }
 
+.product-card--offer .product-card__link:hover {
+  box-shadow: none;
+}
+
+.product-card__offer-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.product-price-compare {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  margin-bottom: 2px;
+}
+
 .product-image {
+  position: relative;
   aspect-ratio: 1;
   background: var(--border);
   display: flex;

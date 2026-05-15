@@ -35,9 +35,21 @@
 
     let product;
     let categories = [];
+    let pickableProducts = [];
+    let bundleItems = [];
     let editColors = [];
     let editSizes = [];
     let removingImageIds = new Set();
+
+    async function loadPickableProducts() {
+      try {
+        const data = await callApi('/admin/products?limit=500');
+        pickableProducts = (data.items || []).filter((p) => p.id !== Number(id) && (p.product_type || 'simple') !== 'bundle');
+      } catch (err) {
+        console.warn('Could not load products for bundle picker', err);
+        pickableProducts = [];
+      }
+    }
 
     async function loadCategories() {
       try {
@@ -53,6 +65,12 @@
         const data = await callApi('/products/' + id);
         product = data.product;
         if (!product) throw new Error('Product not found');
+        bundleItems = (product.bundle_items || []).map((item) => ({
+          component_product_id: item.component_product_id,
+          quantity: item.quantity || 1,
+          title: item.title,
+          price: item.price,
+        }));
         renderForm();
       } catch (err) {
         document.getElementById('formContainer').innerHTML = '<p>Failed to load product. ' + (err.message || '') + '</p>';
@@ -92,8 +110,35 @@
             <small style="color:#666">Leave blank to use the default from <a href="/admin/settings.html">Settings</a>. If set, each unit of this product adjusts the order delivery total relative to that default.</small>
           </div>
           <div class="form-group">
+            <label>Product type</label>
+            <select name="product_type" id="productTypeSelect">
+              <option value="simple" ${(product.product_type || 'simple') === 'simple' ? 'selected' : ''}>Single product</option>
+              <option value="bundle" ${product.product_type === 'bundle' ? 'selected' : ''}>Offer (bundle)</option>
+            </select>
+            <small style="color:#666">Offers combine existing products at one price and appear on the storefront as a deal.</small>
+          </div>
+          <div id="simpleStockGroup" class="form-group">
             <label>Stock Quantity</label>
             <input type="number" name="stock_quantity" value="${product.stock_quantity ?? 0}" min="0">
+          </div>
+          <div id="bundleEditor" class="form-group" style="display:none;border:1px solid #eee;border-radius:8px;padding:16px;background:#fafafa">
+            <label style="display:block;margin-bottom:8px">Included products</label>
+            <p id="bundleStockHint" style="margin:0 0 12px;font-size:13px;color:#666"></p>
+            <div id="bundleItemsList" style="margin-bottom:12px"></div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+              <div style="flex:1;min-width:200px">
+                <label style="font-size:13px">Add product</label>
+                <select id="bundleProductPicker" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px">
+                  <option value="">Select a product…</option>
+                </select>
+              </div>
+              <div style="width:100px">
+                <label style="font-size:13px">Qty</label>
+                <input type="number" id="bundleItemQty" min="1" value="1" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px">
+              </div>
+              <button type="button" class="btn" id="btnAddBundleItem" style="max-width:140px;padding:10px 12px;margin-top:0">Add to offer</button>
+            </div>
+            <p id="bundlePriceHint" style="margin:12px 0 0;font-size:13px;color:#666"></p>
           </div>
           <div class="form-group">
             <label>Categories</label>
@@ -176,6 +221,7 @@
       }
 
       paintVariantChips();
+      setupBundleEditor();
 
       form.addEventListener('click', (e) => {
         const rm = e.target.closest('.variant-chip-remove');
@@ -231,6 +277,101 @@
       return div.innerHTML;
     }
 
+    function isBundleType() {
+      return document.getElementById('productTypeSelect')?.value === 'bundle';
+    }
+
+    function computeBundleComparePrice() {
+      return bundleItems.reduce((sum, item) => {
+        const price = Number(item.price) || 0;
+        const qty = Number(item.quantity) || 1;
+        return sum + price * qty;
+      }, 0);
+    }
+
+    function paintBundleItems() {
+      const list = document.getElementById('bundleItemsList');
+      if (!list) return;
+      if (!bundleItems.length) {
+        list.innerHTML = '<p style="margin:0;color:#999;font-size:13px">No products in this offer yet.</p>';
+        return;
+      }
+      list.innerHTML = bundleItems.map((item, index) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:white;border:1px solid #eee;border-radius:8px;margin-bottom:8px">
+          <div>
+            <strong>${escapeHtml(item.title || 'Product #' + item.component_product_id)}</strong>
+            <span style="color:#666;font-size:13px;margin-left:8px">× ${item.quantity}</span>
+          </div>
+          <button type="button" class="btn btn-secondary bundle-item-remove" data-index="${index}" style="padding:4px 10px;font-size:12px;margin-top:0">Remove</button>
+        </div>
+      `).join('');
+    }
+
+    function syncBundleUi() {
+      const bundle = isBundleType();
+      const editor = document.getElementById('bundleEditor');
+      const stockGroup = document.getElementById('simpleStockGroup');
+      const stockHint = document.getElementById('bundleStockHint');
+      const priceHint = document.getElementById('bundlePriceHint');
+      const picker = document.getElementById('bundleProductPicker');
+      if (editor) editor.style.display = bundle ? 'block' : 'none';
+      if (stockGroup) stockGroup.style.display = bundle ? 'none' : 'block';
+      if (stockHint) {
+        stockHint.textContent = bundle
+          ? `Available offers: ${product.stock_quantity ?? 0} (based on included product stock).`
+          : '';
+      }
+      if (priceHint) {
+        const compare = computeBundleComparePrice();
+        priceHint.textContent = compare > 0
+          ? `Separate total: ${formatStoreMoney(compare)}. Set your offer price above.`
+          : '';
+      }
+      if (picker) {
+        const selectedIds = new Set(bundleItems.map((b) => b.component_product_id));
+        picker.innerHTML = '<option value="">Select a product…</option>' + pickableProducts
+          .filter((p) => !selectedIds.has(p.id))
+          .map((p) => `<option value="${p.id}">${escapeHtml(p.title)} (${formatStoreMoney(p.price)})</option>`)
+          .join('');
+      }
+      paintBundleItems();
+    }
+
+    function setupBundleEditor() {
+      document.getElementById('productTypeSelect')?.addEventListener('change', syncBundleUi);
+      document.getElementById('btnAddBundleItem')?.addEventListener('click', () => {
+        const picker = document.getElementById('bundleProductPicker');
+        const qtyInput = document.getElementById('bundleItemQty');
+        const productId = parseInt(picker?.value || '', 10);
+        const quantity = parseInt(qtyInput?.value || '1', 10) || 1;
+        if (!Number.isInteger(productId)) {
+          alert('Select a product to add.');
+          return;
+        }
+        const picked = pickableProducts.find((p) => p.id === productId);
+        if (!picked) return;
+        bundleItems.push({
+          component_product_id: productId,
+          quantity,
+          title: picked.title,
+          price: picked.price,
+        });
+        if (picker) picker.value = '';
+        if (qtyInput) qtyInput.value = '1';
+        syncBundleUi();
+      });
+      document.getElementById('bundleItemsList')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.bundle-item-remove');
+        if (!btn) return;
+        const index = parseInt(btn.dataset.index, 10);
+        if (Number.isInteger(index)) {
+          bundleItems.splice(index, 1);
+          syncBundleUi();
+        }
+      });
+      syncBundleUi();
+    }
+
     async function handleSubmit(e) {
       e.preventDefault();
       const form = e.target;
@@ -258,6 +399,15 @@
         }
       }
 
+      const productType = form.product_type?.value || 'simple';
+      if (productType === 'bundle' && !bundleItems.length) {
+        errEl.textContent = 'Add at least one product to this offer.';
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+        return;
+      }
+
       const productData = {
         title: form.title.value,
         description: form.description.value,
@@ -265,9 +415,14 @@
         stock_quantity: parseInt(form.stock_quantity.value, 10) || 0,
         category_ids: selectedCategories,
         status: form.status.value,
+        product_type: productType,
         delivery_cost,
         display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
-        options: { colors: [...editColors], sizes: [...editSizes] }
+        options: { colors: [...editColors], sizes: [...editSizes] },
+        bundle_items: bundleItems.map((item) => ({
+          component_product_id: item.component_product_id,
+          quantity: item.quantity,
+        })),
       };
 
       try {
@@ -309,6 +464,7 @@
 
     (async () => {
       await loadCategories();
+      await loadPickableProducts();
       await loadProduct();
     })();
   </script>
