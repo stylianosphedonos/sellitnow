@@ -399,7 +399,7 @@ function startup() {
   }
   return new Promise((resolve, reject) => {
     app.listen(PORT, HOST, () => {
-      console.log(`Sellitnow listening on http://${HOST}:${PORT}`);
+      console.log(`3nityLab listening on http://${HOST}:${PORT}`);
       resolve();
     }).on('error', reject);
   });

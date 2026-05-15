@@ -59,10 +59,10 @@ module.exports = {
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-    from: process.env.EMAIL_FROM || '3nity Lab <support@3nitylab.com>',
+    from: process.env.EMAIL_FROM || '3nityLab <support@3nitylab.com>',
     replyTo: process.env.EMAIL_REPLY_TO || 'support@3nitylab.com',
     supportEmail: process.env.SUPPORT_EMAIL || 'support@3nitylab.com',
-    businessName: process.env.BUSINESS_NAME || '3nity Lab',
+    businessName: process.env.BUSINESS_NAME || '3nityLab',
   },
   app: {
     vatRate: parseFloat(process.env.VAT_RATE || '0.20'),

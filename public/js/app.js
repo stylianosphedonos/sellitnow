@@ -253,10 +253,10 @@ async function loadBrandSettings() {
         el.innerHTML = '';
         const img = document.createElement('img');
         img.src = mediaUrl(data.logo);
-        img.alt = '3nitylab';
+        img.alt = '3nityLab';
         el.appendChild(img);
       } else {
-        el.textContent = '3nitylab';
+        el.textContent = '3nityLab';
       }
     });
   } catch (_) {}

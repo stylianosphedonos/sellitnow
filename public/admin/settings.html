@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings - Admin - 3nitylab</title>
+  <title>Settings - Admin - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -83,7 +83,7 @@
           <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border)">
             <h3 style="font-size:16px;margin-bottom:8px">Send test email</h3>
             <p style="color:var(--text-muted);font-size:14px;margin-bottom:16px;line-height:1.5">Send a short test message using your <strong>saved</strong> From address (save above if you changed it) and the server’s SMTP settings.</p>
-            <p style="color:var(--text-muted);font-size:13px;margin:-8px 0 16px;line-height:1.5">If the browser console shows <code style="font-size:12px">400</code> for this request, that is intentional: it means the server could not send mail and returned a JSON error. Open the request in the Network tab → <strong>Response</strong>, or check the red message below and the console for <code style="font-size:12px">[Sellitnow] Test email failed</code>.</p>
+            <p style="color:var(--text-muted);font-size:13px;margin:-8px 0 16px;line-height:1.5">If the browser console shows <code style="font-size:12px">400</code> for this request, that is intentional: it means the server could not send mail and returned a JSON error. Open the request in the Network tab → <strong>Response</strong>, or check the red message below and the console for <code style="font-size:12px">[3nityLab] Test email failed</code>.</p>
             <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;max-width:560px">
               <div class="form-group" style="flex:1;min-width:220px;margin-bottom:0">
                 <label for="testEmailRecipient">Recipient</label>
@@ -364,7 +364,7 @@
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          console.warn('[Sellitnow] Test email failed — HTTP', res.status, '— server said:', data);
+          console.warn('[3nityLab] Test email failed — HTTP', res.status, '— server said:', data);
           let msg = data.error || res.statusText || 'Request failed';
           if (res.status === 400 && !data.error) {
             msg =
@@ -458,7 +458,7 @@
         const ts = String(backup?.createdAt || Date.now()).replace(/[:.]/g, '-');
         const a = document.createElement('a');
         a.href = url;
-        a.download = `sellitnow-db-backup-${ts}.json`;
+        a.download = `3nityLab-db-backup-${ts}.json`;
         document.body.appendChild(a);
         a.click();
         a.remove();

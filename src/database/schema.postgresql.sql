@@ -1,4 +1,4 @@
--- Sellitnow Schema (PostgreSQL)
+-- 3nityLab Schema (PostgreSQL)
 
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,

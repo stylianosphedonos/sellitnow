@@ -1,4 +1,4 @@
--- Sellitnow Schema (SQLite)
+-- 3nityLab Schema (SQLite)
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

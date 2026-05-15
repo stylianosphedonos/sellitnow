@@ -1,5 +1,9 @@
 const nodemailer = require('nodemailer');
 const config = require('../config');
+
+function brandName() {
+  return config.email.businessName || '3nityLab';
+}
 const { pool } = require('../database/db');
 const { getBrandSettings, getOutboundEmailFrom, getEffectiveSmtpConfig } = require('../routes/brand');
 const { formatMoney } = require('../lib/formatMoney');
@@ -152,7 +156,7 @@ class EmailService {
         smtp: diag,
       };
     }
-    const subject = 'Sellitnow - test email';
+    const subject = `${brandName()} - test email`;
     const safeFrom = escapeHtml(from);
     const html = `
       <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;line-height:1.6;color:#111">
@@ -160,11 +164,11 @@ class EmailService {
         <p style="margin:0 0 12px">If you are reading this, your store’s <strong>outbound email</strong> is working.</p>
         <p style="margin:0 0 8px;font-size:14px;color:#444"><strong>From (configured):</strong> ${safeFrom}</p>
         <p style="margin:0;font-size:14px;color:#444"><strong>To:</strong> ${escapeHtml(addr)}</p>
-        <p style="margin:20px 0 0;font-size:13px;color:#666">This message was sent from the Sellitnow admin Send test email action.</p>
+        <p style="margin:20px 0 0;font-size:13px;color:#666">This message was sent from the ${escapeHtml(brandName())} admin Send test email action.</p>
       </div>
     `;
     const text = [
-      'Sellitnow test email',
+      `${brandName()} test email`,
       '',
       'If you received this, outbound email is working.',
       `From (configured): ${from}`,
@@ -186,15 +190,15 @@ class EmailService {
   async sendWelcome(user) {
     return this.send({
       to: user.email,
-      subject: 'Welcome to Sellitnow',
-      html: `<p>Hi ${user.first_name},</p><p>Thanks for registering with Sellitnow. Your account is ready.</p><p>Happy shopping!</p>`,
+      subject: `Welcome to ${brandName()}`,
+      html: `<p>Hi ${user.first_name},</p><p>Thanks for registering with ${escapeHtml(brandName())}. Your account is ready.</p><p>Happy shopping!</p>`,
     });
   }
 
   async sendVerification(user, verificationUrl) {
     return this.send({
       to: user.email,
-      subject: 'Verify your Sellitnow email',
+      subject: `Verify your ${brandName()} email`,
       html: `<p>Hi ${user.first_name},</p><p>Please verify your email by clicking: <a href="${verificationUrl}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
     });
   }
@@ -202,7 +206,7 @@ class EmailService {
   async sendPasswordReset(user, resetUrl) {
     return this.send({
       to: user.email,
-      subject: 'Reset your Sellitnow password',
+      subject: `Reset your ${brandName()} password`,
       html: `<p>Hi ${user.first_name},</p><p>Reset your password: <a href="${resetUrl}">Reset Password</a></p><p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>`,
     });
   }
@@ -269,7 +273,7 @@ class EmailService {
 
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
-    const businessName = config.email.businessName || '3nity Lab';
+    const businessName = brandName();
     const supportEmail = config.email.supportEmail || 'support@3nitylab.com';
     const customerEmail = order.guest_email || order.user_email || to;
     const addr = this.parseShippingAddress(order);
@@ -402,6 +406,7 @@ class EmailService {
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
     const itemsRows = await this.buildOrderItemsTableHtml(items);
+    const storeName = brandName();
     const paidOnline = order.payment_method !== 'pay_on_delivery' && order.payment_status === 'paid';
     const intro = paidOnline
       ? `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your purchase. We have safely received your <strong>payment</strong> and your order is now in our queue to be <strong>processed and prepared</strong> for shipment.</p>`
@@ -421,14 +426,14 @@ class EmailService {
           <tbody>${itemsRows}</tbody>
         </table>
         <p style="font-size:14px;line-height:1.6;color:#444">If you have any questions, simply reply to this email and our team will help you.</p>
-        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:16px">Thank you for shopping with us,<br><span style="color:#666">Sellitnow</span></p>
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:16px">Thank you for shopping with us,<br><span style="color:#666">${escapeHtml(storeName)}</span></p>
       </div>
     `;
 
     const payLine = paidOnline
       ? 'Payment received — we will process your order shortly.'
       : 'Pay on delivery — payment is due when your order arrives.';
-    const text = `We have your order #${order.order_number}. Total: ${fmt(order.total_amount)}. ${payLine} Thank you for shopping with Sellitnow.`;
+    const text = `We have your order #${order.order_number}. Total: ${fmt(order.total_amount)}. ${payLine} Thank you for shopping with ${storeName}.`;
 
     return this.send({
       to,
@@ -501,7 +506,7 @@ class EmailService {
         <p style="font-size:18px;font-weight:600;margin:0 0 8px">${headline}</p>
         <p style="font-size:13px;color:#666;margin:0 0 20px">Previous status: ${prev} → New status: ${escapeHtml(next)}</p>
         ${bodyHtml}
-        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:24px">Thank you,<br><span style="color:#666">Sellitnow</span></p>
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:24px">Thank you,<br><span style="color:#666">${escapeHtml(brandName())}</span></p>
       </div>
     `;
 

@@ -1,4 +1,4 @@
-# Sellitnow
+# 3nityLab
 
 E-commerce MVP - Node.js/Express API with SQLite (zero config).
 
