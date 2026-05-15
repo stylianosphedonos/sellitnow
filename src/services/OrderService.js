@@ -27,24 +27,19 @@ class OrderService {
 
   /**
    * Create order from cart
-   * @param {'card'|'pay_on_delivery'} paymentMethod
+   * @param {'card'} paymentMethod
    */
   async createOrder(userId, guestEmail, shippingAddress, cartId, sessionId, paymentMethod = 'card') {
     const cartData = await CartService.getCart(userId, sessionId);
     if (cartData.items.length === 0) throw new Error('Cart is empty');
 
-    const pm = paymentMethod === 'pay_on_delivery' ? 'pay_on_delivery' : 'card';
+    if (paymentMethod === 'pay_on_delivery') {
+      throw new Error('Pay on delivery is not available');
+    }
+    const pm = 'card';
 
     const email = userId ? null : guestEmail;
     if (!userId && !email) throw new Error('Email required for guest checkout');
-
-    if (pm === 'pay_on_delivery') {
-      const phone =
-        shippingAddress && typeof shippingAddress.phone === 'string'
-          ? shippingAddress.phone.trim()
-          : '';
-      if (!phone) throw new Error('Phone number is required for pay on delivery');
-    }
 
     const stockIssueLines = [];
     for (const item of cartData.items) {
@@ -123,27 +118,13 @@ class OrderService {
 
     await CartService.clearCart(cartData.cart_id);
 
-    if (pm === 'pay_on_delivery') {
-      for (const item of cartData.items) {
-        await ProductService.decrementStock(item.product_id, item.quantity);
-      }
-      const upd = await pool.query(
-        `UPDATE orders SET status = 'processing', updated_at = NOW() WHERE id = $1 RETURNING *`,
-        [order.id]
-      );
-      Object.assign(order, upd.rows[0]);
-    }
-
     const items = await pool.query(
       'SELECT * FROM order_items WHERE order_id = $1',
       [order.id]
     );
     const orderWithEmail = { ...order, user_email: userEmail };
     await EmailService.sendAdminNewOrder(orderWithEmail, items.rows);
-    // Card checkout: customer email is sent only after payment succeeds (see PaymentService).
-    if (pm === 'pay_on_delivery') {
-      await EmailService.sendOrderReceivedAndProcessing(orderWithEmail, items.rows);
-    }
+    // Customer email is sent only after payment succeeds (see PaymentService).
 
     const result = { order, items: items.rows };
     if (!userId && email) {
