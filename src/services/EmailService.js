@@ -284,10 +284,6 @@ class EmailService {
         ? fmt(payment.amountPaid)
         : fmt(order.total_amount);
 
-    const stockNote = order.stock_warning
-      ? `<p style="color:#b45309;background:#fffbeb;padding:14px 16px;border-radius:8px;border:1px solid #fcd34d;margin:20px 0;line-height:1.5"><strong>Stock notice:</strong> ${escapeHtml(order.stock_warning)}</p>`
-      : '';
-
     const phoneRow = addr.phone
       ? `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;width:38%">Phone</td><td style="padding:8px 12px;border-bottom:1px solid #eee">${escapeHtml(addr.phone)}</td></tr>`
       : '';
@@ -326,8 +322,6 @@ class EmailService {
             <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;width:38%;vertical-align:top">Address</td><td style="padding:8px 12px;border-bottom:1px solid #eee">${this.formatShippingAddressHtml(addr)}</td></tr>
             ${phoneRow}
           </table>
-
-          ${stockNote}
 
           <p style="font-size:15px;font-weight:600;margin:0 0 12px;color:#333">Items purchased</p>
           <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px">
@@ -408,10 +402,6 @@ class EmailService {
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
     const itemsRows = await this.buildOrderItemsTableHtml(items);
-    const stockNote =
-      order.stock_warning
-        ? `<p style="color:#b45309;background:#fffbeb;padding:14px 16px;border-radius:8px;border:1px solid #fcd34d;margin:20px 0;line-height:1.5"><strong>Stock notice:</strong> ${escapeHtml(order.stock_warning)}</p>`
-        : '';
     const paidOnline = order.payment_method !== 'pay_on_delivery' && order.payment_status === 'paid';
     const intro = paidOnline
       ? `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your purchase. We have safely received your <strong>payment</strong> and your order is now in our queue to be <strong>processed and prepared</strong> for shipment.</p>`
@@ -425,7 +415,6 @@ class EmailService {
           <tr><td style="padding:12px 16px;border-bottom:1px solid #eee"><strong>Order number</strong></td><td style="padding:12px 16px;border-bottom:1px solid #eee">${escapeHtml(order.order_number)}</td></tr>
           <tr><td style="padding:12px 16px"><strong>Order total</strong></td><td style="padding:12px 16px">${fmt(order.total_amount)}</td></tr>
         </table>
-        ${stockNote}
         <p style="font-size:15px;margin:8px 0 12px;font-weight:600">Items</p>
         <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:28px">
           <thead><tr style="background:#f0f0f0"><th style="text-align:left;padding:10px 12px">Product</th><th style="padding:10px 12px">Qty</th><th style="text-align:right;padding:10px 12px">Price</th><th style="text-align:right;padding:10px 12px">Total</th></tr></thead>
