@@ -21,9 +21,17 @@
       <a href="/">← Back to Store</a>
     </aside>
     <main class="admin-content">
-      <h1>Customers</h1>
-      <div class="form-group" style="max-width:300px;margin-bottom:16px">
-        <input type="text" id="searchCustomers" placeholder="Search by name or email" style="width:100%">
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Customers</h1>
+          <p class="admin-lead">Registered accounts and contact details.</p>
+        </div>
+      </header>
+      <div class="admin-toolbar">
+        <div class="admin-toolbar__field admin-toolbar__field--grow" style="max-width:360px">
+          <label for="searchCustomers">Search</label>
+          <input type="text" id="searchCustomers" placeholder="Name or email">
+        </div>
       </div>
       <div id="customers"></div>
     </main>
@@ -34,26 +42,36 @@
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/customers.html');
 
+    function escapeAttr(s) {
+      const el = document.createElement('div');
+      el.textContent = s ?? '';
+      return el.innerHTML;
+    }
+
     async function loadCustomers(search = '') {
       try {
         const data = await callApi('/admin/customers?search=' + encodeURIComponent(search));
         const items = data.items || [];
         document.getElementById('customers').innerHTML = `
+          <div class="admin-table-wrap">
           <table class="table">
-            <tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Registered</th></tr>
-            ${items.map(c => `
+            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Registered</th></tr></thead>
+            <tbody>
+            ${items.length ? items.map(c => `
               <tr>
                 <td>${c.id}</td>
-                <td>${c.first_name} ${c.last_name}</td>
-                <td>${c.email}</td>
-                <td>${c.phone || '-'}</td>
+                <td><strong>${escapeAttr(c.first_name)} ${escapeAttr(c.last_name)}</strong></td>
+                <td>${escapeAttr(c.email)}</td>
+                <td>${escapeAttr(c.phone || '-')}</td>
                 <td>${new Date(c.created_at).toLocaleDateString()}</td>
               </tr>
-            `).join('')}
+            `).join('') : '<tr><td colspan="5" class="admin-empty">No customers found.</td></tr>'}
+            </tbody>
           </table>
+          </div>
         `;
       } catch (err) {
-        document.getElementById('customers').innerHTML = '<p>Failed to load customers.</p>';
+        document.getElementById('customers').innerHTML = '<p class="admin-empty">Failed to load customers.</p>';
       }
     }
 

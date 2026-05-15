@@ -21,16 +21,23 @@
       <a href="/">← Back to Store</a>
     </aside>
     <main class="admin-content">
-      <h1>Orders</h1>
-      <div id="ordersMessage" style="display:none;padding:10px 12px;border-radius:6px;margin-bottom:12px"></div>
-      <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
-        <div class="form-group" style="max-width:300px;margin:0">
-          <label for="searchOrders" style="display:block;font-size:13px;margin-bottom:6px;color:var(--text-muted)">Search</label>
-          <input type="text" id="searchOrders" placeholder="Order # or email" style="width:100%">
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Orders</h1>
+          <p class="admin-lead">Search, filter, and update order fulfillment status.</p>
         </div>
-        <div class="form-group" style="max-width:200px;margin:0">
-          <label for="statusFilter" style="display:block;font-size:13px;margin-bottom:6px;color:var(--text-muted)">Status</label>
-          <select id="statusFilter" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+      </header>
+
+      <div id="ordersMessage" class="admin-flash" role="status"></div>
+
+      <div class="admin-toolbar">
+        <div class="admin-toolbar__field" style="min-width:220px;max-width:300px">
+          <label for="searchOrders">Search</label>
+          <input type="text" id="searchOrders" placeholder="Order # or email">
+        </div>
+        <div class="admin-toolbar__field" style="min-width:180px;max-width:220px">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter">
             <option value="pending,processing" selected>Pending &amp; Processing</option>
             <option value="all">All statuses</option>
             <option value="pending">Pending</option>
@@ -41,17 +48,24 @@
           </select>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-        <select id="bulkStatus" aria-label="Bulk status">
-          <option value="">Update selected to...</option>
-          <option value="pending">Pending</option>
-          <option value="processing">Processing</option>
-          <option value="shipped">Shipped</option>
-          <option value="delivered">Delivered</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <button id="applyBulkStatus" class="btn" style="max-width:220px">Apply to selected orders</button>
+
+      <div class="admin-toolbar admin-toolbar--compact">
+        <div class="admin-toolbar__row">
+          <div class="admin-toolbar__field" style="min-width:200px;max-width:260px">
+            <label for="bulkStatus">Bulk update</label>
+            <select id="bulkStatus" aria-label="Bulk status">
+              <option value="">Update selected to...</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <button id="applyBulkStatus" class="btn btn-sm" type="button">Apply to selected</button>
+        </div>
       </div>
+
       <div id="orders"></div>
     </main>
   </div>
@@ -65,13 +79,11 @@
       const el = document.getElementById('ordersMessage');
       if (!el) return;
       el.textContent = message;
-      el.style.display = 'block';
-      el.style.background = isError ? '#fee2e2' : '#dcfce7';
-      el.style.color = isError ? '#991b1b' : '#166534';
+      el.className = 'admin-flash is-visible ' + (isError ? 'admin-flash--error' : 'admin-flash--success');
       if (!isError) {
         clearTimeout(window.ordersMessageTimeout);
         window.ordersMessageTimeout = setTimeout(() => {
-          el.style.display = 'none';
+          el.classList.remove('is-visible');
         }, 2500);
       }
     }
@@ -91,22 +103,27 @@
         await loadBrandSettings();
         const data = await callApi('/admin/orders' + ordersListQueryString());
         const items = data.items || [];
+        const badge = (s) => (typeof adminStatusBadge === 'function' ? adminStatusBadge(s) : s);
         document.getElementById('orders').innerHTML = `
+          <div class="admin-table-wrap">
           <table class="table">
-            <tr><th><input type="checkbox" id="selectAllOrders" aria-label="Select all orders"></th><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr>
-            ${items.map(o => `
+            <thead><tr><th><input type="checkbox" id="selectAllOrders" aria-label="Select all orders"></th><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th><th>Payment</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody>
+            ${items.length ? items.map(o => `
               <tr data-order-id="${o.id}">
                 <td><input type="checkbox" class="order-select" value="${o.id}" aria-label="Select order ${o.order_number}"></td>
-                <td>${o.order_number}</td>
+                <td><strong>${o.order_number}</strong></td>
                 <td>${o.guest_email || o.user_email || '-'}</td>
                 <td>${formatStoreMoney(o.total_amount)}</td>
-                <td class="order-status">${o.status}</td>
+                <td class="order-status">${badge(o.status)}</td>
                 <td>${o.payment_method === 'pay_on_delivery' ? 'On delivery' : 'Card'} · ${o.payment_status}</td>
                 <td>${new Date(o.created_at).toLocaleDateString()}</td>
-                <td><a href="/admin/order.html?id=${o.id}" style="color:var(--primary)">View</a></td>
+                <td class="col-actions"><a href="/admin/order.html?id=${o.id}" class="admin-link">View</a></td>
               </tr>
-            `).join('')}
+            `).join('') : '<tr><td colspan="8" class="admin-empty">No orders match your filters.</td></tr>'}
+            </tbody>
           </table>
+          </div>
         `;
         document.getElementById('selectAllOrders')?.addEventListener('change', (e) => {
           document.querySelectorAll('.order-select').forEach((cb) => {
@@ -114,7 +131,7 @@
           });
         });
       } catch (err) {
-        document.getElementById('orders').innerHTML = '<p>Failed to load orders.</p>';
+        document.getElementById('orders').innerHTML = '<p class="admin-empty">Failed to load orders.</p>';
       }
     }
 
@@ -131,7 +148,7 @@
       }
 
       const button = document.getElementById('applyBulkStatus');
-      const originalText = button?.textContent || 'Apply to selected orders';
+      const originalText = button?.textContent || 'Apply to selected';
       if (button) {
         button.disabled = true;
         button.textContent = 'Updating...';
@@ -145,7 +162,9 @@
         const updatedOrders = result.orders || [];
         for (const order of updatedOrders) {
           const row = document.querySelector(`tr[data-order-id="${order.id}"]`);
-          row?.querySelector('.order-status')?.replaceChildren(document.createTextNode(order.status));
+          const cell = row?.querySelector('.order-status');
+          if (cell && typeof adminStatusBadge === 'function') cell.innerHTML = adminStatusBadge(order.status);
+          else cell?.replaceChildren(document.createTextNode(order.status));
         }
         showOrdersMessage(`Updated ${updatedOrders.length} order${updatedOrders.length === 1 ? '' : 's'} to "${status}".`);
         await loadOrders();

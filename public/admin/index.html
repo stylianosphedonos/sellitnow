@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - 3nitylab</title>
+  <title>Dashboard - Admin - 3nitylab</title>
   <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -18,11 +18,41 @@
       <a href="/admin/brand.html">Brand</a>
       <a href="/admin/settings.html">Settings</a>
       <a href="/admin/user-management.html">User Management</a>
-      <a href="/" style="margin-top:20px">← Back to Store</a>
+      <a href="/">← Back to Store</a>
     </aside>
     <main class="admin-content">
-      <h1>Dashboard</h1>
-      <p>Welcome to 3nitylab Admin. Use the sidebar to manage products, orders, and customers.</p>
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Dashboard</h1>
+          <p class="admin-lead">Manage your store catalog, orders, and configuration from one place.</p>
+        </div>
+      </header>
+      <nav class="admin-dashboard-grid" aria-label="Quick links">
+        <a href="/admin/products.html" class="admin-dash-card">
+          <span class="admin-dash-card__title">Products</span>
+          <span class="admin-dash-card__desc">Add, edit, and organize your catalog</span>
+        </a>
+        <a href="/admin/categories.html" class="admin-dash-card">
+          <span class="admin-dash-card__title">Categories</span>
+          <span class="admin-dash-card__desc">Group products for the storefront</span>
+        </a>
+        <a href="/admin/orders.html" class="admin-dash-card">
+          <span class="admin-dash-card__title">Orders</span>
+          <span class="admin-dash-card__desc">Review and update order status</span>
+        </a>
+        <a href="/admin/customers.html" class="admin-dash-card">
+          <span class="admin-dash-card__title">Customers</span>
+          <span class="admin-dash-card__desc">View registered customer accounts</span>
+        </a>
+        <a href="/admin/brand.html" class="admin-dash-card">
+          <span class="admin-dash-card__title">Brand</span>
+          <span class="admin-dash-card__desc">Logo, colors, and homepage hero</span>
+        </a>
+        <a href="/admin/settings.html" class="admin-dash-card">
+          <span class="admin-dash-card__title">Settings</span>
+          <span class="admin-dash-card__desc">Email, currency, tax, and delivery</span>
+        </a>
+      </nav>
     </main>
   </div>
   <script src="/js/runtime-config.js"></script>

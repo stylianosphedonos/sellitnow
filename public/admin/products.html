@@ -21,19 +21,26 @@
       <a href="/">← Back to Store</a>
     </aside>
     <main class="admin-content">
-      <h1>Products</h1>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:16px">
-        <button class="btn" style="max-width:150px" type="button" onclick="showProductForm('simple')">Add Product</button>
-        <button class="btn btn-secondary" style="max-width:170px" type="button" onclick="showProductForm('bundle')">Create Offer</button>
-        <div class="form-group" style="margin:0;min-width:220px;flex:1;max-width:420px">
-          <label for="productSearchTitle" style="display:block;margin-bottom:6px;font-size:14px">Search by title</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="search" id="productSearchTitle" placeholder="e.g. headphones" autocomplete="off" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
-            <button type="button" class="btn" id="productSearchBtn" style="max-width:120px;white-space:nowrap">Search</button>
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Products</h1>
+          <p class="admin-lead">Manage catalog items, offers, and inventory.</p>
+        </div>
+        <div class="admin-page-head__actions">
+          <button class="btn" type="button" onclick="showProductForm('simple')">Add Product</button>
+          <button class="btn btn-outline" type="button" onclick="showProductForm('bundle')">Create Offer</button>
+        </div>
+      </header>
+      <div class="admin-toolbar">
+        <div class="admin-toolbar__field admin-toolbar__field--grow">
+          <label for="productSearchTitle">Search by title</label>
+          <div class="admin-search-row">
+            <input type="search" id="productSearchTitle" placeholder="e.g. headphones" autocomplete="off">
+            <button type="button" class="btn btn-sm" id="productSearchBtn">Search</button>
           </div>
         </div>
       </div>
-      <div id="productForm" style="display:none;background:white;padding:24px;border-radius:8px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+      <div id="productForm" class="admin-panel">
         <h3>New Product</h3>
         <form id="addProduct">
           <div class="form-group">
@@ -114,7 +121,7 @@
 
     function showProductForm(type) {
       const formWrap = document.getElementById('productForm');
-      formWrap.style.display = 'block';
+      formWrap.classList.add('is-open');
       const typeSelect = document.getElementById('createProductType');
       if (typeSelect) typeSelect.value = type === 'bundle' ? 'bundle' : 'simple';
       syncCreateBundleUi();
@@ -178,29 +185,34 @@
         const data = await callApi('/admin/products?' + qs.toString(), { cache: 'no-store' });
         const items = data.items || [];
         const hint = q
-          ? `<p style="margin:0 0 12px;font-size:14px;color:var(--text-muted)">${items.length ? `Showing ${items.length} of ${data.total} matching “${escapeAttr(q)}”.` : `No products match “${escapeAttr(q)}”.`} <button type="button" class="btn btn-secondary" style="margin-left:8px;padding:4px 10px;font-size:12px" id="productSearchClear">Clear search</button></p>`
+          ? `<p class="admin-hint">${items.length ? `Showing ${items.length} of ${data.total} matching “${escapeAttr(q)}”.` : `No products match “${escapeAttr(q)}”.`} <button type="button" class="btn btn-sm btn-secondary" id="productSearchClear">Clear search</button></p>`
           : '';
+        const badge = (s) => (typeof adminStatusBadge === 'function' ? adminStatusBadge(s) : escapeAttr(s));
         document.getElementById('products').innerHTML = hint + `
+          <div class="admin-table-wrap">
           <table class="table">
-            <tr><th>ID</th><th>Order</th><th>Title</th><th>Type</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr>
+            <thead><tr><th>ID</th><th>Order</th><th>Title</th><th>Type</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
             ${items.length ? items.map(p => `
               <tr>
                 <td>${p.id}</td>
                 <td>${p.display_order ?? '-'}</td>
-                <td>${p.title}</td>
+                <td><strong>${escapeAttr(p.title)}</strong></td>
                 <td>${p.product_type === 'bundle' ? 'Offer' : 'Product'}</td>
                 <td>${formatStoreMoney(p.price)}</td>
                 <td>${p.stock_quantity}</td>
-                <td>${p.status}</td>
-                <td style="white-space:nowrap">
-                  <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <button type="button" class="btn" style="padding:6px 12px;font-size:12px;width:auto" onclick="editProduct(${p.id})">Edit</button>
-                    <button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;width:auto;margin-top:0;background:#b91c1c" onclick="deleteProduct(${p.id})">Delete</button>
+                <td>${badge(p.status)}</td>
+                <td class="col-actions">
+                  <div class="admin-btn-group">
+                    <button type="button" class="btn btn-sm" onclick="editProduct(${p.id})">Edit</button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Delete</button>
                   </div>
                 </td>
               </tr>
-            `).join('') : '<tr><td colspan="8" style="padding:16px;color:var(--text-muted)">No products to show.</td></tr>'}
+            `).join('') : '<tr><td colspan="8" class="admin-empty">No products to show.</td></tr>'}
+            </tbody>
           </table>
+          </div>
         `;
         document.getElementById('productSearchClear')?.addEventListener('click', () => {
           const inp = document.getElementById('productSearchTitle');
@@ -274,7 +286,7 @@
         form.reset();
         createBundleItems = [];
         syncCreateBundleUi();
-        document.getElementById('productForm').style.display = 'none';
+        document.getElementById('productForm').classList.remove('is-open');
         loadProducts();
       } catch (err) {
         alert(err.message);

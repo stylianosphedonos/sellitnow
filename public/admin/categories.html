@@ -21,9 +21,16 @@
       <a href="/">← Back to Store</a>
     </aside>
     <main class="admin-content">
-      <h1>Categories</h1>
-      <button class="btn" style="max-width:150px;margin-bottom:16px" onclick="document.getElementById('categoryForm').style.display='block'">Add Category</button>
-      <div id="categoryForm" style="display:none;background:white;padding:24px;border-radius:8px;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Categories</h1>
+          <p class="admin-lead">Organize products for browsing on your storefront.</p>
+        </div>
+        <div class="admin-page-head__actions">
+          <button class="btn" type="button" onclick="document.getElementById('categoryForm').classList.add('is-open')">Add Category</button>
+        </div>
+      </header>
+      <div id="categoryForm" class="admin-panel">
         <h3>New Category</h3>
         <form id="addCategory">
           <div class="form-group">
@@ -36,7 +43,7 @@
           </div>
           <div class="form-group">
             <label>Description</label>
-            <textarea name="description" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px"></textarea>
+            <textarea name="description" rows="3"></textarea>
           </div>
           <div class="form-group">
             <label>Order number (optional)</label>
@@ -45,7 +52,7 @@
           <div class="form-group">
             <label>Category image</label>
             <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
-            <small style="color:#666">JPEG, PNG, WebP or GIF. Max 5MB.</small>
+            <small>JPEG, PNG, WebP or GIF. Max 5MB.</small>
           </div>
           <button type="submit" class="btn">Create Category</button>
         </form>
@@ -59,26 +66,38 @@
   <script>
     if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/categories.html');
 
+    function escapeAttr(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
     async function loadCategories() {
       try {
         const { categories } = await callApi('/categories?_=' + Date.now(), { cache: 'no-store' });
         document.getElementById('categories').innerHTML = `
+          <div class="admin-table-wrap">
           <table class="table">
-            <tr><th>ID</th><th>Order</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr>
+            <thead><tr><th>ID</th><th>Order</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
+            <tbody>
             ${(categories || []).map(c => `
               <tr>
                 <td>${c.id}</td>
                 <td>${c.display_order ?? '-'}</td>
-                <td>${c.name}</td>
-                <td>${c.slug}</td>
-                <td>${(c.description || '').slice(0, 50)}</td>
-                <td><button class="btn" style="padding:6px 12px;font-size:12px" onclick="editCategory(${c.id})">Edit</button></td>
+                <td><strong>${escapeAttr(c.name)}</strong></td>
+                <td>${escapeAttr(c.slug)}</td>
+                <td>${escapeAttr((c.description || '').slice(0, 50))}</td>
+                <td class="col-actions">
+                  <button class="btn btn-sm" type="button" onclick="editCategory(${c.id})">Edit</button>
+                </td>
               </tr>
             `).join('')}
+            </tbody>
           </table>
+          </div>
         `;
       } catch (err) {
-        document.getElementById('categories').innerHTML = '<p>Failed to load categories. Make sure you are logged in as admin.</p>';
+        document.getElementById('categories').innerHTML = '<p class="admin-empty">Failed to load categories. Make sure you are logged in as admin.</p>';
       }
     }
 
@@ -108,7 +127,7 @@
           if (!imgRes.ok) throw new Error(imgData.error || 'Failed to upload image');
         }
         form.reset();
-        document.getElementById('categoryForm').style.display = 'none';
+        document.getElementById('categoryForm').classList.remove('is-open');
         loadCategories();
       } catch (err) {
         alert(err.message);
