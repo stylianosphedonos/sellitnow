@@ -206,6 +206,12 @@
           preferApplePay: payChoice === 'apple_pay',
           shippingCountry: orderShippingCountry(data.order),
         };
+        if (createdOrder.guest_order_token) {
+          sessionStorage.setItem(
+            'guest_order_token_' + createdOrder.id,
+            createdOrder.guest_order_token
+          );
+        }
 
         document.getElementById('stepShipping').style.display = 'none';
         document.getElementById('stepPayment').style.display = 'block';
@@ -247,6 +253,24 @@
         if (introEl) introEl.textContent = text;
       }
 
+      async function syncPaymentWithServer(paymentIntentId) {
+        if (!createdOrder?.id || !paymentIntentId) return;
+        const headers = {};
+        const payload = {
+          order_id: createdOrder.id,
+          payment_intent_id: paymentIntentId,
+        };
+        if (createdOrder.guest_order_token) {
+          headers['X-Guest-Order-Token'] = createdOrder.guest_order_token;
+          payload.guest_token = createdOrder.guest_order_token;
+        }
+        await callApi('/payments/confirm', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+      }
+
       function bindCardFormSubmit(stripe, elements) {
         paymentForm.onsubmit = async (e) => {
           e.preventDefault();
@@ -262,7 +286,7 @@
             return;
           }
 
-          const { error } = await stripe.confirmPayment({
+          const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
             confirmParams: { return_url: returnUrl },
             redirect: 'if_required',
@@ -273,6 +297,16 @@
             messageEl.style.display = 'block';
             payBtn.disabled = false;
             return;
+          }
+          if (
+            paymentIntent?.id &&
+            (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')
+          ) {
+            try {
+              await syncPaymentWithServer(paymentIntent.id);
+            } catch (syncErr) {
+              console.warn('[checkout] Could not sync payment status:', syncErr);
+            }
           }
           window.location.assign(returnUrl);
         };
@@ -384,6 +418,11 @@
               }
               if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
                 ev.complete('success');
+                try {
+                  await syncPaymentWithServer(paymentIntent.id);
+                } catch (syncErr) {
+                  console.warn('[checkout] Could not sync payment status:', syncErr);
+                }
                 window.location.assign(returnUrl);
                 return;
               }

@@ -207,6 +207,23 @@ paymentsRouter.post('/create-intent', async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+paymentsRouter.post('/confirm', async (req, res) => {
+  try {
+    const { order_id, order_number, payment_intent_id, guest_token } = req.body;
+    const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
+    const orderRef = order_id ?? order_number;
+    if (!orderRef || !payment_intent_id) {
+      return res.status(400).json({ error: 'order_id/order_number and payment_intent_id required' });
+    }
+    const result = await PaymentService.confirmPaymentIntent(orderRef, payment_intent_id, {
+      userId: req.user?.id || null,
+      guestToken: guestHeaderToken || guest_token || null,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 app.use('/api/v1/payments', paymentsRouter);
 
 app.get('/health', (req, res) => {

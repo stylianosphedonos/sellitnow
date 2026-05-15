@@ -171,6 +171,47 @@ class PaymentService {
   }
 
   /**
+   * Mark order paid after client-side PaymentIntent confirmation (backup when webhook is delayed/missing).
+   */
+  async confirmPaymentIntent(orderRef, paymentIntentId, actor = {}) {
+    if (!stripe) throw new Error('Stripe is not configured');
+    const piId = String(paymentIntentId || '').trim();
+    if (!piId) throw new Error('payment_intent_id is required');
+
+    const order = Number.isInteger(Number(orderRef))
+      ? await OrderService.getById(Number(orderRef))
+      : await OrderService.getOrderByNumber(orderRef);
+    if (!order) throw new Error('Order not found');
+    this.assertOrderAccess(order, actor);
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(piId);
+    const metaOrderId = parseInt(paymentIntent.metadata?.order_id, 10);
+    if (!metaOrderId || metaOrderId !== Number(order.id)) {
+      throw new Error('Payment does not match this order');
+    }
+
+    if (paymentIntent.status === 'succeeded') {
+      const amount =
+        paymentIntent.amount_received != null
+          ? paymentIntent.amount_received / 100
+          : order.total_amount;
+      await this.handlePaymentSuccess(order.id, paymentIntent.id, amount);
+      return { payment_status: 'paid', order_id: order.id, order_number: order.order_number };
+    }
+
+    if (paymentIntent.status === 'processing') {
+      return {
+        payment_status: 'pending',
+        order_id: order.id,
+        order_number: order.order_number,
+        message: 'Payment is processing. Status will update when Stripe confirms.',
+      };
+    }
+
+    throw new Error(`Payment is not complete (status: ${paymentIntent.status})`);
+  }
+
+  /**
    * Handle Stripe webhook
    */
   async handleWebhook(payload, signature) {

@@ -27,9 +27,34 @@
     </div>
   </main>
 
+  <script src="/js/runtime-config.js"></script>
+  <script src="/js/app.js"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const redirectStatus = params.get('redirect_status');
+    const orderId = params.get('id');
+    const paymentIntentId = params.get('payment_intent');
+
+    async function syncPaymentAfterRedirect() {
+      if (!orderId || !paymentIntentId || redirectStatus !== 'succeeded') return;
+      const guestToken = sessionStorage.getItem('guest_order_token_' + orderId);
+      const headers = {};
+      const body = { order_id: orderId, payment_intent_id: paymentIntentId };
+      if (guestToken) {
+        headers['X-Guest-Order-Token'] = guestToken;
+        body.guest_token = guestToken;
+      }
+      try {
+        await callApi('/payments/confirm', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        });
+      } catch (err) {
+        console.warn('[order-confirm] Payment sync:', err.message || err);
+      }
+    }
+
     if (redirectStatus === 'failed') {
       document.querySelector('h1').textContent = 'Payment failed';
       document.querySelector('h1').style.color = '#c00';
@@ -37,10 +62,11 @@
       document.querySelector('.btn').href = '/cart.html';
       document.querySelector('.btn').textContent = 'Back to cart';
     } else {
-      document.getElementById('orderNumber').textContent = 'Order #' + (params.get('number') || params.get('id') || '');
+      document.getElementById('orderNumber').textContent = 'Order #' + (params.get('number') || orderId || '');
       if (params.get('payment') === 'delivery') {
         document.getElementById('podPaymentNote').style.display = 'block';
       }
+      syncPaymentAfterRedirect();
     }
   </script>
 </body>
