@@ -46,24 +46,48 @@ function defaultTaxPercentFromConfig() {
   return Math.round(v * 10000) / 100;
 }
 
-/** Loose validation for nodemailer "from" (email or "Name <email>") */
+/** Extract bare email from "Name <email>" or plain address. */
+function parseEmailAddress(from) {
+  const s = String(from || '').trim();
+  if (!s) return null;
+  const angle = s.match(/^(.+)<([^>]+)>$/);
+  const addr = angle ? angle[2].trim() : s;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr) ? addr : null;
+}
+
+/** Nodemailer From with display name (e.g. 3nityLab <support@3nitylab.com>). */
+function formatOutboundFrom(raw) {
+  const displayName = String(config.email.businessName || '3nityLab').trim() || '3nityLab';
+  const addr =
+    parseEmailAddress(raw) ||
+    parseEmailAddress(config.email.from) ||
+    parseEmailAddress(config.email.supportEmail);
+  if (!addr) return config.email.from;
+  const safeName =
+    displayName.includes('"') || displayName.includes(',')
+      ? `"${displayName.replace(/"/g, '\\"')}"`
+      : displayName;
+  return `${safeName} <${addr}>`;
+}
+
+/** Validate address; stored/sent as "3nityLab <email>". */
 function normalizeEmailFromInput(raw) {
   if (raw == null) return null;
   const s = String(raw).trim();
   if (!s) return null;
-  const angle = s.match(/^(.+)<([^>]+)>$/);
-  const addrPart = angle ? angle[2].trim() : s;
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addrPart)) {
-    throw new Error('Sender email must be a valid address (e.g. orders@yourstore.com or Shop <orders@yourstore.com>)');
+  const addrPart = parseEmailAddress(s);
+  if (!addrPart) {
+    throw new Error('Enter a valid email address (e.g. support@3nitylab.com)');
   }
-  return s;
+  return formatOutboundFrom(addrPart);
 }
 
 /** Resolved From: admin-configured sender, else EMAIL_FROM env. */
 async function getOutboundEmailFrom() {
   const s = await getBrandSettings();
-  if (s.emailFrom && String(s.emailFrom).trim()) return String(s.emailFrom).trim();
-  return config.email.from;
+  const raw =
+    s.emailFrom && String(s.emailFrom).trim() ? String(s.emailFrom).trim() : config.email.from;
+  return formatOutboundFrom(raw);
 }
 
 function smtpEnvHostSet() {
@@ -206,6 +230,8 @@ module.exports.getOutboundEmailFrom = getOutboundEmailFrom;
 module.exports.getEffectiveSmtpConfig = getEffectiveSmtpConfig;
 module.exports.smtpEnvHostSet = smtpEnvHostSet;
 module.exports.normalizeEmailFromInput = normalizeEmailFromInput;
+module.exports.formatOutboundFrom = formatOutboundFrom;
+module.exports.parseEmailAddress = parseEmailAddress;
 module.exports.DEFAULTS = DEFAULTS;
 module.exports.normalizeCurrency = normalizeCurrency;
 module.exports.defaultDeliveryCostFromStored = defaultDeliveryCostFromStored;

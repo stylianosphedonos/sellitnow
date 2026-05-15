@@ -36,9 +36,9 @@
           <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;line-height:1.5">This is where you set the <strong>From</strong> address customers see on order emails, password resets, and admin notifications. It must be an address your mail provider allows (often the same mailbox as <code style="font-size:12px">SMTP_USER</code> on the server).</p>
           <div style="display:grid;gap:20px;max-width:520px">
             <div class="form-group">
-              <label for="senderEmailFrom">From email (displayed to customers)</label>
-              <input type="text" id="senderEmailFrom" autocomplete="off" placeholder="Your Shop &lt;orders@yourdomain.com&gt;" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
-              <small style="color:var(--text-muted);display:block;margin-top:8px;line-height:1.45">Examples: <code style="font-size:12px">orders@company.com</code> or <code style="font-size:12px">My Store &lt;sales@company.com&gt;</code>. Leave blank and save to use the server default <code style="font-size:12px">EMAIL_FROM</code>.</small>
+              <label for="senderEmailFrom">Sender mailbox</label>
+              <input type="text" id="senderEmailFrom" autocomplete="off" placeholder="support@3nitylab.com" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+              <small style="color:var(--text-muted);display:block;margin-top:8px;line-height:1.45">Customers see the sender name <strong>3nityLab</strong> (not the email address). Enter only the mailbox, e.g. <code style="font-size:12px">support@3nitylab.com</code>. Leave blank to use the server default <code style="font-size:12px">EMAIL_FROM</code>.</small>
             </div>
           </div>
           <button type="button" id="saveSenderEmail" class="btn" style="margin-top:8px;max-width:240px">Save from email</button>
@@ -246,7 +246,11 @@
           taxEl.value = data.taxRatePercent;
         }
         const fromEl = document.getElementById('senderEmailFrom');
-        if (fromEl) fromEl.value = data.emailFrom != null && data.emailFrom !== '' ? data.emailFrom : '';
+        if (fromEl) {
+          const raw = data.emailFrom != null && data.emailFrom !== '' ? String(data.emailFrom) : '';
+          const m = raw.match(/<([^>]+)>/);
+          fromEl.value = m ? m[1].trim() : raw.trim();
+        }
         const delEl = document.getElementById('defaultDeliveryCost');
         if (delEl) {
           const v = data.defaultDeliveryCost;
