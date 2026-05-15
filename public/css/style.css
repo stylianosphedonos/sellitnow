@@ -125,27 +125,55 @@ body {
   margin-left: 4px;
 }
 
-/* Hero */
+/* Hero — banner width matches .main (1200px + 20px side padding) */
 .hero {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  background: var(--bg);
   color: var(--white);
   text-align: center;
-  padding: clamp(32px, 6vw, 56px) 20px;
+  padding: 20px 0 0;
+  box-sizing: border-box;
+}
+
+.hero:not(.hero--has-image) {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  padding: clamp(32px, 6vw, 56px) 0;
+}
+
+.hero__frame {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  width: 100%;
+  position: relative;
   min-height: clamp(200px, 28vw, 380px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.hero:not(.hero--has-image) .hero__frame {
+  min-height: 0;
+}
+
+.hero__banner {
+  display: none;
+}
+
+.hero--has-image .hero__banner {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  box-sizing: border-box;
-  position: relative;
-  overflow: hidden;
 }
 
 /* Banner photo: full image visible (letterbox uses brand gradient from stacked layers in JS) */
-.hero.hero--has-image {
+.hero--has-image .hero__banner {
   background-size: 100% 100%, contain, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -156,6 +184,11 @@ body {
   z-index: 1;
   max-width: 40rem;
   margin: 0 auto;
+  padding: clamp(32px, 6vw, 56px) 8px;
+  width: 100%;
+}
+
+.hero:not(.hero--has-image) .hero__inner {
   padding: 0 8px;
 }
 

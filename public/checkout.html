@@ -86,7 +86,6 @@
 
         <div id="stepPayment" class="checkout-card" style="display:none;max-width:640px">
           <h2 style="margin-top:0;font-size:18px">Payment</h2>
-          <div id="stockWarningBanner" class="alert alert-warning" style="display:none;margin-bottom:16px" role="status"></div>
           <div id="paymentOrderBanner"></div>
           <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete payment below. Items and options are fixed for this order.</p>
           <div id="apple-wallet-checkout" style="display:none;margin-bottom:16px">
@@ -203,7 +202,6 @@
           order_number: data.order.order_number,
           total_amount: data.order.total_amount,
           guest_order_token: data.guest_order_token || null,
-          stock_warning: data.order.stock_warning || null,
           payment_method: data.order.payment_method || 'card',
           preferApplePay: payChoice === 'apple_pay',
           shippingCountry: orderShippingCountry(data.order),
@@ -211,14 +209,6 @@
 
         document.getElementById('stepShipping').style.display = 'none';
         document.getElementById('stepPayment').style.display = 'block';
-        const stockBanner = document.getElementById('stockWarningBanner');
-        if (createdOrder.stock_warning) {
-          stockBanner.textContent = createdOrder.stock_warning;
-          stockBanner.style.display = 'block';
-        } else {
-          stockBanner.textContent = '';
-          stockBanner.style.display = 'none';
-        }
         document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(
           createdOrder.order_number,
           createdOrder.total_amount

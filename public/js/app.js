@@ -58,8 +58,9 @@ function parseHeroBannerOverlay(data) {
 function applyHeroBannerBackground(data) {
   const hero = document.querySelector('.hero');
   if (!hero) return;
+  const bannerEl = hero.querySelector('.hero__banner');
   const banner = data && data.banner;
-  if (banner) {
+  if (banner && bannerEl) {
     const b = mediaUrl(banner);
     const overlay = parseHeroBannerOverlay(data);
     hero.classList.add('hero--has-image');
@@ -67,14 +68,14 @@ function applyHeroBannerBackground(data) {
       overlay > 0
         ? `linear-gradient(135deg, rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay}))`
         : 'linear-gradient(135deg, transparent, transparent)';
-    hero.style.backgroundImage = [
+    bannerEl.style.backgroundImage = [
       topLayer,
       `url(${JSON.stringify(b)})`,
       'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
     ].join(', ');
   } else {
     hero.classList.remove('hero--has-image');
-    hero.style.backgroundImage = '';
+    if (bannerEl) bannerEl.style.backgroundImage = '';
   }
 }
 
