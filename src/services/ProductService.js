@@ -441,6 +441,10 @@ class ProductService {
     const sku = this.normalizeSku(rawSku) || this.generateFallbackSku(title);
     const description = data.description !== undefined ? data.description : product.description;
     const price = data.price !== undefined && data.price !== null ? data.price : product.price;
+    const productType =
+      data.product_type !== undefined && data.product_type !== null
+        ? this.normalizeProductType(data.product_type)
+        : (product.product_type || 'simple');
     let stock_quantity = data.stock_quantity !== undefined && data.stock_quantity !== null ? data.stock_quantity : product.stock_quantity;
     if (productType === 'bundle') {
       stock_quantity = 0;
@@ -458,10 +462,6 @@ class ProductService {
     )];
     const category_id = normalizedCategoryIds.length ? normalizedCategoryIds[0] : null;
     const status = data.status !== undefined && data.status !== null ? data.status : product.status;
-    const productType =
-      data.product_type !== undefined && data.product_type !== null
-        ? this.normalizeProductType(data.product_type)
-        : (product.product_type || 'simple');
 
     let delivery_cost = product.delivery_cost;
     if (data.delivery_cost !== undefined) {
