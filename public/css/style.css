@@ -999,6 +999,104 @@ button.category-card:focus-visible {
   color: var(--white);
 }
 
+/* Admin order — resend payment receipt feedback */
+.resend-receipt-panel {
+  margin-top: 20px;
+  padding: 18px 20px;
+  background: #f0f9ff;
+  border-radius: 10px;
+  border: 2px solid #bae6fd;
+  max-width: 560px;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.resend-receipt-panel.is-sending {
+  border-color: #0284c7;
+  background: #e0f2fe;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+}
+
+.resend-receipt-panel.is-success {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.resend-receipt-panel.is-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.resend-receipt-status {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #fff;
+  border: 2px dashed #cbd5e1;
+  min-height: 56px;
+}
+
+.resend-receipt-status__label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.resend-receipt-status__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+.resend-receipt-status.is-sending .resend-receipt-status__text {
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.resend-receipt-status.is-success {
+  border-style: solid;
+  border-color: #86efac;
+  background: #ecfdf5;
+}
+
+.resend-receipt-status.is-success .resend-receipt-status__text {
+  color: #166534;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.resend-receipt-status.is-error {
+  border-style: solid;
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.resend-receipt-status.is-error .resend-receipt-status__text {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+#resendReceiptBtn.is-sending {
+  background: #0284c7 !important;
+  border-color: #0369a1 !important;
+  cursor: wait;
+}
+
+#resendReceiptBtn.is-success {
+  background: #16a34a !important;
+  border-color: #15803d !important;
+}
+
+#resendReceiptBtn.is-error {
+  background: #dc2626 !important;
+  border-color: #b91c1c !important;
+}
+
 .admin-btn-group {
   display: inline-flex;
   flex-wrap: wrap;

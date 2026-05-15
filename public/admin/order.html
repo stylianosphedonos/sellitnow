@@ -86,17 +86,17 @@
           ${
             order.payment_method !== 'pay_on_delivery'
               ? `
-          <div style="margin-top:20px;padding:18px 20px;background:#f0f9ff;border-radius:10px;border:1px solid #bae6fd;max-width:560px">
+          <div id="resendReceiptPanel" class="resend-receipt-panel">
             <h3 style="margin:0 0 10px;font-size:16px">Payment receipt email</h3>
             <p style="margin:0 0 8px;font-size:14px;color:#334155"><strong>To:</strong> ${esc(order.guest_email || order.user_email || '—')}</p>
-            <p style="margin:0 0 14px;font-size:13px;color:#64748b;line-height:1.5">Resend the automatic receipt sent after card payment (items, total, transaction reference).</p>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-              <button type="button" class="btn" id="resendReceiptBtn" style="max-width:260px;transition:background 0.2s,border-color 0.2s"${
+            <p style="margin:0 0 14px;font-size:13px;color:#64748b;line-height:1.5">Resend the payment receipt. The <strong>Send status</strong> box below updates the moment you click.</p>
+            <button type="button" class="btn" id="resendReceiptBtn" style="max-width:280px"${
               order.payment_status !== 'paid' ? ' disabled title="Order must be paid first"' : ''
             }>Resend payment receipt</button>
-              <span id="resendReceiptSpinner" style="display:none;font-size:14px;color:#0369a1">Sending…</span>
+            <div id="resendReceiptStatus" class="resend-receipt-status" role="status" aria-live="assertive" aria-atomic="true">
+              <p class="resend-receipt-status__label">Send status</p>
+              <p id="resendReceiptStatusText" class="resend-receipt-status__text">Ready — click the button when payment is paid.</p>
             </div>
-            <div id="resendReceiptFeedback" role="status" aria-live="polite" style="display:none;margin-top:12px;padding:12px 14px;border-radius:8px;font-size:14px;line-height:1.5"></div>
             ${
               order.payment_status !== 'paid'
                 ? '<p style="margin:10px 0 0;font-size:12px;color:#b45309">Receipt can be sent after payment status is <strong>paid</strong> (Stripe webhook or successful checkout).</p>'
@@ -168,73 +168,65 @@
           };
         }
 
-        function setResendReceiptFeedback(message, type) {
-          const box = document.getElementById('resendReceiptFeedback');
-          if (!box) return;
-          if (!message) {
-            box.style.display = 'none';
-            box.textContent = '';
-            return;
+        function setResendReceiptUi(state, message) {
+          const panel = document.getElementById('resendReceiptPanel');
+          const status = document.getElementById('resendReceiptStatus');
+          const text = document.getElementById('resendReceiptStatusText');
+          const btn = document.getElementById('resendReceiptBtn');
+          if (!text) return;
+
+          const states = ['is-sending', 'is-success', 'is-error'];
+          if (panel) panel.classList.remove(...states);
+          if (status) status.classList.remove(...states);
+          if (btn) btn.classList.remove(...states);
+
+          if (state && state !== 'idle') {
+            if (panel) panel.classList.add('is-' + state);
+            if (status) status.classList.add('is-' + state);
+            if (btn) btn.classList.add('is-' + state);
           }
-          const isError = type === 'error';
-          const isSuccess = type === 'success';
-          box.style.display = 'block';
-          box.style.background = isError ? '#fee2e2' : isSuccess ? '#dcfce7' : '#e0f2fe';
-          box.style.color = isError ? '#991b1b' : isSuccess ? '#166534' : '#0c4a6e';
-          box.style.border = isError
-            ? '1px solid #fecaca'
-            : isSuccess
-              ? '1px solid #bbf7d0'
-              : '1px solid #bae6fd';
-          box.textContent = message;
-          box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+          text.textContent = message;
+          status?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         document.getElementById('resendReceiptBtn')?.addEventListener('click', async () => {
           const btn = document.getElementById('resendReceiptBtn');
-          const spinner = document.getElementById('resendReceiptSpinner');
-          if (!btn || btn.disabled) {
-            setResendReceiptFeedback(
-              'Payment receipt can only be sent when payment status is paid.',
-              'error'
+          if (!btn) return;
+
+          const clickedAt = new Date().toLocaleTimeString();
+          if (btn.disabled) {
+            setResendReceiptUi(
+              'error',
+              'Button pressed at ' + clickedAt + ' — cannot send: payment status is not paid.'
             );
             return;
           }
-          const prevLabel = btn.textContent;
-          const prevBg = btn.style.background;
-          const prevBorder = btn.style.borderColor;
+
+          const prevLabel = 'Resend payment receipt';
           btn.disabled = true;
           btn.textContent = 'Sending…';
-          btn.style.opacity = '0.85';
-          if (spinner) spinner.style.display = 'inline';
-          setResendReceiptFeedback('Sending payment receipt email…', 'sending');
-          clearTimeout(window.resendReceiptResetTimeout);
+          setResendReceiptUi('sending', 'Button pressed at ' + clickedAt + ' — sending email now…');
+          showStatusMessage('Sending payment receipt…', false, 0);
+
           try {
             const res = await callApi('/admin/orders/' + id + '/resend-payment-receipt', { method: 'POST' });
+            const doneAt = new Date().toLocaleTimeString();
             const msg = res.message || 'Payment receipt sent successfully.';
-            setResendReceiptFeedback('✓ ' + msg, 'success');
-            showStatusMessage(msg, false, 8000);
+            setResendReceiptUi(
+              'success',
+              'EMAIL SENT at ' + doneAt + '. ' + msg + ' (You can resend again if needed.)'
+            );
+            showStatusMessage('Payment receipt sent at ' + doneAt, false, 12000);
             btn.textContent = 'Sent ✓';
-            btn.style.background = '#16a34a';
-            btn.style.borderColor = '#15803d';
-            window.resendReceiptResetTimeout = setTimeout(() => {
-              btn.textContent = prevLabel;
-              btn.style.background = prevBg;
-              btn.style.borderColor = prevBorder;
-              btn.style.opacity = '';
-              btn.disabled = false;
-            }, 4000);
-          } catch (err) {
-            const errMsg = err.message || 'Could not send payment receipt.';
-            setResendReceiptFeedback('✗ ' + errMsg, 'error');
-            showStatusMessage(errMsg, true);
-            btn.textContent = prevLabel;
-            btn.style.background = prevBg;
-            btn.style.borderColor = prevBorder;
-            btn.style.opacity = '';
             btn.disabled = false;
-          } finally {
-            if (spinner) spinner.style.display = 'none';
+          } catch (err) {
+            const doneAt = new Date().toLocaleTimeString();
+            const errMsg = err.message || 'Could not send payment receipt.';
+            setResendReceiptUi('error', 'FAILED at ' + doneAt + '. ' + errMsg);
+            showStatusMessage(errMsg, true, 0);
+            btn.textContent = prevLabel;
+            btn.disabled = false;
           }
         });
 
