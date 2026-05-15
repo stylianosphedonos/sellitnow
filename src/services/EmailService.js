@@ -267,7 +267,7 @@ class EmailService {
     const to = this.resolveCustomerTo(order);
     if (!to) {
       console.log('[Email] No customer address for payment receipt:', order.order_number);
-      return { success: true };
+      return { success: false, error: 'No customer email on this order.' };
     }
 
     const { currency } = await getBrandSettings();

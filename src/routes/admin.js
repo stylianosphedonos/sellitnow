@@ -249,6 +249,40 @@ router.get('/orders/:id', async (req, res) => {
   }
 });
 
+router.post('/orders/:id/resend-payment-receipt', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const order = await OrderService.getOrderWithCustomerEmail(id);
+    if (order.payment_status !== 'paid') {
+      return res.status(400).json({
+        error: 'Order is not paid. Payment receipts are only sent after successful card payment.',
+      });
+    }
+    const to = EmailService.resolveCustomerTo(order);
+    if (!to) {
+      return res.status(400).json({ error: 'This order has no customer email address.' });
+    }
+    const itemsResult = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [id]);
+    const txResult = await pool.query(
+      `SELECT stripe_transaction_id, amount FROM transactions
+       WHERE order_id = $1 AND status = 'succeeded'
+       ORDER BY id DESC LIMIT 1`,
+      [id]
+    );
+    const tx = txResult.rows[0];
+    const result = await EmailService.sendPaymentReceipt(order, itemsResult.rows, {
+      stripeTransactionId: tx?.stripe_transaction_id || null,
+      amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
+    });
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || 'Could not send payment receipt.' });
+    }
+    res.json({ success: true, message: `Payment receipt sent to ${to}.` });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.patch('/orders/:id/status', async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

@@ -119,10 +119,16 @@ class PaymentService {
 
     const orderForMail = await OrderService.getOrderWithCustomerEmail(orderId);
     const itemRows = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
-    await EmailService.sendPaymentReceipt(orderForMail, itemRows.rows, {
+    const mailResult = await EmailService.sendPaymentReceipt(orderForMail, itemRows.rows, {
       stripeTransactionId,
       amountPaid: amount,
     });
+    if (!mailResult?.success) {
+      console.error(
+        `[Payment] Payment receipt email failed for order #${orderForMail.order_number} (id ${orderId}):`,
+        mailResult?.error || 'unknown error'
+      );
+    }
   }
 
   /**
