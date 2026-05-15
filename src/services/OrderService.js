@@ -151,10 +151,27 @@ class OrderService {
       [order.id]
     );
     const orderWithEmail = { ...order, user_email: userEmail };
-    await EmailService.sendAdminNewOrder(orderWithEmail, items.rows);
-    // Customer email is sent only after payment succeeds (see PaymentService).
+    const itemRows = items.rows;
 
-    const result = { order, items: items.rows };
+    const customerMail = await EmailService.sendOrderReceivedAndProcessing(orderWithEmail, itemRows, {
+      source: 'order_created',
+    });
+    if (!customerMail?.success) {
+      console.error(
+        `[Order] Customer order confirmation failed for #${order.order_number}:`,
+        customerMail?.error || 'unknown error'
+      );
+    }
+
+    const supportMail = await EmailService.sendAdminNewOrder(orderWithEmail, itemRows);
+    if (!supportMail?.success) {
+      console.error(
+        `[Order] Support new-order notification failed for #${order.order_number}:`,
+        supportMail?.error || 'unknown error'
+      );
+    }
+
+    const result = { order, items: itemRows };
     if (!userId && email) {
       result.guest_order_token = createGuestOrderToken(order.id, email);
     }

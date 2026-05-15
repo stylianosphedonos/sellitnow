@@ -415,27 +415,73 @@ class EmailService {
    * Sent when checkout is complete from the customer's perspective:
    * card payment succeeded, or pay-on-delivery order placed.
    */
-  async sendOrderReceivedAndProcessing(order, items) {
+  /** support@3nitylab.com plus active admin inboxes (deduped). */
+  async getSupportNotificationRecipients() {
+    const supportEmail = String(config.email.supportEmail || 'support@3nitylab.com')
+      .trim()
+      .toLowerCase();
+    const seen = new Set();
+    const recipients = [];
+
+    function add(email) {
+      const norm = String(email || '')
+        .trim()
+        .toLowerCase();
+      if (!norm.includes('@') || seen.has(norm)) return;
+      seen.add(norm);
+      recipients.push(norm);
+    }
+
+    add(supportEmail);
+
+    const adminResult = await pool.query(
+      `SELECT email FROM users WHERE role = 'admin' AND is_active`
+    );
+    for (const row of adminResult.rows) add(row.email);
+
+    if (!recipients.length) {
+      const fallback = parseFromAddress(await getOutboundEmailFrom());
+      if (fallback) add(fallback);
+    }
+
+    return recipients;
+  }
+
+  async sendOrderReceivedAndProcessing(order, items, options = {}) {
     const to = this.resolveCustomerTo(order);
     if (!to) {
       console.log('[Email] No customer address for order received mail:', order.order_number);
-      return { success: true };
+      return { success: false, error: 'No customer email on this order.' };
     }
     const { currency } = await getBrandSettings();
     const fmt = (a) => formatMoney(a, currency);
     const itemsRows = await this.buildOrderItemsTableHtml(items);
     const storeName = brandName();
-    const paidOnline = order.payment_method !== 'pay_on_delivery' && order.payment_status === 'paid';
-    const intro = paidOnline
-      ? `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your purchase. We have safely received your <strong>payment</strong> and your order is now in our queue to be <strong>processed and prepared</strong> for shipment.</p>`
-      : `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your order. We have received it and will <strong>process and prepare</strong> your items for shipment. <strong>Payment will be collected on delivery</strong> — please have the agreed amount or payment method ready when your parcel arrives.</p>`;
+    const isPod = order.payment_method === 'pay_on_delivery';
+    const isPaid = order.payment_status === 'paid';
+    const paymentLabel = isPaid ? 'Paid' : isPod ? 'Pay on delivery' : 'Payment pending';
 
+    let intro;
+    let payLine;
+    if (isPaid) {
+      intro = `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your purchase. We have received your <strong>order</strong> and your <strong>payment</strong>. Your items are now in our queue to be <strong>processed and prepared</strong> for shipment.</p>`;
+      payLine = 'Payment received — we will process your order shortly.';
+    } else if (isPod) {
+      intro = `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your order. We have received it and will <strong>process and prepare</strong> your items for shipment. <strong>Payment will be collected on delivery</strong> — please have the agreed amount ready when your parcel arrives.</p>`;
+      payLine = 'Pay on delivery — payment is due when your order arrives.';
+    } else {
+      intro = `<p style="font-size:16px;line-height:1.6;color:#333">Thank you for your order. We have <strong>received order #${escapeHtml(order.order_number)}</strong>. If you have not finished paying yet, please complete card payment on the checkout page. Once payment is confirmed, we will process and prepare your items for shipment.</p>`;
+      payLine = 'Payment is pending — complete checkout to confirm your order.';
+    }
+
+    const subject = `We received your order #${order.order_number}`;
     const html = `
       <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;color:#111">
         <p style="font-size:18px;font-weight:600;margin:0 0 8px">We have your order</p>
         ${intro}
         <table style="width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;background:#fafafa;border-radius:8px;overflow:hidden">
           <tr><td style="padding:12px 16px;border-bottom:1px solid #eee"><strong>Order number</strong></td><td style="padding:12px 16px;border-bottom:1px solid #eee">${escapeHtml(order.order_number)}</td></tr>
+          <tr><td style="padding:12px 16px;border-bottom:1px solid #eee"><strong>Payment</strong></td><td style="padding:12px 16px;border-bottom:1px solid #eee">${escapeHtml(paymentLabel)}</td></tr>
           <tr><td style="padding:12px 16px"><strong>Order total</strong></td><td style="padding:12px 16px">${fmt(order.total_amount)}</td></tr>
         </table>
         <p style="font-size:15px;margin:8px 0 12px;font-weight:600">Items</p>
@@ -448,17 +494,22 @@ class EmailService {
       </div>
     `;
 
-    const payLine = paidOnline
-      ? 'Payment received — we will process your order shortly.'
-      : 'Pay on delivery — payment is due when your order arrives.';
     const text = `We have your order #${order.order_number}. Total: ${fmt(order.total_amount)}. ${payLine} Thank you for shopping with ${storeName}.`;
 
-    return this.send({
-      to,
-      subject: `We received your order #${order.order_number}`,
-      html,
-      text,
-    });
+    const result = await this.send({ to, subject, html, text });
+    if (order?.id) {
+      await OrderEmailLogService.append({
+        orderId: order.id,
+        emailType: 'order_received',
+        label: 'Order received (customer)',
+        recipientTo: to,
+        subject,
+        success: Boolean(result.success),
+        errorMessage: result.error || null,
+        source: options.source || 'order_created',
+      });
+    }
+    return result;
   }
 
   /**
@@ -555,22 +606,15 @@ class EmailService {
   }
 
   /**
-   * Notify every active admin user; falls back to EMAIL_FROM address if none exist.
+   * Internal notification to support@3nitylab.com (and active admins) for fulfillment.
    * @param {object} order — row from orders (+ user_email when present)
    * @param {object[]} items — order_items rows
    */
   async sendAdminNewOrder(order, items = []) {
-    const adminResult = await pool.query(
-      `SELECT email FROM users WHERE role = 'admin' AND is_active`
-    );
-    let recipients = adminResult.rows.map((r) => r.email).filter((e) => e && String(e).trim().includes('@'));
+    const recipients = await this.getSupportNotificationRecipients();
     if (!recipients.length) {
-      const fallback = parseFromAddress(await getOutboundEmailFrom());
-      if (fallback) recipients = [fallback];
-      else {
-        console.log('[Email] No admin recipients for new order notification:', order.order_number);
-        return { success: true };
-      }
+      console.log('[Email] No support recipients for new order notification:', order.order_number);
+      return { success: false, error: 'No support email configured.' };
     }
 
     const { currency } = await getBrandSettings();
@@ -650,15 +694,19 @@ class EmailService {
       </table>
     `;
 
-    const subject = `New order #${order.order_number}`;
+    const subject = `[3nityLab] New order #${order.order_number}`;
+    let anySuccess = false;
+    let lastError = null;
     for (const to of recipients) {
       const recipient = String(to).trim();
       const sendResult = await this.send({ to: recipient, subject, html });
+      if (sendResult.success) anySuccess = true;
+      else lastError = sendResult.error || lastError;
       if (order?.id) {
         await OrderEmailLogService.append({
           orderId: order.id,
-          emailType: 'admin_new_order',
-          label: 'Admin new-order notification',
+          emailType: 'support_new_order',
+          label: 'Support new-order notification',
           recipientTo: recipient,
           subject,
           success: Boolean(sendResult.success),
@@ -667,7 +715,9 @@ class EmailService {
         });
       }
     }
-    return { success: true };
+    return anySuccess
+      ? { success: true }
+      : { success: false, error: lastError || 'Could not send support notification.' };
   }
 }
 
