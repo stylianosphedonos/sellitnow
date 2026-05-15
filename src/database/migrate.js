@@ -10,6 +10,8 @@ async function migrate() {
   try {
     if (config.database.usePostgres) {
       const { pool, execPostgresScript, closeDb } = require('./db');
+      const { runPostgresMigrations } = require('./postgresMigrations');
+      await runPostgresMigrations(pool);
       await execPostgresScript(pool, schema);
       await closeDb();
       console.log('PostgreSQL migration completed successfully.');

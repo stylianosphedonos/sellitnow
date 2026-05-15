@@ -319,48 +319,10 @@ async function ensureDb() {
     const fs = require('fs');
     const dbMod = require('./database/db');
     if (config.database.usePostgres) {
+      const { runPostgresMigrations } = require('./database/postgresMigrations');
+      await runPostgresMigrations(dbMod.pool);
       const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.postgresql.sql'), 'utf8');
       await dbMod.execPostgresScript(dbMod.pool, schema);
-      await dbMod.pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
-      await dbMod.pool.query(
-        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'card'`
-      );
-      await dbMod.pool.query(
-        'ALTER TABLE products ADD COLUMN IF NOT EXISTS delivery_cost DOUBLE PRECISION'
-      );
-      await dbMod.pool.query(
-        'ALTER TABLE products ALTER COLUMN sku DROP NOT NULL'
-      );
-      await dbMod.pool.query(
-        'ALTER TABLE products ADD COLUMN IF NOT EXISTS display_order INTEGER'
-      );
-      await dbMod.pool.query(
-        'ALTER TABLE categories ADD COLUMN IF NOT EXISTS display_order INTEGER'
-      );
-      await dbMod.pool.query(
-        "ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type TEXT DEFAULT 'simple'"
-      );
-      await dbMod.pool.query(
-        `CREATE TABLE IF NOT EXISTS bundle_items (
-          id SERIAL PRIMARY KEY,
-          bundle_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-          component_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-          quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-          display_order INTEGER DEFAULT 0,
-          UNIQUE(bundle_product_id, component_product_id)
-        )`
-      );
-      await dbMod.pool.query(
-        'CREATE INDEX IF NOT EXISTS idx_bundle_items_bundle ON bundle_items(bundle_product_id)'
-      );
-      await dbMod.pool.query(
-        'CREATE INDEX IF NOT EXISTS idx_products_product_type ON products(product_type)'
-      );
-      await dbMod.pool.query(
-        `INSERT INTO product_categories (product_id, category_id)
-         SELECT id, category_id FROM products WHERE category_id IS NOT NULL
-         ON CONFLICT (product_id, category_id) DO NOTHING`
-      );
       console.log('Database ready (PostgreSQL)');
       return;
     }
