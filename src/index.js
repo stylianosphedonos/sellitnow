@@ -312,6 +312,22 @@ function runSchemaMigrations(db) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_products_product_type ON products(product_type)');
   db.exec(`INSERT OR IGNORE INTO product_categories (product_id, category_id)
     SELECT id, category_id FROM products WHERE category_id IS NOT NULL`);
+
+  db.exec(`CREATE TABLE IF NOT EXISTS order_email_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    email_type TEXT NOT NULL,
+    label TEXT NOT NULL,
+    recipient_to TEXT NOT NULL,
+    subject TEXT,
+    success INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    source TEXT NOT NULL DEFAULT 'system',
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_order_email_logs_order_id ON order_email_logs(order_id)'
+  );
 }
 
 async function ensureDb() {

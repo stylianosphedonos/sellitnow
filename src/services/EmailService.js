@@ -5,6 +5,7 @@ function brandName() {
   return config.email.businessName || '3nityLab';
 }
 const { pool } = require('../database/db');
+const OrderEmailLogService = require('./OrderEmailLogService');
 const { getBrandSettings, getOutboundEmailFrom, getEffectiveSmtpConfig } = require('../routes/brand');
 const { formatMoney } = require('../lib/formatMoney');
 
@@ -384,13 +385,30 @@ class EmailService {
   /**
    * Payment receipt sent automatically when card payment succeeds (Stripe webhook / confirm).
    */
-  async sendPaymentReceipt(order, items, payment = {}) {
+  async sendPaymentReceipt(order, items, payment = {}, options = {}) {
     const draft = await this.buildPaymentReceiptDraft(order, items, payment);
     if (!draft) {
       console.log('[Email] No customer address for payment receipt:', order.order_number);
       return { success: false, error: 'No customer email on this order.' };
     }
-    return this.send(draft);
+    const label =
+      order.payment_status === 'paid' ? 'Payment receipt' : 'Order confirmation';
+    const emailType =
+      order.payment_status === 'paid' ? 'payment_receipt' : 'order_confirmation';
+    const result = await this.send(draft);
+    if (order?.id) {
+      await OrderEmailLogService.append({
+        orderId: order.id,
+        emailType,
+        label,
+        recipientTo: draft.to,
+        subject: draft.subject,
+        success: Boolean(result.success),
+        errorMessage: result.error || null,
+        source: options.source || 'automatic',
+      });
+    }
+    return result;
   }
 
   /**
@@ -513,9 +531,27 @@ class EmailService {
     return { to, subject, html, text: bodyText };
   }
 
-  async sendDraft(draft) {
+  async sendDraft(draft, logContext = null) {
     if (!draft?.to || !draft.subject) return { success: false, error: 'Invalid draft' };
-    return this.send({ to: draft.to, subject: draft.subject, html: draft.html, text: draft.text });
+    const result = await this.send({
+      to: draft.to,
+      subject: draft.subject,
+      html: draft.html,
+      text: draft.text,
+    });
+    if (logContext?.orderId) {
+      await OrderEmailLogService.append({
+        orderId: logContext.orderId,
+        emailType: logContext.emailType || 'status_update',
+        label: logContext.label || 'Status update email',
+        recipientTo: draft.to,
+        subject: draft.subject,
+        success: Boolean(result.success),
+        errorMessage: result.error || null,
+        source: logContext.source || 'admin_manual',
+      });
+    }
+    return result;
   }
 
   /**
@@ -616,7 +652,20 @@ class EmailService {
 
     const subject = `New order #${order.order_number}`;
     for (const to of recipients) {
-      await this.send({ to: String(to).trim(), subject, html });
+      const recipient = String(to).trim();
+      const sendResult = await this.send({ to: recipient, subject, html });
+      if (order?.id) {
+        await OrderEmailLogService.append({
+          orderId: order.id,
+          emailType: 'admin_new_order',
+          label: 'Admin new-order notification',
+          recipientTo: recipient,
+          subject,
+          success: Boolean(sendResult.success),
+          errorMessage: sendResult.error || null,
+          source: 'order_created',
+        });
+      }
     }
     return { success: true };
   }

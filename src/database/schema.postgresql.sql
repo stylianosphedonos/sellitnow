@@ -155,6 +155,19 @@ CREATE TABLE IF NOT EXISTS brand_settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS order_email_logs (
+  id SERIAL PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  email_type TEXT NOT NULL,
+  label TEXT NOT NULL,
+  recipient_to TEXT NOT NULL,
+  subject TEXT,
+  success BOOLEAN NOT NULL DEFAULT FALSE,
+  error_message TEXT,
+  source TEXT NOT NULL DEFAULT 'system',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS media_blobs (
   id UUID PRIMARY KEY,
   content_type TEXT NOT NULL,
@@ -175,5 +188,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_email_logs_order_id ON order_email_logs(order_id);
 CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
 CREATE INDEX IF NOT EXISTS idx_cart_session_id ON cart(session_id);

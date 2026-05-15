@@ -44,6 +44,23 @@ async function runPostgresMigrations(pool) {
      SELECT id, category_id FROM products WHERE category_id IS NOT NULL
      ON CONFLICT (product_id, category_id) DO NOTHING`
   );
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS order_email_logs (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+      email_type TEXT NOT NULL,
+      label TEXT NOT NULL,
+      recipient_to TEXT NOT NULL,
+      subject TEXT,
+      success BOOLEAN NOT NULL DEFAULT FALSE,
+      error_message TEXT,
+      source TEXT NOT NULL DEFAULT 'system',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`
+  );
+  await pool.query(
+    'CREATE INDEX IF NOT EXISTS idx_order_email_logs_order_id ON order_email_logs(order_id)'
+  );
 }
 
 module.exports = { runPostgresMigrations };

@@ -206,7 +206,12 @@ async function callApi(path, options = {}) {
 
   const res = await fetch(apiPrefix() + path, { ...options, headers, credentials: 'include' });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) {
+    const err = new Error(data.error || 'Request failed');
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 

@@ -29,7 +29,7 @@
     const id = new URLSearchParams(location.search).get('id');
     if (!id) window.location.href = '/admin/orders.html';
     let currentOrder = null;
-    const emailActivityLog = [];
+    let emailLogs = [];
 
     function esc(s) {
       return String(s ?? '')
@@ -52,19 +52,47 @@
       }
     }
 
-    function logEmailActivity(entry) {
-      emailActivityLog.unshift(entry);
+    function formatLogTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function sourceLabel(source) {
+      const map = {
+        payment_webhook: 'Stripe payment',
+        admin_manual: 'Admin (manual send)',
+        admin_status_save: 'Admin (save & email)',
+        order_created: 'Order placed',
+        automatic: 'Automatic',
+      };
+      return map[source] || source || '';
+    }
+
+    function renderEmailLogs(logs) {
+      emailLogs = Array.isArray(logs) ? logs : [];
       const list = document.getElementById('emailActivityList');
       if (!list) return;
-      list.innerHTML = emailActivityLog
-        .slice(0, 8)
-        .map(
-          (e) =>
-            `<li class="order-activity-item order-activity-item--${e.ok ? 'ok' : 'err'}">
-              <span class="order-activity-item__time">${esc(e.time)}</span>
-              <strong>${esc(e.action)}</strong> — ${esc(e.detail)}
-            </li>`
-        )
+      if (!emailLogs.length) {
+        list.innerHTML =
+          '<li class="order-activity-item order-activity-item--idle">No emails logged for this order yet.</li>';
+        return;
+      }
+      list.innerHTML = emailLogs
+        .map((e) => {
+          const ok = Boolean(e.success);
+          const detail = ok
+            ? `Sent to ${e.recipient_to || '—'}`
+            : e.error_message || 'Send failed';
+          const subject = e.subject ? ` · ${e.subject}` : '';
+          const via = e.source ? ` · ${sourceLabel(e.source)}` : '';
+          return `<li class="order-activity-item order-activity-item--${ok ? 'ok' : 'err'}">
+              <span class="order-activity-item__time">${esc(formatLogTime(e.created_at))}</span>
+              <strong>${esc(e.label || e.email_type || 'Email')}</strong>${esc(subject)}${esc(via)}
+              <span class="order-activity-item__detail">${esc(detail)}</span>
+            </li>`;
+        })
         .join('');
     }
 
@@ -156,19 +184,14 @@
         const doneAt = new Date().toLocaleTimeString();
         setEmailPanelState('success', `✓ ${res.message || 'Email sent.'} (${doneAt})`);
         showBanner(res.message || 'Email sent successfully.', false, 10000);
-        logEmailActivity({
-          ok: true,
-          time: doneAt,
-          action: res.label || label,
-          detail: res.message || 'Sent',
-        });
+        if (res.email_logs) renderEmailLogs(res.email_logs);
         if (sendBtn) sendBtn.textContent = 'Sent ✓';
       } catch (err) {
         const doneAt = new Date().toLocaleTimeString();
         const errMsg = err.message || 'Could not send email.';
+        if (err.data?.email_logs) renderEmailLogs(err.data.email_logs);
         setEmailPanelState('error', `✗ Failed at ${doneAt}. ${errMsg}`);
         showBanner(errMsg, true, 0);
-        logEmailActivity({ ok: false, time: doneAt, action: label, detail: errMsg });
         if (sendBtn && sendBtn.dataset.prevText) sendBtn.textContent = sendBtn.dataset.prevText;
       } finally {
         if (sendBtn) sendBtn.disabled = false;
@@ -227,21 +250,10 @@
         let msg = `Order status updated to "${res.order.status}".`;
         if (res.customerEmailSent) {
           msg += ' Customer was emailed.';
-          logEmailActivity({
-            ok: true,
-            time: new Date().toLocaleTimeString(),
-            action: 'Status update (on save)',
-            detail: msg,
-          });
         } else if (sendEmail && res.customerEmailError) {
           msg += ' Email failed: ' + res.customerEmailError;
-          logEmailActivity({
-            ok: false,
-            time: new Date().toLocaleTimeString(),
-            action: 'Status update (on save)',
-            detail: res.customerEmailError,
-          });
         }
+        if (res.email_logs) renderEmailLogs(res.email_logs);
         showBanner(msg, Boolean(sendEmail && res.customerEmailError), sendEmail ? 10000 : 5000);
         if (sendEmail) await loadEmailPreview();
       } catch (err) {
@@ -381,9 +393,9 @@
               </div>
 
               <div class="order-activity">
-                <h3 class="order-activity__title">Activity log (this session)</h3>
+                <h3 class="order-activity__title">Email history</h3>
                 <ul id="emailActivityList" class="order-activity__list">
-                  <li class="order-activity-item order-activity-item--idle">No emails sent yet this session.</li>
+                  <li class="order-activity-item order-activity-item--idle">Loading…</li>
                 </ul>
               </div>
             </section>
@@ -395,6 +407,7 @@
         `;
 
         bindOrderPageHandlers();
+        renderEmailLogs(order.email_logs);
         await loadEmailPreview();
       } catch (err) {
         document.getElementById('order').innerHTML =

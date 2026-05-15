@@ -17,6 +17,7 @@ const {
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
 const EmailService = require('../services/EmailService');
+const OrderEmailLogService = require('../services/OrderEmailLogService');
 const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
 const { createFullBackup, restoreFullBackup } = require('../services/DatabaseBackupService');
@@ -335,18 +336,34 @@ router.post('/orders/:id/email/send', async (req, res) => {
       if (!draft) {
         return res.status(400).json({ error: 'Could not build status update email.' });
       }
-      result = await EmailService.sendDraft(draft);
+      result = await EmailService.sendDraft(draft, {
+        orderId: id,
+        emailType: 'status_update',
+        label: 'Status update email',
+        source: 'admin_manual',
+      });
       label = 'Status update email';
     } else {
-      result = await EmailService.sendPaymentReceipt(order, items, {
-        stripeTransactionId: tx?.stripe_transaction_id || null,
-        amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
-      });
+      result = await EmailService.sendPaymentReceipt(
+        order,
+        items,
+        {
+          stripeTransactionId: tx?.stripe_transaction_id || null,
+          amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
+        },
+        { source: 'admin_manual' }
+      );
       label = order.payment_status === 'paid' ? 'Payment receipt' : 'Order confirmation';
     }
 
+    const email_logs = await OrderEmailLogService.listForOrder(id);
     if (!result.success) {
-      return res.status(400).json({ error: result.error || 'Could not send email.', label, to });
+      return res.status(400).json({
+        error: result.error || 'Could not send email.',
+        label,
+        to,
+        email_logs,
+      });
     }
     res.json({
       success: true,
@@ -354,6 +371,7 @@ router.post('/orders/:id/email/send', async (req, res) => {
       label,
       to,
       sent_at: new Date().toISOString(),
+      email_logs,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -368,20 +386,30 @@ router.post('/orders/:id/resend-payment-receipt', async (req, res) => {
     if (!to) {
       return res.status(400).json({ error: 'This order has no customer email address.' });
     }
-    const result = await EmailService.sendPaymentReceipt(order, items, {
-      stripeTransactionId: tx?.stripe_transaction_id || null,
-      amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
-    });
-    if (!result.success) {
-      return res.status(400).json({ error: result.error || 'Could not send email.' });
-    }
+    const result = await EmailService.sendPaymentReceipt(
+      order,
+      items,
+      {
+        stripeTransactionId: tx?.stripe_transaction_id || null,
+        amountPaid: tx?.amount != null ? tx.amount : order.total_amount,
+      },
+      { source: 'admin_manual' }
+    );
     const label = order.payment_status === 'paid' ? 'Payment receipt' : 'Order confirmation';
+    const email_logs = await OrderEmailLogService.listForOrder(id);
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error || 'Could not send email.',
+        email_logs,
+      });
+    }
     res.json({
       success: true,
       message: `${label} sent to ${to}.`,
       label,
       to,
       sent_at: new Date().toISOString(),
+      email_logs,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -395,11 +423,13 @@ router.patch('/orders/:id/status', async (req, res) => {
     const result = await OrderService.updateOrderStatus(id, status, tracking_number, {
       sendCustomerEmail: Boolean(send_customer_email),
     });
+    const email_logs = await OrderEmailLogService.listForOrder(id);
     res.json({
       order: result.order,
       customerEmailDraft: result.customerEmailDraft,
       customerEmailSent: result.customerEmailSent,
       customerEmailError: result.customerEmailError,
+      email_logs,
     });
   } catch (err) {
     res.status(400).json({ error: err.message });

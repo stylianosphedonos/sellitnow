@@ -5,6 +5,7 @@ const { getBrandSettings } = require('../routes/brand');
 const { computeShippingTotal } = require('../lib/shipping');
 const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
+const OrderEmailLogService = require('./OrderEmailLogService');
 const { createGuestOrderToken, verifyGuestOrderToken } = require('../lib/guestOrderToken');
 
 class OrderService {
@@ -331,6 +332,7 @@ class OrderService {
       [orderId]
     );
     order.items = itemsResult.rows;
+    order.email_logs = await OrderEmailLogService.listForOrder(orderId);
     return order;
   }
 
@@ -402,7 +404,12 @@ class OrderService {
     let customerEmailSent = false;
     let customerEmailError = null;
     if (sendCustomerEmail && customerEmailDraft) {
-      const r = await EmailService.sendDraft(customerEmailDraft);
+      const r = await EmailService.sendDraft(customerEmailDraft, {
+        orderId,
+        emailType: 'status_update',
+        label: 'Status update (on save)',
+        source: 'admin_status_save',
+      });
       customerEmailSent = Boolean(r.success);
       if (!r.success) customerEmailError = r.error || 'Email could not be sent';
     }

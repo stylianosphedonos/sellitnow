@@ -1460,6 +1460,13 @@ button.category-card:focus-visible {
   font-style: italic;
 }
 
+.order-activity-item__detail {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 .order-activity-item__time {
   display: block;
   font-size: 11px;
