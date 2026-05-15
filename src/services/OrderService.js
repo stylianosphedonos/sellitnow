@@ -221,10 +221,17 @@ class OrderService {
   async adminListOrders(search, page = 1, limit = 20, status = null) {
     const offset = (page - 1) * limit;
     const allowedStatuses = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
-    const statusFilter =
-      status && typeof status === 'string' && allowedStatuses.has(String(status).trim().toLowerCase())
-        ? String(status).trim().toLowerCase()
-        : null;
+    const defaultStatuses = ['pending', 'processing'];
+    let statusFilters = defaultStatuses;
+    if (status === 'all') {
+      statusFilters = [];
+    } else if (status && typeof status === 'string') {
+      const parsed = String(status)
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => allowedStatuses.has(s));
+      if (parsed.length) statusFilters = [...new Set(parsed)];
+    }
 
     const conditions = [];
     const params = [];
@@ -237,9 +244,9 @@ class OrderService {
       params.push(`%${search}%`);
       n += 1;
     }
-    if (statusFilter) {
-      conditions.push(`o.status = $${n}`);
-      params.push(statusFilter);
+    if (statusFilters.length) {
+      conditions.push(`o.status = ANY($${n}::text[])`);
+      params.push(statusFilters);
       n += 1;
     }
 
@@ -262,9 +269,9 @@ class OrderService {
       countParams.push(`%${search}%`);
       cn += 1;
     }
-    if (statusFilter) {
-      countConditions.push(`o.status = $${cn}`);
-      countParams.push(statusFilter);
+    if (statusFilters.length) {
+      countConditions.push(`o.status = ANY($${cn}::text[])`);
+      countParams.push(statusFilters);
       cn += 1;
     }
     let countQuery = 'SELECT COUNT(*)::int FROM orders o LEFT JOIN users u ON o.user_id = u.id';
