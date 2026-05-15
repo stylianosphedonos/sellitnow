@@ -397,7 +397,12 @@ async function quickAddProductFromCard(productId) {
 }
 
 function bindProductCardControls(container) {
+  container.querySelectorAll('.product-stock').forEach((el) => el.remove());
   container.querySelectorAll('[data-quick-add]').forEach((btn) => {
+    btn.disabled = false;
+    if (btn.textContent.trim().toLowerCase() === 'out of stock') {
+      btn.textContent = 'Add to cart';
+    }
     btn.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();

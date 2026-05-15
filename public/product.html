@@ -30,7 +30,6 @@
         <p id="productPrice" style="font-size:28px;font-weight:700;color:var(--primary);margin-bottom:16px"></p>
         <p id="productOfferBadge" style="display:none;margin-bottom:8px"><span style="display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px">Special offer</span></p>
         <p id="productPriceCompare" style="display:none;font-size:16px;color:#888;text-decoration:line-through;margin:-8px 0 12px"></p>
-        <p id="productStock" style="color:#666;margin-bottom:24px"></p>
         <p id="productDesc" style="margin-bottom:24px;line-height:1.6;color:#555"></p>
         <div id="bundleIncludes" style="display:none;margin-bottom:24px;padding:16px;background:#fafafa;border-radius:8px;border:1px solid #eee">
           <h3 style="font-size:16px;margin:0 0 12px">This offer includes</h3>
@@ -132,10 +131,6 @@
         } else {
           compareEl.style.display = 'none';
         }
-        document.getElementById('productStock').textContent =
-          product.stock_quantity > 0
-            ? `${product.stock_quantity} offer${product.stock_quantity === 1 ? '' : 's'} available`
-            : 'Out of stock';
         document.getElementById('productDesc').textContent = product.description || 'No description.';
         const bundleWrap = document.getElementById('bundleIncludes');
         const bundleList = document.getElementById('bundleIncludesList');
