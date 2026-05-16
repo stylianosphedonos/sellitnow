@@ -454,6 +454,18 @@ function renderProductCardMarkup(p) {
 /** Populated in `loadCategories` for section titles when filtering by category. */
 const sellitnowCategoryLabels = new Map();
 
+/** Scroll so the products section title sits below the sticky header. */
+function scrollProductsBrowseIntoView() {
+  const heading = document.getElementById('productsSectionHeading');
+  const target = heading || document.querySelector('.products');
+  if (!target) return;
+
+  const header = document.querySelector('.header');
+  const headerOffset = (header ? header.getBoundingClientRect().height : 0) + 12;
+  const top = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
 function applyProductsBrowseMode(categoryId, categoryLabel) {
   const categoriesEl = document.getElementById('categories');
   const browseBar = document.getElementById('productsBrowseBar');
@@ -489,7 +501,7 @@ function bindCategoryGridNavigation() {
     const label = sellitnowCategoryLabels.get(id);
     applyProductsBrowseMode(id, label);
     loadProducts(1, id);
-    document.querySelector('.products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollProductsBrowseIntoView();
   });
 }
 
@@ -648,7 +660,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
       pagination.innerHTML = '';
     }
     if (scrollToTop) {
-      document.querySelector('.products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollProductsBrowseIntoView();
     }
   } catch (err) {
     grid.innerHTML = '<p>Failed to load products. Make sure the server is running.</p>';
