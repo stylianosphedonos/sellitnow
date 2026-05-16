@@ -50,6 +50,18 @@
             <input type="number" name="display_order" step="1" min="0" placeholder="Lower number shows first">
           </div>
           <div class="form-group">
+            <label>Icon size on website (px)</label>
+            <input type="number" name="icon_size_px" step="1" min="48" max="280" placeholder="Default: 140">
+            <small>Square icon size shown on the storefront (48–280 px).</small>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="show_on_website" value="1">
+              Show on website
+            </label>
+            <small>When checked, this category appears in “Shop by Category” on your store.</small>
+          </div>
+          <div class="form-group">
             <label>Category image</label>
             <input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
             <small>JPEG, PNG, WebP or GIF. Max 5MB.</small>
@@ -74,16 +86,18 @@
 
     async function loadCategories() {
       try {
-        const { categories } = await callApi('/categories?_=' + Date.now(), { cache: 'no-store' });
+        const { categories } = await callApi('/admin/categories?_=' + Date.now(), { cache: 'no-store' });
         document.getElementById('categories').innerHTML = `
           <div class="admin-table-wrap">
           <table class="table">
-            <thead><tr><th>ID</th><th>Order</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Order</th><th>On site</th><th>Icon (px)</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
             <tbody>
             ${(categories || []).map(c => `
               <tr>
                 <td>${c.id}</td>
                 <td>${c.display_order ?? '-'}</td>
+                <td>${c.show_on_website ? 'Yes' : 'No'}</td>
+                <td>${c.icon_size_px ?? '140'}</td>
                 <td><strong>${escapeAttr(c.name)}</strong></td>
                 <td>${escapeAttr(c.slug)}</td>
                 <td>${escapeAttr((c.description || '').slice(0, 50))}</td>
@@ -110,8 +124,12 @@
       const payload = {
         name,
         description: descTrim === '' ? null : form.description.value,
-        display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10)
+        display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
+        show_on_website: form.show_on_website.checked
       };
+      if (form.icon_size_px.value !== '') {
+        payload.icon_size_px = parseInt(form.icon_size_px.value, 10);
+      }
       if (slugTrim) payload.slug = slugTrim;
       const fileInput = form.querySelector('input[name="image"]');
       try {

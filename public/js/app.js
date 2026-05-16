@@ -555,12 +555,14 @@ async function loadCategories() {
       allProductsTile +
       categories
         .map((c) => {
+          const iconSize = c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : 140;
+          const mediaStyle = `style="width:${iconSize}px;height:${iconSize}px"`;
           const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
           const media = imgUrl
-            ? `<div class="category-card__media"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
-            : `<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🛒</span></div>`;
+            ? `<div class="category-card__media" ${mediaStyle}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
+            : `<div class="category-card__media category-card__media--placeholder" ${mediaStyle}><span class="icon" aria-hidden="true">🛒</span></div>`;
           return `
-      <button type="button" class="category-card" data-category-id="${c.id}">
+      <button type="button" class="category-card category-card--sized" data-category-id="${c.id}">
         ${media}
         <span class="category-card__label">${escapeHtml(c.name)}</span>
       </button>`;

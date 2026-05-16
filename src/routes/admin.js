@@ -182,7 +182,16 @@ router.delete('/products/:id', async (req, res) => {
   }
 });
 
-// Categories (admin create/update if needed)
+// Categories (admin list all, including hidden from storefront)
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await CategoryService.list();
+    res.json({ categories });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/categories', async (req, res) => {
   try {
     const category = await CategoryService.create(req.body);

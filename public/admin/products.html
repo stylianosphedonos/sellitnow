@@ -162,7 +162,7 @@
 
     async function loadCategories() {
       try {
-        const data = await callApi('/categories');
+        const data = await callApi('/admin/categories');
         categories = data.categories || [];
       } catch (_) {
         categories = [];

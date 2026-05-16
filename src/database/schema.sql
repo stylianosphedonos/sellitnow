@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS categories (
   description TEXT,
   image_url TEXT,
   display_order INTEGER,
+  icon_size_px INTEGER,
+  show_on_website INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now'))
 );
 

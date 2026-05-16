@@ -6,7 +6,7 @@ const router = express.Router();
 // GET /api/v1/categories
 router.get('/', async (req, res) => {
   try {
-    const categories = await CategoryService.list();
+    const categories = await CategoryService.list({ websiteOnly: true });
     res.json({ categories });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -2,6 +2,10 @@ const slugify = require('slugify');
 const { pool } = require('../database/db');
 const { parseOptionsJson } = require('../lib/productOptions');
 
+const DEFAULT_ICON_SIZE_PX = 140;
+const MIN_ICON_SIZE_PX = 48;
+const MAX_ICON_SIZE_PX = 280;
+
 function parseNullableInteger(value, fieldName) {
   if (value === undefined || value === null || value === '') return null;
   const parsed = Number(value);
@@ -11,35 +15,63 @@ function parseNullableInteger(value, fieldName) {
   return parsed;
 }
 
+function parseIconSizePx(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = parseNullableInteger(value, 'Icon size');
+  if (parsed < MIN_ICON_SIZE_PX || parsed > MAX_ICON_SIZE_PX) {
+    throw new Error(`Icon size must be between ${MIN_ICON_SIZE_PX} and ${MAX_ICON_SIZE_PX} pixels.`);
+  }
+  return parsed;
+}
+
+function parseShowOnWebsite(value) {
+  if (value === undefined || value === null) return 0;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (value === 1 || value === '1' || value === 'true') return 1;
+  return 0;
+}
+
+function normalizeCategoryRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    show_on_website: row.show_on_website === 1 || row.show_on_website === true,
+    icon_size_px: row.icon_size_px != null ? row.icon_size_px : null,
+  };
+}
+
 class CategoryService {
-  async list() {
+  async list(options = {}) {
+    const { websiteOnly = false } = options;
+    const where = websiteOnly ? 'WHERE show_on_website = 1' : '';
     const result = await pool.query(
-      `SELECT id, name, slug, description, image_url, display_order
+      `SELECT id, name, slug, description, image_url, display_order, icon_size_px, show_on_website
        FROM categories
+       ${where}
        ORDER BY
          CASE WHEN display_order IS NULL THEN 1 ELSE 0 END,
          display_order ASC,
          id ASC`
     );
-    return result.rows;
+    return result.rows.map(normalizeCategoryRow);
   }
 
   async getById(id) {
     const result = await pool.query(
-      'SELECT id, name, slug, description, image_url, display_order FROM categories WHERE id = $1',
+      'SELECT id, name, slug, description, image_url, display_order, icon_size_px, show_on_website FROM categories WHERE id = $1',
       [id]
     );
     if (!result.rows.length) throw new Error('Category not found');
-    return result.rows[0];
+    return normalizeCategoryRow(result.rows[0]);
   }
 
   async getBySlug(slug) {
     const result = await pool.query(
-      'SELECT id, name, slug, description, image_url, display_order FROM categories WHERE slug = $1',
+      'SELECT id, name, slug, description, image_url, display_order, icon_size_px, show_on_website FROM categories WHERE slug = $1',
       [slug]
     );
     if (!result.rows.length) throw new Error('Category not found');
-    return result.rows[0];
+    return normalizeCategoryRow(result.rows[0]);
   }
 
   async getProductsByCategoryId(categoryId, page = 1, limit = 20, search = '') {
@@ -151,13 +183,23 @@ class CategoryService {
     const slugRaw = data.slug != null ? String(data.slug).trim() : '';
     const slug = slugRaw ? slugRaw : slugify(name, { lower: true });
     const displayOrder = parseNullableInteger(data.display_order, 'Display order');
+    const iconSizePx = parseIconSizePx(data.icon_size_px);
+    const showOnWebsite = parseShowOnWebsite(data.show_on_website);
     const result = await pool.query(
-      `INSERT INTO categories (name, slug, description, image_url, display_order)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, name, slug, description, image_url, display_order`,
-      [name, slug, data.description != null ? data.description : null, data.image_url || null, displayOrder]
+      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, show_on_website)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, name, slug, description, image_url, display_order, icon_size_px, show_on_website`,
+      [
+        name,
+        slug,
+        data.description != null ? data.description : null,
+        data.image_url || null,
+        displayOrder,
+        iconSizePx,
+        showOnWebsite,
+      ]
     );
-    return result.rows[0];
+    return normalizeCategoryRow(result.rows[0]);
   }
 
   async update(id, data) {
@@ -189,6 +231,14 @@ class CategoryService {
       updates.push(`display_order = $${i++}`);
       values.push(parseNullableInteger(data.display_order, 'Display order'));
     }
+    if (data.icon_size_px !== undefined) {
+      updates.push(`icon_size_px = $${i++}`);
+      values.push(parseIconSizePx(data.icon_size_px));
+    }
+    if (data.show_on_website !== undefined) {
+      updates.push(`show_on_website = $${i++}`);
+      values.push(parseShowOnWebsite(data.show_on_website));
+    }
 
     if (updates.length === 0) throw new Error('No fields to update');
 
@@ -198,8 +248,12 @@ class CategoryService {
       values
     );
     if (!result.rows.length) throw new Error('Category not found');
-    return result.rows[0];
+    return normalizeCategoryRow(result.rows[0]);
   }
 }
+
+CategoryService.DEFAULT_ICON_SIZE_PX = DEFAULT_ICON_SIZE_PX;
+CategoryService.MIN_ICON_SIZE_PX = MIN_ICON_SIZE_PX;
+CategoryService.MAX_ICON_SIZE_PX = MAX_ICON_SIZE_PX;
 
 module.exports = new CategoryService();

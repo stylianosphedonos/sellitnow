@@ -58,7 +58,7 @@
 
     async function loadCategories() {
       try {
-        const res = await callApi('/categories');
+        const res = await callApi('/admin/categories');
         categories = res.categories || [];
       } catch (err) {
         console.warn('Could not load categories', err);
