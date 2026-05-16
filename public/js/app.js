@@ -541,19 +541,22 @@ function getCategoryWebsiteLayout(c) {
   return 'tile';
 }
 
-function renderCategoryCardMedia(c, iconSizePx) {
-  const mediaStyle = `style="width:${iconSizePx}px;height:${iconSizePx}px"`;
+function renderCategoryCardMedia(c, layout) {
+  const isBanner = layout === 'banner-left' || layout === 'banner-right';
+  const mediaClass = isBanner
+    ? 'category-card__media category-card__media--banner'
+    : 'category-card__media category-card__media--tile';
   const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
   if (imgUrl) {
-    return `<div class="category-card__media" ${mediaStyle}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
+    return `<div class="${mediaClass}"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
   }
-  return `<div class="category-card__media category-card__media--placeholder" ${mediaStyle}><span class="icon" aria-hidden="true">🛒</span></div>`;
+  const minH = getCategoryIconSizePx(c);
+  return `<div class="${mediaClass} category-card__media--placeholder" style="min-height:${minH}px"><span class="icon" aria-hidden="true">🛒</span></div>`;
 }
 
 function renderStorefrontCategoryCard(c) {
   const layout = getCategoryWebsiteLayout(c);
-  const iconSizePx = getCategoryIconSizePx(c);
-  const media = renderCategoryCardMedia(c, iconSizePx);
+  const media = renderCategoryCardMedia(c, layout);
   const label = `<span class="category-card__label">${escapeHtml(c.name)}</span>`;
 
   if (layout === 'banner-left') {
