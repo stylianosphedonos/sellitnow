@@ -512,6 +512,141 @@ class EmailService {
     return result;
   }
 
+  storeBaseUrl() {
+    return String(config.apiBaseUrl || '').replace(/\/$/, '') || 'http://localhost:3000';
+  }
+
+  /**
+   * Remind customer to complete payment for an unpaid order.
+   */
+  async buildPaymentReminderDraft(order, items = []) {
+    const to = this.resolveCustomerTo(order);
+    if (!to) return null;
+    if (order.payment_status === 'paid') return null;
+
+    const { currency } = await getBrandSettings();
+    const fmt = (a) => formatMoney(a, currency);
+    const itemsRows = await this.buildOrderItemsTableHtml(items);
+    const storeName = brandName();
+    const storeUrl = this.storeBaseUrl();
+    const supportEmail = config.email.supportEmail || 'support@3nitylab.com';
+    const on = escapeHtml(order.order_number);
+
+    const subject = `Payment reminder — order #${order.order_number}`;
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;color:#111">
+        <p style="font-size:18px;font-weight:600;margin:0 0 8px">Complete your payment</p>
+        <p style="font-size:16px;line-height:1.6;color:#333">This is a friendly reminder that we are still waiting for payment on order <strong>#${on}</strong> (total <strong>${fmt(order.total_amount)}</strong>).</p>
+        <p style="font-size:15px;line-height:1.6;color:#444">If you were interrupted during checkout, please return to our store and place your order again, or reply to this email and we will help you complete payment.</p>
+        <table style="width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;background:#fafafa;border-radius:8px;overflow:hidden">
+          <tr><td style="padding:12px 16px;border-bottom:1px solid #eee"><strong>Order number</strong></td><td style="padding:12px 16px;border-bottom:1px solid #eee">${on}</td></tr>
+          <tr><td style="padding:12px 16px"><strong>Amount due</strong></td><td style="padding:12px 16px">${fmt(order.total_amount)}</td></tr>
+        </table>
+        <p style="font-size:15px;margin:8px 0 12px;font-weight:600">Items</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:28px">
+          <thead><tr style="background:#f0f0f0"><th style="text-align:left;padding:10px 12px">Product</th><th style="padding:10px 12px">Qty</th><th style="text-align:right;padding:10px 12px">Total</th></tr></thead>
+          <tbody>${itemsRows}</tbody>
+        </table>
+        <p style="font-size:14px;line-height:1.6;margin:0 0 16px"><a href="${escapeHtml(storeUrl)}" style="color:#ee4d2d;font-weight:600">Visit ${escapeHtml(storeName)}</a></p>
+        <p style="font-size:14px;line-height:1.6;color:#444">Questions? Reply to this email or contact <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a>.</p>
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:16px">Thank you,<br><span style="color:#666">${escapeHtml(storeName)}</span></p>
+      </div>
+    `;
+
+    const text = [
+      `Payment reminder for order #${order.order_number}.`,
+      `Amount due: ${fmt(order.total_amount)}.`,
+      `Visit ${storeUrl} or contact ${supportEmail} if you need help.`,
+      `— ${storeName}`,
+    ].join('\n');
+
+    return { to, subject, html, text };
+  }
+
+  async sendPaymentReminder(order, items = [], options = {}) {
+    const draft = await this.buildPaymentReminderDraft(order, items);
+    if (!draft) {
+      if (order.payment_status === 'paid') {
+        return { success: false, error: 'This order is already paid.' };
+      }
+      return { success: false, error: 'No customer email on this order.' };
+    }
+    const result = await this.send(draft);
+    if (order?.id) {
+      await OrderEmailLogService.append({
+        orderId: order.id,
+        emailType: 'payment_reminder',
+        label: 'Payment reminder',
+        recipientTo: draft.to,
+        subject: draft.subject,
+        success: Boolean(result.success),
+        errorMessage: result.error || null,
+        source: options.source || 'admin_manual',
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Customer notice when an unpaid order is auto-cancelled after the expiry window.
+   */
+  async buildUnpaidOrderCancelledDraft(order, { expiryDays = 3 } = {}) {
+    const to = this.resolveCustomerTo(order);
+    if (!to) return null;
+
+    const { currency } = await getBrandSettings();
+    const fmt = (a) => formatMoney(a, currency);
+    const storeName = brandName();
+    const supportEmail = config.email.supportEmail || 'support@3nitylab.com';
+    const on = escapeHtml(order.order_number);
+    const days = Number(expiryDays) || 3;
+
+    const subject = `Order #${order.order_number} cancelled — payment not received`;
+    const html = `
+      <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;color:#111">
+        <p style="font-size:18px;font-weight:600;margin:0 0 8px">Order cancelled</p>
+        <p style="font-size:16px;line-height:1.6;color:#333">Your order <strong>#${on}</strong> has been <strong>cancelled</strong> because we did not receive payment within <strong>${days} days</strong>.</p>
+        <p style="font-size:15px;line-height:1.6;color:#444">Order total was ${fmt(order.total_amount)}. No charge was completed for this order.</p>
+        <p style="font-size:15px;line-height:1.6;color:#444">If you still wish to purchase these items, you are welcome to place a new order on our website.</p>
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:24px">If you believe this is a mistake or you already paid, please reply to this email or contact <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a> with your order number.</p>
+        <p style="font-size:14px;line-height:1.6;color:#444;margin-top:16px">Thank you,<br><span style="color:#666">${escapeHtml(storeName)}</span></p>
+      </div>
+    `;
+
+    const text = [
+      `Order #${order.order_number} was cancelled because payment was not received within ${days} days.`,
+      `Order total: ${fmt(order.total_amount)}. No payment was completed.`,
+      `Contact ${supportEmail} if you have questions.`,
+      `— ${storeName}`,
+    ].join('\n');
+
+    return { to, subject, html, text };
+  }
+
+  async sendUnpaidOrderCancelled(order, options = {}) {
+    const draft = await this.buildUnpaidOrderCancelledDraft(order, {
+      expiryDays: options.expiryDays,
+    });
+    if (!draft) {
+      console.log('[Email] No customer address for unpaid cancel mail:', order.order_number);
+      return { success: false, error: 'No customer email on this order.' };
+    }
+    const result = await this.send(draft);
+    if (order?.id) {
+      await OrderEmailLogService.append({
+        orderId: order.id,
+        emailType: 'unpaid_cancelled',
+        label: 'Order cancelled (unpaid)',
+        recipientTo: draft.to,
+        subject: draft.subject,
+        success: Boolean(result.success),
+        errorMessage: result.error || null,
+        source: options.source || 'auto_expiry',
+      });
+    }
+    return result;
+  }
+
   /**
    * Suggested customer email after an admin changes fulfillment status.
    * @returns {null | { to: string, subject: string, html: string, text: string }}

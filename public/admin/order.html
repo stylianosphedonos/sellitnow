@@ -65,6 +65,7 @@
         admin_manual: 'Admin (manual send)',
         admin_status_save: 'Admin (save & email)',
         order_created: 'Order placed',
+        auto_expiry: 'Auto (unpaid timeout)',
         automatic: 'Automatic',
       };
       return map[source] || source || '';
@@ -156,11 +157,15 @@
       const sendBtn =
         type === 'status_update'
           ? document.getElementById('sendStatusEmailBtn')
-          : document.getElementById('sendReceiptBtn');
+          : type === 'payment_reminder'
+            ? document.getElementById('sendPaymentReminderBtn')
+            : document.getElementById('sendReceiptBtn');
       const label =
         type === 'status_update'
           ? 'Status update'
-          : document.getElementById('sendReceiptBtn')?.textContent || 'Receipt';
+          : type === 'payment_reminder'
+            ? 'Payment reminder'
+            : document.getElementById('sendReceiptBtn')?.textContent || 'Receipt';
 
       if (sendBtn) {
         sendBtn.disabled = true;
@@ -273,6 +278,9 @@
       document.getElementById('sendStatusEmailBtn')?.addEventListener('click', () =>
         sendCustomerEmail('status_update')
       );
+      document.getElementById('sendPaymentReminderBtn')?.addEventListener('click', () =>
+        sendCustomerEmail('payment_reminder')
+      );
 
       document.getElementById('saveStatusBtn')?.addEventListener('click', () => updateOrderStatus(false));
       document.getElementById('saveAndEmailBtn')?.addEventListener('click', () => updateOrderStatus(true));
@@ -328,6 +336,12 @@
             ? JSON.parse(order.shipping_address)
             : order.shipping_address;
         const customerEmail = order.guest_email || order.user_email || '';
+        const showPaymentReminder =
+          order.payment_status === 'pending' && order.payment_method !== 'pay_on_delivery';
+        const unpaidNotice =
+          showPaymentReminder && order.status !== 'cancelled'
+            ? '<p class="order-email-warning" style="margin-top:0">Unpaid card orders are automatically cancelled after 3 days if payment is not received.</p>'
+            : '';
         const stockAlert = order.stock_warning
           ? `<div class="alert alert-warning order-stock-alert" role="status"><strong>Stock:</strong> ${esc(order.stock_warning)}</div>`
           : '';
@@ -421,6 +435,7 @@
             <section id="orderEmailPanel" class="order-panel order-panel--email">
               <h2 class="order-panel__title">Customer email</h2>
               <p class="order-panel__intro">Preview and send emails anytime. Configure SMTP in <a href="/admin/settings.html">Settings</a>.</p>
+              ${unpaidNotice}
               <p class="order-email-recipient"><strong>To:</strong> ${esc(customerEmail || '—')}</p>
               ${!customerEmail ? '<p class="order-email-warning">No customer email on this order — emails cannot be sent.</p>' : ''}
 
@@ -430,6 +445,14 @@
                   <input type="radio" name="emailType" value="payment_receipt" checked>
                   <span>Payment receipt / order confirmation</span>
                 </label>
+                ${
+                  showPaymentReminder
+                    ? `<label class="order-email-type__option">
+                  <input type="radio" name="emailType" value="payment_reminder">
+                  <span>Payment reminder (unpaid order)</span>
+                </label>`
+                    : ''
+                }
                 <label class="order-email-type__option">
                   <input type="radio" name="emailType" value="status_update">
                   <span>Status update (uses status &amp; tracking above)</span>
@@ -449,6 +472,11 @@
 
               <div class="order-panel__actions">
                 <button type="button" class="btn" id="sendReceiptBtn" ${!customerEmail ? 'disabled' : ''}>Send payment receipt</button>
+                ${
+                  showPaymentReminder
+                    ? `<button type="button" class="btn btn-secondary" id="sendPaymentReminderBtn" ${!customerEmail ? 'disabled' : ''}>Send payment reminder</button>`
+                    : ''
+                }
                 <button type="button" class="btn btn-secondary" id="sendStatusEmailBtn" ${!customerEmail ? 'disabled' : ''}>Send status email only</button>
               </div>
 

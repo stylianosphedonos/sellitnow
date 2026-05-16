@@ -4,6 +4,7 @@ const CartService = require('./CartService');
 const { getBrandSettings } = require('../routes/brand');
 const { computeShippingTotal } = require('../lib/shipping');
 const ProductService = require('./ProductService');
+const config = require('../config');
 const EmailService = require('./EmailService');
 const OrderEmailLogService = require('./OrderEmailLogService');
 const { createGuestOrderToken, verifyGuestOrderToken } = require('../lib/guestOrderToken');
@@ -505,6 +506,103 @@ class OrderService {
     }
 
     return { order, previousPaymentStatus };
+  }
+
+  /**
+   * Cancel an unpaid card order (payment failed) and notify the customer.
+   */
+  async cancelUnpaidOrder(orderId, options = {}) {
+    const expiryDays = options.expiryDays ?? config.app.unpaidOrderExpiryDays;
+    const sendEmail = options.sendEmail !== false;
+
+    const client = await pool.connect();
+    let order;
+    try {
+      await client.query('BEGIN');
+      const currentResult = await client.query(
+        `SELECT id, status, payment_status, payment_method FROM orders WHERE id = $1 FOR UPDATE`,
+        [orderId]
+      );
+      if (!currentResult.rows.length) throw new Error('Order not found');
+      const current = currentResult.rows[0];
+
+      if (current.payment_status === 'paid') {
+        await client.query('ROLLBACK');
+        return { order: current, skipped: true, reason: 'already_paid' };
+      }
+      if (current.status === 'cancelled' && current.payment_status === 'failed') {
+        await client.query('ROLLBACK');
+        return { order: current, skipped: true, reason: 'already_cancelled' };
+      }
+
+      const result = await client.query(
+        `UPDATE orders SET payment_status = 'failed', status = 'cancelled', updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [orderId]
+      );
+      order = result.rows[0];
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    let emailSent = false;
+    let emailError = null;
+    if (sendEmail) {
+      const orderForMail = await this.getOrderWithCustomerEmail(orderId);
+      const mailResult = await EmailService.sendUnpaidOrderCancelled(orderForMail, {
+        expiryDays,
+        source: options.source || 'auto_expiry',
+      });
+      emailSent = Boolean(mailResult.success);
+      if (!emailSent) emailError = mailResult.error || 'Email could not be sent';
+    }
+
+    return { order, emailSent, emailError, skipped: false };
+  }
+
+  /**
+   * Auto-cancel card orders unpaid longer than configured days.
+   */
+  async expireUnpaidOrders() {
+    const days = config.app.unpaidOrderExpiryDays;
+    const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const result = await pool.query(
+      `SELECT o.id, o.created_at
+       FROM orders o
+       WHERE o.payment_status = 'pending'
+         AND o.payment_method = 'card'
+         AND o.status != 'cancelled'`
+    );
+
+    const expired = [];
+    const errors = [];
+
+    for (const row of result.rows) {
+      const created = new Date(row.created_at).getTime();
+      if (!Number.isFinite(created) || created >= cutoffMs) continue;
+
+      try {
+        const r = await this.cancelUnpaidOrder(row.id, {
+          expiryDays: days,
+          source: 'auto_expiry',
+        });
+        if (!r.skipped) expired.push(row.id);
+      } catch (err) {
+        errors.push({ orderId: row.id, error: err.message });
+        console.error(`[Order] Failed to expire unpaid order ${row.id}:`, err.message);
+      }
+    }
+
+    if (expired.length) {
+      console.log(`[Order] Expired ${expired.length} unpaid order(s) after ${days} day(s):`, expired);
+    }
+
+    return { expiredCount: expired.length, orderIds: expired, errors };
   }
 
   /**

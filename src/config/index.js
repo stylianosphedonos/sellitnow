@@ -72,6 +72,11 @@ module.exports = {
     maxImageSizeMB: parseInt(process.env.MAX_IMAGE_SIZE_MB || '5', 10),
     maxImagesPerProduct: parseInt(process.env.MAX_IMAGES_PER_PRODUCT || '5', 10),
     cartExpiryDays: 7,
+    /** Unpaid card orders older than this are auto-cancelled (payment failed). */
+    unpaidOrderExpiryDays: Math.max(
+      1,
+      parseInt(process.env.UNPAID_ORDER_EXPIRY_DAYS || '3', 10) || 3
+    ),
     maxLoginAttempts: 5,
     lockoutMinutes: 15,
     passwordMinLength: 8,

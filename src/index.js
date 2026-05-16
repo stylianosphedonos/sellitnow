@@ -419,6 +419,8 @@ async function ensureSeed() {
 async function afterListenStartup() {
   await ensureDb();
   await ensureSeed();
+  const { startOrderExpiryScheduler } = require('./services/OrderExpiryScheduler');
+  startOrderExpiryScheduler();
 }
 
 function startup() {

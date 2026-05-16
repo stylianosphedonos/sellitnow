@@ -274,7 +274,13 @@ router.get('/orders/:id/email/preview', async (req, res) => {
 
     let draft = null;
     let label = '';
-    if (type === 'status_update') {
+    if (type === 'payment_reminder') {
+      if (order.payment_status === 'paid') {
+        return res.status(400).json({ error: 'This order is already paid.' });
+      }
+      draft = await EmailService.buildPaymentReminderDraft(order, items);
+      label = 'Payment reminder';
+    } else if (type === 'status_update') {
       const status = req.query.status != null ? String(req.query.status) : order.status;
       const tracking =
         req.query.tracking_number != null
@@ -324,7 +330,13 @@ router.post('/orders/:id/email/send', async (req, res) => {
 
     let result;
     let label = '';
-    if (type === 'status_update') {
+    if (type === 'payment_reminder') {
+      if (order.payment_status === 'paid') {
+        return res.status(400).json({ error: 'This order is already paid.' });
+      }
+      result = await EmailService.sendPaymentReminder(order, items, { source: 'admin_manual' });
+      label = 'Payment reminder';
+    } else if (type === 'status_update') {
       const status = req.body?.status != null ? String(req.body.status) : order.status;
       const tracking =
         req.body?.tracking_number != null ? String(req.body.tracking_number) : order.tracking_number;
