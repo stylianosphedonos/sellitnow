@@ -46,8 +46,33 @@
             <textarea name="description" rows="3"></textarea>
           </div>
           <div class="form-group">
-            <label>Order number (optional)</label>
-            <input type="number" name="display_order" step="1" min="0" placeholder="Lower number shows first">
+            <label>Position on website (sort order)</label>
+            <input type="number" name="display_order" step="1" min="0" placeholder="e.g. 1, 2, 3 — lower appears first">
+            <small>Controls left-to-right order in “Shop by Category”. Leave empty to sort by ID.</small>
+          </div>
+          <div class="form-group">
+            <label>Icon alignment</label>
+            <select name="icon_align">
+              <option value="left">Left</option>
+              <option value="center" selected>Center</option>
+              <option value="right">Right</option>
+            </select>
+            <small>Where the icon sits inside its tile on the storefront.</small>
+          </div>
+          <div class="form-group">
+            <label>Image focus</label>
+            <select name="icon_focus">
+              <option value="center" selected>Center</option>
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+              <option value="top-left">Top left</option>
+              <option value="top-right">Top right</option>
+              <option value="bottom-left">Bottom left</option>
+              <option value="bottom-right">Bottom right</option>
+            </select>
+            <small>Which part of the image is visible when it is cropped to a square.</small>
           </div>
           <div class="form-group">
             <label>Icon size on website (px)</label>
@@ -90,13 +115,14 @@
         document.getElementById('categories').innerHTML = `
           <div class="admin-table-wrap">
           <table class="table">
-            <thead><tr><th>ID</th><th>Order</th><th>On site</th><th>Icon (px)</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Sort</th><th>On site</th><th>Align</th><th>Icon (px)</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
             <tbody>
             ${(categories || []).map(c => `
               <tr>
                 <td>${c.id}</td>
                 <td>${c.display_order ?? '-'}</td>
                 <td>${c.show_on_website ? 'Yes' : 'No'}</td>
+                <td>${escapeAttr(c.icon_align || 'center')}</td>
                 <td>${c.icon_size_px ?? '140'}</td>
                 <td><strong>${escapeAttr(c.name)}</strong></td>
                 <td>${escapeAttr(c.slug)}</td>
@@ -125,7 +151,9 @@
         name,
         description: descTrim === '' ? null : form.description.value,
         display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
-        show_on_website: form.show_on_website.checked
+        show_on_website: form.show_on_website.checked,
+        icon_align: form.icon_align.value,
+        icon_focus: form.icon_focus.value
       };
       if (form.icon_size_px.value !== '') {
         payload.icon_size_px = parseInt(form.icon_size_px.value, 10);

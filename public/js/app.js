@@ -531,6 +531,35 @@ function bindLoadAllProductsFromCategorySection() {
   });
 }
 
+const CATEGORY_ICON_FOCUS_CSS = {
+  center: 'center',
+  top: 'center top',
+  bottom: 'center bottom',
+  left: 'left center',
+  right: 'right center',
+  'top-left': 'left top',
+  'top-right': 'right top',
+  'bottom-left': 'left bottom',
+  'bottom-right': 'right bottom',
+};
+
+function renderStorefrontCategoryCard(c) {
+  const iconSize = c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : 140;
+  const align = c.icon_align === 'left' || c.icon_align === 'right' ? c.icon_align : 'center';
+  const mediaStyle = `style="width:${iconSize}px;height:${iconSize}px"`;
+  const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
+  const objectPosition = CATEGORY_ICON_FOCUS_CSS[c.icon_focus] || 'center';
+  const imgExtraStyle = imgUrl ? ` style="object-position:${objectPosition}"` : '';
+  const media = imgUrl
+    ? `<div class="category-card__media" ${mediaStyle}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"${imgExtraStyle}></div>`
+    : `<div class="category-card__media category-card__media--placeholder" ${mediaStyle}><span class="icon" aria-hidden="true">🛒</span></div>`;
+  return `
+      <button type="button" class="category-card category-card--sized category-card--align-${align}" data-category-id="${c.id}">
+        ${media}
+        <span class="category-card__label">${escapeHtml(c.name)}</span>
+      </button>`;
+}
+
 async function loadCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
@@ -554,19 +583,7 @@ async function loadCategories() {
     grid.innerHTML =
       allProductsTile +
       categories
-        .map((c) => {
-          const iconSize = c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : 140;
-          const mediaStyle = `style="width:${iconSize}px;height:${iconSize}px"`;
-          const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
-          const media = imgUrl
-            ? `<div class="category-card__media" ${mediaStyle}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`
-            : `<div class="category-card__media category-card__media--placeholder" ${mediaStyle}><span class="icon" aria-hidden="true">🛒</span></div>`;
-          return `
-      <button type="button" class="category-card category-card--sized" data-category-id="${c.id}">
-        ${media}
-        <span class="category-card__label">${escapeHtml(c.name)}</span>
-      </button>`;
-        })
+        .map((c) => renderStorefrontCategoryCard(c))
         .join('');
   } catch (err) {
     sellitnowCategoryLabels.clear();

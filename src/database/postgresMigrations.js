@@ -24,6 +24,12 @@ async function runPostgresMigrations(pool) {
     'ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_on_website INTEGER NOT NULL DEFAULT 1'
   );
   await pool.query(
+    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_align TEXT DEFAULT 'center'"
+  );
+  await pool.query(
+    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_focus TEXT DEFAULT 'center'"
+  );
+  await pool.query(
     "ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type TEXT DEFAULT 'simple'"
   );
   await pool.query(

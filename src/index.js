@@ -289,6 +289,12 @@ function runSchemaMigrations(db) {
   if (!categoryCols.some((c) => c.name === 'show_on_website')) {
     db.exec('ALTER TABLE categories ADD COLUMN show_on_website INTEGER NOT NULL DEFAULT 1');
   }
+  if (!categoryCols.some((c) => c.name === 'icon_align')) {
+    db.exec("ALTER TABLE categories ADD COLUMN icon_align TEXT DEFAULT 'center'");
+  }
+  if (!categoryCols.some((c) => c.name === 'icon_focus')) {
+    db.exec("ALTER TABLE categories ADD COLUMN icon_focus TEXT DEFAULT 'center'");
+  }
 
   const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!orderCols.includes('stock_warning')) {

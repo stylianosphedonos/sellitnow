@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS categories (
   image_url TEXT,
   display_order INTEGER,
   icon_size_px INTEGER,
+  icon_align TEXT DEFAULT 'center',
+  icon_focus TEXT DEFAULT 'center',
   show_on_website INTEGER NOT NULL DEFAULT 1,
   created_at TEXT DEFAULT (datetime('now'))
 );
