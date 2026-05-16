@@ -5,20 +5,9 @@ const { parseOptionsJson } = require('../lib/productOptions');
 const DEFAULT_ICON_SIZE_PX = 140;
 const MIN_ICON_SIZE_PX = 48;
 const MAX_ICON_SIZE_PX = 280;
-const ICON_ALIGNS = ['left', 'center', 'right'];
-const ICON_FOCUSES = [
-  'center',
-  'top',
-  'bottom',
-  'left',
-  'right',
-  'top-left',
-  'top-right',
-  'bottom-left',
-  'bottom-right',
-];
+const WEBSITE_LAYOUTS = ['tile', 'banner-left', 'banner-right'];
 const CATEGORY_FIELDS =
-  'id, name, slug, description, image_url, display_order, icon_size_px, icon_align, icon_focus, show_on_website';
+  'id, name, slug, description, image_url, display_order, icon_size_px, website_layout, show_on_website';
 
 function parseNullableInteger(value, fieldName) {
   if (value === undefined || value === null || value === '') return null;
@@ -45,20 +34,11 @@ function parseShowOnWebsite(value) {
   return 0;
 }
 
-function parseIconAlign(value) {
-  if (value === undefined || value === null || value === '') return 'center';
+function parseWebsiteLayout(value) {
+  if (value === undefined || value === null || value === '') return 'tile';
   const normalized = String(value).trim().toLowerCase();
-  if (!ICON_ALIGNS.includes(normalized)) {
-    throw new Error('Icon alignment must be left, center, or right.');
-  }
-  return normalized;
-}
-
-function parseIconFocus(value) {
-  if (value === undefined || value === null || value === '') return 'center';
-  const normalized = String(value).trim().toLowerCase();
-  if (!ICON_FOCUSES.includes(normalized)) {
-    throw new Error('Image focus is invalid.');
+  if (!WEBSITE_LAYOUTS.includes(normalized)) {
+    throw new Error('Layout must be grid tile, banner left, or banner right.');
   }
   return normalized;
 }
@@ -69,8 +49,7 @@ function normalizeCategoryRow(row) {
     ...row,
     show_on_website: row.show_on_website === 1 || row.show_on_website === true,
     icon_size_px: row.icon_size_px != null ? row.icon_size_px : null,
-    icon_align: parseIconAlign(row.icon_align),
-    icon_focus: parseIconFocus(row.icon_focus),
+    website_layout: parseWebsiteLayout(row.website_layout),
   };
 }
 
@@ -219,11 +198,10 @@ class CategoryService {
     const displayOrder = parseNullableInteger(data.display_order, 'Display order');
     const iconSizePx = parseIconSizePx(data.icon_size_px);
     const showOnWebsite = parseShowOnWebsite(data.show_on_website);
-    const iconAlign = parseIconAlign(data.icon_align);
-    const iconFocus = parseIconFocus(data.icon_focus);
+    const websiteLayout = parseWebsiteLayout(data.website_layout);
     const result = await pool.query(
-      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, icon_align, icon_focus, show_on_website)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, website_layout, show_on_website)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${CATEGORY_FIELDS}`,
       [
         name,
@@ -232,8 +210,7 @@ class CategoryService {
         data.image_url || null,
         displayOrder,
         iconSizePx,
-        iconAlign,
-        iconFocus,
+        websiteLayout,
         showOnWebsite,
       ]
     );
@@ -277,13 +254,9 @@ class CategoryService {
       updates.push(`show_on_website = $${i++}`);
       values.push(parseShowOnWebsite(data.show_on_website));
     }
-    if (data.icon_align !== undefined) {
-      updates.push(`icon_align = $${i++}`);
-      values.push(parseIconAlign(data.icon_align));
-    }
-    if (data.icon_focus !== undefined) {
-      updates.push(`icon_focus = $${i++}`);
-      values.push(parseIconFocus(data.icon_focus));
+    if (data.website_layout !== undefined) {
+      updates.push(`website_layout = $${i++}`);
+      values.push(parseWebsiteLayout(data.website_layout));
     }
 
     if (updates.length === 0) throw new Error('No fields to update');
@@ -301,5 +274,6 @@ class CategoryService {
 CategoryService.DEFAULT_ICON_SIZE_PX = DEFAULT_ICON_SIZE_PX;
 CategoryService.MIN_ICON_SIZE_PX = MIN_ICON_SIZE_PX;
 CategoryService.MAX_ICON_SIZE_PX = MAX_ICON_SIZE_PX;
+CategoryService.WEBSITE_LAYOUTS = WEBSITE_LAYOUTS;
 
 module.exports = new CategoryService();

@@ -54,8 +54,7 @@
     }
 
     function renderForm() {
-      const align = category.icon_align || 'center';
-      const focus = category.icon_focus || 'center';
+      const layout = category.website_layout || 'tile';
       document.getElementById('formContainer').innerHTML = `
         <form id="editForm" style="max-width:600px;background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
           <div class="form-group">
@@ -76,28 +75,13 @@
             <small>Controls left-to-right order in “Shop by Category”. Leave empty to sort by ID.</small>
           </div>
           <div class="form-group">
-            <label>Icon alignment</label>
-            <select name="icon_align">
-              <option value="left"${optionSelected('left', align)}>Left</option>
-              <option value="center"${optionSelected('center', align)}>Center</option>
-              <option value="right"${optionSelected('right', align)}>Right</option>
+            <label>Layout on website</label>
+            <select name="website_layout">
+              <option value="tile"${optionSelected('tile', layout)}>Grid tile</option>
+              <option value="banner-left"${optionSelected('banner-left', layout)}>Banner — left side (full width)</option>
+              <option value="banner-right"${optionSelected('banner-right', layout)}>Banner — right side (full width)</option>
             </select>
-            <small>Where the icon sits inside its tile on the storefront.</small>
-          </div>
-          <div class="form-group">
-            <label>Image focus</label>
-            <select name="icon_focus">
-              <option value="center"${optionSelected('center', focus)}>Center</option>
-              <option value="top"${optionSelected('top', focus)}>Top</option>
-              <option value="bottom"${optionSelected('bottom', focus)}>Bottom</option>
-              <option value="left"${optionSelected('left', focus)}>Left</option>
-              <option value="right"${optionSelected('right', focus)}>Right</option>
-              <option value="top-left"${optionSelected('top-left', focus)}>Top left</option>
-              <option value="top-right"${optionSelected('top-right', focus)}>Top right</option>
-              <option value="bottom-left"${optionSelected('bottom-left', focus)}>Bottom left</option>
-              <option value="bottom-right"${optionSelected('bottom-right', focus)}>Bottom right</option>
-            </select>
-            <small>Which part of the image is visible when it is cropped to a square.</small>
+            <small>Moves the whole category icon: grid cell, or a full-width banner on the left or right.</small>
           </div>
           <div class="form-group">
             <label>Icon size on website (px)</label>
@@ -188,8 +172,7 @@
         description: form.description.value.trim() === '' ? null : form.description.value,
         display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
         show_on_website: form.show_on_website.checked,
-        icon_align: form.icon_align.value,
-        icon_focus: form.icon_focus.value
+        website_layout: form.website_layout.value
       };
       payload.icon_size_px = form.icon_size_px.value === '' ? null : parseInt(form.icon_size_px.value, 10);
       if (slugTrim) payload.slug = slugTrim;

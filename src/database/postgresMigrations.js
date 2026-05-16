@@ -30,6 +30,17 @@ async function runPostgresMigrations(pool) {
     "ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_focus TEXT DEFAULT 'center'"
   );
   await pool.query(
+    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS website_layout TEXT DEFAULT 'tile'"
+  );
+  await pool.query(`
+    UPDATE categories SET website_layout = CASE
+      WHEN icon_align = 'left' THEN 'banner-left'
+      WHEN icon_align = 'right' THEN 'banner-right'
+      ELSE 'tile'
+    END
+    WHERE website_layout IS NULL OR website_layout = 'tile'
+  `);
+  await pool.query(
     "ALTER TABLE products ADD COLUMN IF NOT EXISTS product_type TEXT DEFAULT 'simple'"
   );
   await pool.query(

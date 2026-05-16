@@ -295,6 +295,18 @@ function runSchemaMigrations(db) {
   if (!categoryCols.some((c) => c.name === 'icon_focus')) {
     db.exec("ALTER TABLE categories ADD COLUMN icon_focus TEXT DEFAULT 'center'");
   }
+  if (!categoryCols.some((c) => c.name === 'website_layout')) {
+    db.exec("ALTER TABLE categories ADD COLUMN website_layout TEXT DEFAULT 'tile'");
+    if (categoryCols.some((c) => c.name === 'icon_align')) {
+      db.exec(`
+        UPDATE categories SET website_layout = CASE
+          WHEN icon_align = 'left' THEN 'banner-left'
+          WHEN icon_align = 'right' THEN 'banner-right'
+          ELSE 'tile'
+        END
+      `);
+    }
+  }
 
   const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!orderCols.includes('stock_warning')) {

@@ -531,32 +531,49 @@ function bindLoadAllProductsFromCategorySection() {
   });
 }
 
-const CATEGORY_ICON_FOCUS_CSS = {
-  center: 'center',
-  top: 'center top',
-  bottom: 'center bottom',
-  left: 'left center',
-  right: 'right center',
-  'top-left': 'left top',
-  'top-right': 'right top',
-  'bottom-left': 'left bottom',
-  'bottom-right': 'right bottom',
-};
+function getCategoryIconSizePx(c) {
+  return c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : 140;
+}
+
+function getCategoryWebsiteLayout(c) {
+  const layout = c.website_layout;
+  if (layout === 'banner-left' || layout === 'banner-right') return layout;
+  return 'tile';
+}
+
+function renderCategoryCardMedia(c, iconSizePx) {
+  const mediaStyle = `style="width:${iconSizePx}px;height:${iconSizePx}px"`;
+  const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
+  if (imgUrl) {
+    return `<div class="category-card__media" ${mediaStyle}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
+  }
+  return `<div class="category-card__media category-card__media--placeholder" ${mediaStyle}><span class="icon" aria-hidden="true">🛒</span></div>`;
+}
 
 function renderStorefrontCategoryCard(c) {
-  const iconSize = c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : 140;
-  const align = c.icon_align === 'left' || c.icon_align === 'right' ? c.icon_align : 'center';
-  const mediaStyle = `style="width:${iconSize}px;height:${iconSize}px"`;
-  const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
-  const objectPosition = CATEGORY_ICON_FOCUS_CSS[c.icon_focus] || 'center';
-  const imgExtraStyle = imgUrl ? ` style="object-position:${objectPosition}"` : '';
-  const media = imgUrl
-    ? `<div class="category-card__media" ${mediaStyle}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"${imgExtraStyle}></div>`
-    : `<div class="category-card__media category-card__media--placeholder" ${mediaStyle}><span class="icon" aria-hidden="true">🛒</span></div>`;
-  return `
-      <button type="button" class="category-card category-card--sized category-card--align-${align}" data-category-id="${c.id}">
+  const layout = getCategoryWebsiteLayout(c);
+  const iconSizePx = getCategoryIconSizePx(c);
+  const media = renderCategoryCardMedia(c, iconSizePx);
+  const label = `<span class="category-card__label">${escapeHtml(c.name)}</span>`;
+
+  if (layout === 'banner-left') {
+    return `
+      <button type="button" class="category-card category-card--banner category-card--banner-left" data-category-id="${c.id}">
         ${media}
-        <span class="category-card__label">${escapeHtml(c.name)}</span>
+        ${label}
+      </button>`;
+  }
+  if (layout === 'banner-right') {
+    return `
+      <button type="button" class="category-card category-card--banner category-card--banner-right" data-category-id="${c.id}">
+        ${media}
+        ${label}
+      </button>`;
+  }
+  return `
+      <button type="button" class="category-card category-card--tile" data-category-id="${c.id}">
+        ${media}
+        ${label}
       </button>`;
 }
 
