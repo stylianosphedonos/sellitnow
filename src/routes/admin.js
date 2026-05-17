@@ -625,6 +625,7 @@ router.put('/brand', async (req, res) => {
       banner,
       logo,
       allProductsImage,
+      allProductsShowOnWebsite,
       currency,
       taxRatePercent,
       heroTitle,
@@ -641,6 +642,10 @@ router.put('/brand', async (req, res) => {
       banner !== undefined && { key: 'banner', value: String(banner || '') },
       logo !== undefined && { key: 'logo', value: String(logo || '') },
       allProductsImage !== undefined && { key: 'allProductsImage', value: String(allProductsImage || '') },
+      allProductsShowOnWebsite !== undefined && {
+        key: 'allProductsShowOnWebsite',
+        value: allProductsShowOnWebsite === true || allProductsShowOnWebsite === 'true' || allProductsShowOnWebsite === 1 || allProductsShowOnWebsite === '1' ? 'true' : 'false',
+      },
       heroTitle !== undefined && { key: 'heroTitle', value: String(heroTitle) },
       heroSubtitle !== undefined && { key: 'heroSubtitle', value: String(heroSubtitle) },
     ].filter(Boolean);

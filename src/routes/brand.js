@@ -12,6 +12,7 @@ const DEFAULTS = {
   banner: '',
   logo: '',
   allProductsImage: '',
+  allProductsShowOnWebsite: true,
   currency: 'usd',
   heroTitle: 'Up to 90% Off',
   heroSubtitle: 'Discover amazing deals on electronics, fashion & more',
@@ -25,6 +26,14 @@ function rowToObj(rows) {
     obj[r.key] = r.value;
   }
   return obj;
+}
+
+function parseBoolSetting(val, defaultVal = true) {
+  if (val == null || String(val).trim() === '') return defaultVal;
+  const s = String(val).toLowerCase();
+  if (s === 'true' || s === '1') return true;
+  if (s === 'false' || s === '0') return false;
+  return defaultVal;
 }
 
 function normalizeCurrency(val) {
@@ -188,6 +197,10 @@ async function getBrandSettings() {
     banner: stored.banner || DEFAULTS.banner,
     logo: stored.logo || DEFAULTS.logo,
     allProductsImage: stored.allProductsImage || DEFAULTS.allProductsImage,
+    allProductsShowOnWebsite: parseBoolSetting(
+      stored.allProductsShowOnWebsite,
+      DEFAULTS.allProductsShowOnWebsite
+    ),
     currency,
     taxRatePercent,
     heroTitle,

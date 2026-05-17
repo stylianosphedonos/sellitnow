@@ -29,6 +29,7 @@ function persistBrandSettings(data) {
       banner: data.banner || '',
       logo: data.logo || '',
       allProductsImage: data.allProductsImage || '',
+      allProductsShowOnWebsite: data.allProductsShowOnWebsite !== false,
       heroTitle: data.heroTitle,
       heroSubtitle: data.heroSubtitle,
       heroBannerOverlay: data.heroBannerOverlay,
@@ -584,8 +585,9 @@ async function loadCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
   const cachedBrand = readCachedBrandSettings();
+  const showAllProductsTile = cachedBrand?.allProductsShowOnWebsite !== false;
   const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
-  const allProductsTile = `
+  const allProductsTile = showAllProductsTile ? `
       <button type="button" class="category-card" id="loadAllProductsBtn" aria-label="Show all products">
         ${
           allProductsImage
@@ -593,7 +595,7 @@ async function loadCategories() {
             : '<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>'
         }
         <span class="category-card__label">All products</span>
-      </button>`;
+      </button>` : '';
   try {
     const { categories } = await callApi('/categories');
     sellitnowCategoryLabels.clear();
