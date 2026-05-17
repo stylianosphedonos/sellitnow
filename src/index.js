@@ -194,12 +194,27 @@ paymentsRouter.post('/process', async (req, res) => {
 });
 paymentsRouter.post('/create-intent', async (req, res) => {
   try {
-    const { order_id, order_number, guest_token } = req.body;
+    const { order_id, order_number, guest_token, shipping_address, guest_email } = req.body;
     const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
     const orderRef = order_id ?? order_number;
-    if (!orderRef) return res.status(400).json({ error: 'order_id or order_number required' });
+    const userId = req.user?.id || null;
+    const sessionId = req.headers['x-cart-session'] || null;
+
+    if (shipping_address) {
+      const result = await PaymentService.createCheckoutPaymentIntent({
+        userId,
+        sessionId,
+        shippingAddress: shipping_address,
+        guestEmail: guest_email,
+      });
+      return res.json(result);
+    }
+
+    if (!orderRef) {
+      return res.status(400).json({ error: 'shipping_address or order_id is required' });
+    }
     const result = await PaymentService.createPaymentIntent(orderRef, {
-      userId: req.user?.id || null,
+      userId,
       guestToken: guestHeaderToken || guest_token || null,
     });
     res.json(result);
@@ -211,13 +226,14 @@ paymentsRouter.post('/confirm', async (req, res) => {
   try {
     const { order_id, order_number, payment_intent_id, guest_token } = req.body;
     const guestHeaderToken = typeof req.headers['x-guest-order-token'] === 'string' ? req.headers['x-guest-order-token'] : null;
-    const orderRef = order_id ?? order_number;
-    if (!orderRef || !payment_intent_id) {
-      return res.status(400).json({ error: 'order_id/order_number and payment_intent_id required' });
+    const orderRef = order_id ?? order_number ?? null;
+    if (!payment_intent_id) {
+      return res.status(400).json({ error: 'payment_intent_id is required' });
     }
     const result = await PaymentService.confirmPaymentIntent(orderRef, payment_intent_id, {
       userId: req.user?.id || null,
       guestToken: guestHeaderToken || guest_token || null,
+      sessionId: req.headers['x-cart-session'] || null,
     });
     res.json(result);
   } catch (err) {

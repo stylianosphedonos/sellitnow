@@ -45,7 +45,185 @@ class OrderService {
   }
 
   /**
-   * Create order from cart
+   * Create order from cart after successful card payment (checkout flow).
+   */
+  async createOrderFromPaidCheckout(
+    userId,
+    guestEmail,
+    shippingAddress,
+    sessionId,
+    { stripeTransactionId, amount }
+  ) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const existingTx = await client.query(
+        'SELECT order_id FROM transactions WHERE stripe_transaction_id = $1',
+        [stripeTransactionId]
+      );
+      if (existingTx.rows.length) {
+        const orderId = existingTx.rows[0].order_id;
+        const orderResult = await client.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+        await client.query('COMMIT');
+        const order = orderResult.rows[0];
+        const items = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
+        const result = { order, items: items.rows };
+        if (!userId && order.guest_email) {
+          result.guest_order_token = createGuestOrderToken(order.id, order.guest_email);
+        }
+        return result;
+      }
+
+      const cartData = await CartService.getCart(userId, sessionId);
+      if (cartData.items.length === 0) throw new Error('Cart is empty');
+
+      const email = userId ? null : guestEmail;
+      if (!userId && !email) throw new Error('Email required for guest checkout');
+
+      const stockIssueLines = [];
+      for (const item of cartData.items) {
+        const product = await ProductService.getById(item.product_id);
+        const available = await ProductService.getEffectiveStock(product);
+        if (available < Number(item.quantity)) {
+          stockIssueLines.push(
+            `"${product.title}": ordered ${item.quantity}, available ${available}`
+          );
+        }
+      }
+      const stockWarning =
+        stockIssueLines.length > 0
+          ? `Stock was not available for all line items at checkout: ${stockIssueLines.join('; ')}.`
+          : null;
+
+      let userEmail = null;
+      if (userId) {
+        const u = await client.query('SELECT email FROM users WHERE id = $1', [userId]);
+        userEmail = u.rows[0]?.email;
+      }
+
+      const subtotal = cartData.subtotal;
+      const taxAmount = cartData.tax_amount;
+      const brand = await getBrandSettings();
+      const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items);
+      const totalAmount = subtotal + taxAmount + shippingCost;
+      const orderNumber = this.generateOrderNumber();
+
+      const orderResult = await client.query(
+        `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status, payment_method, stock_warning)
+         VALUES ($1, $2, $3, 'processing', $4, $5, $6, $7, $8, 'paid', 'card', $9)
+         RETURNING *`,
+        [
+          orderNumber,
+          userId || null,
+          email || null,
+          subtotal,
+          taxAmount,
+          shippingCost,
+          totalAmount,
+          JSON.stringify(shippingAddress),
+          stockWarning,
+        ]
+      );
+      const order = orderResult.rows[0];
+
+      for (const item of cartData.items) {
+        const product = await ProductService.getById(item.product_id);
+        const productSnapshot = {
+          id: product.id,
+          sku: product.sku,
+          title: product.title,
+          slug: product.slug,
+          product_type: product.product_type || 'simple',
+          color: item.color || '',
+          size: item.size || '',
+          delivery_cost:
+            product.delivery_cost != null && product.delivery_cost !== ''
+              ? Number(product.delivery_cost)
+              : null,
+          bundle_items: Array.isArray(product.bundle_items)
+            ? product.bundle_items.map((b) => ({
+                product_id: b.component_product_id,
+                title: b.title,
+                quantity: b.quantity,
+                price: b.price,
+              }))
+            : [],
+        };
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, product_snapshot, quantity, unit_price, total_price)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            order.id,
+            item.product_id,
+            JSON.stringify(productSnapshot),
+            item.quantity,
+            item.price,
+            item.line_total,
+          ]
+        );
+        await ProductService.decrementStock(item.product_id, item.quantity);
+      }
+
+      await client.query(
+        'INSERT INTO transactions (order_id, stripe_transaction_id, amount, status) VALUES ($1, $2, $3, $4)',
+        [order.id, stripeTransactionId, amount ?? totalAmount, 'succeeded']
+      );
+
+      await CartService.clearCart(cartData.cart_id);
+
+      await client.query('COMMIT');
+
+      const items = await pool.query('SELECT * FROM order_items WHERE order_id = $1', [order.id]);
+      const orderWithEmail = { ...order, user_email: userEmail };
+      const itemRows = items.rows;
+
+      const customerMail = await EmailService.sendOrderReceivedAndProcessing(orderWithEmail, itemRows, {
+        source: 'checkout_paid',
+      });
+      if (!customerMail?.success) {
+        console.error(
+          `[Order] Customer order confirmation failed for #${order.order_number}:`,
+          customerMail?.error || 'unknown error'
+        );
+      }
+
+      const receiptMail = await EmailService.sendPaymentReceipt(
+        orderWithEmail,
+        itemRows,
+        { stripeTransactionId, amountPaid: amount ?? totalAmount },
+        { source: 'checkout_paid' }
+      );
+      if (!receiptMail?.success) {
+        console.error(
+          `[Order] Payment receipt failed for #${order.order_number}:`,
+          receiptMail?.error || 'unknown error'
+        );
+      }
+
+      const supportMail = await EmailService.sendAdminNewOrder(orderWithEmail, itemRows);
+      if (!supportMail?.success) {
+        console.error(
+          `[Order] Support new-order notification failed for #${order.order_number}:`,
+          supportMail?.error || 'unknown error'
+        );
+      }
+
+      const result = { order, items: itemRows };
+      if (!userId && email) {
+        result.guest_order_token = createGuestOrderToken(order.id, email);
+      }
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
+   * Create order from cart (legacy pending checkout — prefer createOrderFromPaidCheckout).
    * @param {'card'} paymentMethod
    */
   async createOrder(userId, guestEmail, shippingAddress, cartId, sessionId, paymentMethod = 'card') {

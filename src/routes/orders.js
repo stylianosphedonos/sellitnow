@@ -1,40 +1,15 @@
 const express = require('express');
 const OrderService = require('../services/OrderService');
-const CartService = require('../services/CartService');
 const { authenticate, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-function getCartContext(req) {
-  const userId = req.user?.id || null;
-  const sessionId = req.headers['x-cart-session'] || null;
-  return { userId, sessionId };
-}
-
-// POST /api/v1/orders - create order from cart
+// POST /api/v1/orders - checkout creates orders after payment via /payments/confirm
 router.post('/', optionalAuth, async (req, res) => {
-  try {
-    const { userId, sessionId } = getCartContext(req);
-    const { guest_email, shipping_address, payment_method } = req.body;
-
-    if (!shipping_address) {
-      return res.status(400).json({ error: 'Shipping address is required' });
-    }
-
-    const cart = await CartService.getCart(userId, sessionId);
-    const { order, items, guest_order_token } = await OrderService.createOrder(
-      userId,
-      guest_email,
-      shipping_address,
-      cart.cart_id,
-      sessionId,
-      payment_method
-    );
-
-    res.status(201).json({ order, items, guest_order_token });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  res.status(400).json({
+    error:
+      'Orders are created when payment succeeds. Complete checkout on the payment step.',
+  });
 });
 
 // GET /api/v1/orders - user's orders (requires auth)

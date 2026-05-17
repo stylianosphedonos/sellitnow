@@ -3,9 +3,11 @@ const config = require('../config');
 const { pool } = require('../database/db');
 const { getBrandSettings } = require('../routes/brand');
 const OrderService = require('./OrderService');
+const CartService = require('./CartService');
 const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
-const { verifyGuestOrderToken } = require('../lib/guestOrderToken');
+const { verifyGuestOrderToken, createGuestOrderToken } = require('../lib/guestOrderToken');
+const { computeShippingTotal } = require('../lib/shipping');
 
 let stripe = null;
 if (config.stripe.secretKey) {
@@ -137,6 +139,158 @@ class PaymentService {
   }
 
   /**
+   * Create PaymentIntent from cart + shipping (order is created after payment succeeds).
+   */
+  async createCheckoutPaymentIntent({ userId = null, sessionId = null, shippingAddress, guestEmail }) {
+    if (!stripe) throw new Error('Stripe is not configured');
+    if (!shippingAddress || typeof shippingAddress !== 'object') {
+      throw new Error('Shipping address is required');
+    }
+
+    const cartData = await CartService.getCart(userId, sessionId);
+    if (!cartData.items.length) throw new Error('Cart is empty');
+
+    if (!userId && !guestEmail) throw new Error('Email required for guest checkout');
+
+    const brand = await getBrandSettings();
+    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items);
+    const totalAmount = cartData.subtotal + cartData.tax_amount + shippingCost;
+    const amountInCents = Math.round(parseFloat(totalAmount) * 100);
+    if (amountInCents < 50) throw new Error('Amount too small');
+
+    const { currency: storeCurrency } = brand;
+    const stripeCurrency = (storeCurrency || 'usd').toLowerCase();
+
+    const shippingJson = JSON.stringify(shippingAddress);
+    if (shippingJson.length > 500) {
+      throw new Error('Shipping address is too long');
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: stripeCurrency,
+      ...CARD_ONLY_INTENT,
+      metadata: {
+        checkout_flow: 'cart',
+        user_id: userId ? String(userId) : '',
+        session_id: sessionId ? String(sessionId) : '',
+        guest_email: guestEmail ? String(guestEmail).trim().toLowerCase() : '',
+        shipping_address: shippingJson,
+      },
+    });
+
+    return {
+      client_secret: paymentIntent.client_secret,
+      total_amount: totalAmount,
+    };
+  }
+
+  /**
+   * After payment succeeds, create the order from cart metadata on the PaymentIntent.
+   */
+  async finalizeCheckoutPayment(paymentIntentId, actor = {}) {
+    if (!stripe) throw new Error('Stripe is not configured');
+    const piId = String(paymentIntentId || '').trim();
+    if (!piId) throw new Error('payment_intent_id is required');
+
+    const paymentIntent = await stripe.paymentIntents.retrieve(piId);
+    const meta = paymentIntent.metadata || {};
+
+    const legacyOrderId = parseInt(meta.order_id, 10);
+    if (legacyOrderId) {
+      const order = await OrderService.getById(legacyOrderId);
+      this.assertOrderAccess(order, actor);
+      if (paymentIntent.status === 'succeeded') {
+        const amount =
+          paymentIntent.amount_received != null
+            ? paymentIntent.amount_received / 100
+            : order.total_amount;
+        await this.handlePaymentSuccess(order.id, paymentIntent.id, amount);
+        return {
+          payment_status: 'paid',
+          order_id: order.id,
+          order_number: order.order_number,
+        };
+      }
+      if (paymentIntent.status === 'processing') {
+        return {
+          payment_status: 'pending',
+          order_id: order.id,
+          order_number: order.order_number,
+          message: 'Payment is processing. Status will update when Stripe confirms.',
+        };
+      }
+      throw new Error(`Payment is not complete (status: ${paymentIntent.status})`);
+    }
+
+    if (meta.checkout_flow !== 'cart') {
+      throw new Error('Payment is not linked to a checkout');
+    }
+
+    const existingTx = await pool.query(
+      'SELECT order_id FROM transactions WHERE stripe_transaction_id = $1',
+      [piId]
+    );
+    if (existingTx.rows.length) {
+      const order = await OrderService.getById(existingTx.rows[0].order_id);
+      const out = {
+        payment_status: 'paid',
+        order_id: order.id,
+        order_number: order.order_number,
+      };
+      if (!order.user_id && order.guest_email) {
+        out.guest_order_token = createGuestOrderToken(order.id, order.guest_email);
+      }
+      return out;
+    }
+
+    if (paymentIntent.status !== 'succeeded') {
+      if (paymentIntent.status === 'processing') {
+        return {
+          payment_status: 'pending',
+          message: 'Payment is processing. Your order will be created when Stripe confirms.',
+        };
+      }
+      throw new Error(`Payment is not complete (status: ${paymentIntent.status})`);
+    }
+
+    let shippingAddress;
+    try {
+      shippingAddress = JSON.parse(meta.shipping_address || '{}');
+    } catch {
+      throw new Error('Invalid checkout data on payment');
+    }
+
+    const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
+    const sessionId = meta.session_id || actor.sessionId || null;
+    const guestEmail = meta.guest_email || null;
+
+    if (!userId && !sessionId) {
+      throw new Error('Checkout session expired. Please try again from your cart.');
+    }
+
+    const amount =
+      paymentIntent.amount_received != null
+        ? paymentIntent.amount_received / 100
+        : paymentIntent.amount / 100;
+
+    const { order, guest_order_token } = await OrderService.createOrderFromPaidCheckout(
+      userId || null,
+      guestEmail,
+      shippingAddress,
+      sessionId,
+      { stripeTransactionId: piId, amount }
+    );
+
+    return {
+      payment_status: 'paid',
+      order_id: order.id,
+      order_number: order.order_number,
+      guest_order_token: guest_order_token || null,
+    };
+  }
+
+  /**
    * Create PaymentIntent for client-side confirmation
    * orderRef can be order_id (number) or order_number (string)
    */
@@ -178,14 +332,23 @@ class PaymentService {
     const piId = String(paymentIntentId || '').trim();
     if (!piId) throw new Error('payment_intent_id is required');
 
+    const paymentIntent = await stripe.paymentIntents.retrieve(piId);
+    const metaOrderId = parseInt(paymentIntent.metadata?.order_id, 10);
+
+    if (paymentIntent.metadata?.checkout_flow === 'cart' && !metaOrderId) {
+      return this.finalizeCheckoutPayment(piId, actor);
+    }
+
+    if (!orderRef) {
+      throw new Error('order_id or order_number is required');
+    }
+
     const order = Number.isInteger(Number(orderRef))
       ? await OrderService.getById(Number(orderRef))
       : await OrderService.getOrderByNumber(orderRef);
     if (!order) throw new Error('Order not found');
     this.assertOrderAccess(order, actor);
 
-    const paymentIntent = await stripe.paymentIntents.retrieve(piId);
-    const metaOrderId = parseInt(paymentIntent.metadata?.order_id, 10);
     if (!metaOrderId || metaOrderId !== Number(order.id)) {
       throw new Error('Payment does not match this order');
     }
@@ -228,10 +391,18 @@ class PaymentService {
 
     if (event.type === 'payment_intent.succeeded') {
       const pi = event.data.object;
-      const orderId = parseInt(pi.metadata?.order_id, 10);
       const amount = pi.amount_received / 100;
+      const orderId = parseInt(pi.metadata?.order_id, 10);
       if (orderId) {
         await this.handlePaymentSuccess(orderId, pi.id, amount);
+      } else if (pi.metadata?.checkout_flow === 'cart') {
+        try {
+          await this.finalizeCheckoutPayment(pi.id, {
+            sessionId: pi.metadata?.session_id || null,
+          });
+        } catch (err) {
+          console.error('[Payment] Webhook checkout finalize failed:', err.message);
+        }
       }
     }
 

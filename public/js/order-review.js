@@ -102,7 +102,9 @@
   };
 
   global.buildPaymentStepOrderBanner = function (orderNumber, totalAmount) {
-    const num = escapeHtml(orderNumber || '');
+    const num = orderNumber
+      ? escapeHtml(orderNumber)
+      : '<span style="font-weight:500;color:var(--text-muted)">Assigned after payment</span>';
     const total = parseFloat(totalAmount);
     return `
       <div class="checkout-order-banner">

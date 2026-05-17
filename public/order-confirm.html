@@ -34,22 +34,30 @@
     const redirectStatus = params.get('redirect_status');
     const orderId = params.get('id');
     const paymentIntentId = params.get('payment_intent');
+    const orderNumberEl = document.getElementById('orderNumber');
+
+    function showOrderNumber(number, id) {
+      orderNumberEl.textContent = 'Order #' + (number || id || '');
+    }
 
     async function syncPaymentAfterRedirect() {
-      if (!orderId || !paymentIntentId || redirectStatus !== 'succeeded') return;
-      const guestToken = sessionStorage.getItem('guest_order_token_' + orderId);
-      const headers = {};
-      const body = { order_id: orderId, payment_intent_id: paymentIntentId };
-      if (guestToken) {
-        headers['X-Guest-Order-Token'] = guestToken;
-        body.guest_token = guestToken;
-      }
+      if (!paymentIntentId || redirectStatus !== 'succeeded') return;
+      const guestToken = orderId ? sessionStorage.getItem('guest_order_token_' + orderId) : null;
+      const body = { payment_intent_id: paymentIntentId };
+      if (orderId) body.order_id = orderId;
+      if (guestToken) body.guest_token = guestToken;
       try {
-        await callApi('/payments/confirm', {
+        const result = await callApi('/payments/confirm', {
           method: 'POST',
-          headers,
           body: JSON.stringify(body),
         });
+        if (result.order_number || result.order_id) {
+          showOrderNumber(result.order_number, result.order_id);
+        }
+        if (result.guest_order_token && result.order_id) {
+          sessionStorage.setItem('guest_order_token_' + result.order_id, result.guest_order_token);
+        }
+        if (typeof loadCartCount === 'function') loadCartCount();
       } catch (err) {
         console.warn('[order-confirm] Payment sync:', err.message || err);
       }
@@ -58,11 +66,12 @@
     if (redirectStatus === 'failed') {
       document.querySelector('h1').textContent = 'Payment failed';
       document.querySelector('h1').style.color = '#c00';
-      document.getElementById('orderNumber').textContent = 'Your payment could not be completed. Please try again from your cart.';
+      orderNumberEl.textContent =
+        'Your payment could not be completed. Please try again from your cart.';
       document.querySelector('.btn').href = '/cart.html';
       document.querySelector('.btn').textContent = 'Back to cart';
     } else {
-      document.getElementById('orderNumber').textContent = 'Order #' + (params.get('number') || orderId || '');
+      showOrderNumber(params.get('number'), orderId);
       if (params.get('payment') === 'delivery') {
         document.getElementById('podPaymentNote').style.display = 'block';
       }

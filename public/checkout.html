@@ -25,7 +25,7 @@
     <div class="checkout-layout">
       <div class="checkout-main">
         <h1 style="font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em">Checkout</h1>
-        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px">Choose how you will pay, enter shipping details, then continue. Your order review on the right lists every SKU, color, and size.</p>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px">Enter shipping details, then pay securely by card. Your order is created only after payment succeeds.</p>
         <div id="checkoutError" class="alert alert-error" style="display:none"></div>
 
         <div id="stepShipping" class="checkout-card" style="max-width:640px">
@@ -36,29 +36,7 @@
               <input type="email" name="guest_email" id="guestEmail" required autocomplete="email">
             </div>
 
-            <div class="form-group" style="margin-top:24px">
-              <div class="checkout-payment-options" role="radiogroup" aria-labelledby="checkoutPaymentLegend">
-                <span id="checkoutPaymentLegend" class="checkout-payment-options__legend">How would you like to pay?</span>
-                <label class="checkout-payment-option">
-                  <input type="radio" name="checkout_payment_method" value="card" checked>
-                  <span class="checkout-payment-option__box">
-                    <span class="checkout-payment-option__title">Pay by card</span>
-                    <span class="checkout-payment-option__hint">Visa, Mastercard, and other cards — secure checkout with Stripe on the next step.</span>
-                  </span>
-                </label>
-                <label class="checkout-payment-option checkout-payment-option--applepay">
-                  <input type="radio" name="checkout_payment_method" value="apple_pay">
-                  <span class="checkout-payment-option__box">
-                    <span class="checkout-payment-option__title checkout-payment-option__title--with-mark">
-                      <span class="checkout-apple-pay-wordmark">Apple Pay</span>
-                    </span>
-                    <span class="checkout-payment-option__hint">On the next step you’ll confirm with Apple Pay from your Wallet.</span>
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <h3 style="margin:8px 0 12px;font-size:15px">Delivery address</h3>
+            <h3 style="margin:24px 0 12px;font-size:15px">Delivery address</h3>
             <div class="form-group">
               <label>Address line 1 *</label>
               <input type="text" name="address_line1" required autocomplete="street-address">
@@ -87,13 +65,7 @@
         <div id="stepPayment" class="checkout-card" style="display:none;max-width:640px">
           <h2 style="margin-top:0;font-size:18px">Payment</h2>
           <div id="paymentOrderBanner"></div>
-          <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Complete payment below. Items and options are fixed for this order.</p>
-          <div id="apple-wallet-checkout" style="display:none;margin-bottom:16px">
-            <div id="payment-request-button" class="checkout-pr-mount"></div>
-            <button type="button" class="btn btn-secondary" id="switchToCardPaymentBtn" style="display:none;margin-top:12px;max-width:260px">
-              Pay with card instead
-            </button>
-          </div>
+          <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Enter your card below. Your order will be placed when payment succeeds.</p>
           <div id="payment-message" class="alert alert-error" style="display:none;margin-top:12px"></div>
           <form id="paymentForm">
             <div id="payment-element"></div>
@@ -115,31 +87,6 @@
   <script src="/js/app.js"></script>
   <script src="/js/order-review.js"></script>
   <script>
-    /** 2-letter country from order shipping (for Stripe Payment Request when merchant env is unset). */
-    function orderShippingCountry(order) {
-      if (!order?.shipping_address) return null;
-      let addr = order.shipping_address;
-      if (typeof addr === 'string') {
-        try {
-          addr = JSON.parse(addr);
-        } catch {
-          return null;
-        }
-      }
-      const c = String(addr.country || '')
-        .trim()
-        .toUpperCase()
-        .slice(0, 2);
-      return /^[A-Z]{2}$/.test(c) ? c : null;
-    }
-
-    /** Stripe canMakePayment() shape varies by browser; treat legacy `true` as usable. */
-    function paymentRequestSupportsApplePay(can) {
-      if (!can) return false;
-      if (can === true) return true;
-      return can.applePay === true;
-    }
-
     const user = getUser();
     if (user?.email) {
       document.getElementById('guestEmail').value = user.email;
@@ -149,7 +96,8 @@
       document.getElementById('checkoutPhone').value = user.phone;
     }
 
-    let createdOrder = null;
+    /** Shipping + totals held between steps; order exists only after payment. */
+    let checkoutDraft = null;
 
     async function loadCheckoutReview() {
       const el = document.getElementById('checkoutOrderReview');
@@ -170,7 +118,6 @@
       btn.disabled = true;
 
       const phoneTrim = (form.phone?.value || '').trim();
-
       const shipping_address = {
         address_line1: form.address_line1.value.trim(),
         city: form.city.value.trim(),
@@ -178,11 +125,7 @@
         country: form.country.value.trim(),
       };
       if (phoneTrim) shipping_address.phone = phoneTrim;
-      const body = { shipping_address };
-      const emailVal = form.guest_email?.value?.trim();
-      if (emailVal) body.guest_email = emailVal;
-      const payChoice = form.querySelector('input[name="checkout_payment_method"]:checked')?.value;
-      body.payment_method = 'card';
+      const guest_email = form.guest_email?.value?.trim() || null;
 
       try {
         const cartForReview = await callApi('/cart');
@@ -193,37 +136,26 @@
           await loadCheckoutReview();
           return;
         }
+
         const panelHtml = buildOrderReviewPanel(cartForReview);
         document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
 
-        const data = await callApi('/orders', { method: 'POST', body: JSON.stringify(body) });
-        createdOrder = {
-          id: data.order.id,
-          order_number: data.order.order_number,
-          total_amount: data.order.total_amount,
-          guest_order_token: data.guest_order_token || null,
-          payment_method: data.order.payment_method || 'card',
-          preferApplePay: payChoice === 'apple_pay',
-          shippingCountry: orderShippingCountry(data.order),
-        };
-        if (createdOrder.guest_order_token) {
-          sessionStorage.setItem(
-            'guest_order_token_' + createdOrder.id,
-            createdOrder.guest_order_token
-          );
-        }
+        const total =
+          cartForReview.total != null
+            ? cartForReview.total
+            : (cartForReview.subtotal || 0) +
+              (cartForReview.tax_amount || 0) +
+              (cartForReview.shipping_estimate || 0);
+
+        checkoutDraft = { shipping_address, guest_email, total_amount: total };
 
         document.getElementById('stepShipping').style.display = 'none';
         document.getElementById('stepPayment').style.display = 'block';
-        document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(
-          createdOrder.order_number,
-          createdOrder.total_amount
-        );
+        document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(null, total);
         document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
         initStripePayment();
-        loadCartCount();
       } catch (err) {
-        errEl.textContent = err.message || 'Could not create order';
+        errEl.textContent = err.message || 'Could not continue to payment';
         errEl.style.display = 'block';
         btn.disabled = false;
       }
@@ -231,245 +163,130 @@
 
     async function initStripePayment() {
       const payBtn = document.getElementById('payBtn');
-      const cancelLink = document.getElementById('cancelPaymentLink');
       const paymentForm = document.getElementById('paymentForm');
       const messageEl = document.getElementById('payment-message');
-      const introEl = document.getElementById('paymentStepIntro');
-      const appleWrap = document.getElementById('apple-wallet-checkout');
-      const prMount = document.getElementById('payment-request-button');
-      const switchToCardBtn = document.getElementById('switchToCardPaymentBtn');
       const paymentElHost = document.getElementById('payment-element');
 
-      if (!createdOrder) return;
+      if (!checkoutDraft) return;
 
-      const returnUrl =
-        window.location.origin +
-        '/order-confirm.html?id=' +
-        createdOrder.id +
-        '&number=' +
-        encodeURIComponent(createdOrder.order_number);
-
-      function setPaymentIntro(text) {
-        if (introEl) introEl.textContent = text;
-      }
+      const returnUrl = window.location.origin + '/order-confirm.html';
 
       async function syncPaymentWithServer(paymentIntentId) {
-        if (!createdOrder?.id || !paymentIntentId) return;
-        const headers = {};
-        const payload = {
-          order_id: createdOrder.id,
-          payment_intent_id: paymentIntentId,
-        };
-        if (createdOrder.guest_order_token) {
-          headers['X-Guest-Order-Token'] = createdOrder.guest_order_token;
-          payload.guest_token = createdOrder.guest_order_token;
-        }
-        await callApi('/payments/confirm', {
+        if (!paymentIntentId) return null;
+        const result = await callApi('/payments/confirm', {
           method: 'POST',
-          headers,
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ payment_intent_id: paymentIntentId }),
         });
+        if (result.guest_order_token && result.order_id) {
+          sessionStorage.setItem(
+            'guest_order_token_' + result.order_id,
+            result.guest_order_token
+          );
+        }
+        return result;
       }
 
-      function bindCardFormSubmit(stripe, elements) {
-        paymentForm.onsubmit = async (e) => {
-          e.preventDefault();
-          messageEl.style.display = 'none';
-          messageEl.textContent = '';
-          payBtn.disabled = true;
+      function orderConfirmUrl(result) {
+        const q = new URLSearchParams();
+        if (result?.order_id) q.set('id', String(result.order_id));
+        if (result?.order_number) q.set('number', result.order_number);
+        return returnUrl + (q.toString() ? '?' + q.toString() : '');
+      }
 
-          const { error: submitError } = await elements.submit();
-          if (submitError) {
-            messageEl.textContent = submitError.message || 'Please check your payment details';
+      paymentForm.onsubmit = async (e) => {
+        e.preventDefault();
+        messageEl.style.display = 'none';
+        messageEl.textContent = '';
+        payBtn.disabled = true;
+
+        const { error: submitError } = await elements.submit();
+        if (submitError) {
+          messageEl.textContent = submitError.message || 'Please check your payment details';
+          messageEl.style.display = 'block';
+          payBtn.disabled = false;
+          return;
+        }
+
+        const { error, paymentIntent } = await stripe.confirmPayment({
+          elements,
+          confirmParams: { return_url: returnUrl },
+          redirect: 'if_required',
+        });
+
+        if (error) {
+          messageEl.textContent = error.message || 'Payment failed';
+          messageEl.style.display = 'block';
+          payBtn.disabled = false;
+          return;
+        }
+
+        if (
+          paymentIntent?.id &&
+          (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')
+        ) {
+          try {
+            const result = await syncPaymentWithServer(paymentIntent.id);
+            window.location.assign(orderConfirmUrl(result));
+            return;
+          } catch (syncErr) {
+            console.warn('[checkout] Could not finalize order:', syncErr);
+            messageEl.textContent =
+              syncErr.message || 'Payment received but order could not be finalized. Contact support.';
             messageEl.style.display = 'block';
             payBtn.disabled = false;
             return;
           }
-
-          const { error, paymentIntent } = await stripe.confirmPayment({
-            elements,
-            confirmParams: { return_url: returnUrl },
-            redirect: 'if_required',
-          });
-
-          if (error) {
-            messageEl.textContent = error.message || 'Payment failed';
-            messageEl.style.display = 'block';
-            payBtn.disabled = false;
-            return;
-          }
-          if (
-            paymentIntent?.id &&
-            (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')
-          ) {
-            try {
-              await syncPaymentWithServer(paymentIntent.id);
-            } catch (syncErr) {
-              console.warn('[checkout] Could not sync payment status:', syncErr);
-            }
-          }
-          window.location.assign(returnUrl);
-        };
-      }
+        }
+        window.location.assign(returnUrl);
+      };
 
       try {
         messageEl.style.display = 'none';
         messageEl.textContent = '';
         paymentElHost.innerHTML = '';
-        prMount.innerHTML = '';
-        appleWrap.style.display = 'none';
-        switchToCardBtn.style.display = 'none';
-        paymentForm.style.display = 'block';
-        payBtn.style.display = '';
 
         const configRes = await fetch(sellitnowApiUrl('/payments/config'));
         if (!configRes.ok) throw new Error('Payment is not configured');
-        const { publishableKey, currency, paymentRequestCountry } = await configRes.json();
+        const { publishableKey } = await configRes.json();
         if (!publishableKey) throw new Error('Payment is not configured');
 
-        const intentPayload = { order_id: createdOrder.id };
-        const intentHeaders = {};
-        if (createdOrder.guest_order_token) {
-          intentHeaders['X-Guest-Order-Token'] = createdOrder.guest_order_token;
-        }
+        const intentBody = {
+          shipping_address: checkoutDraft.shipping_address,
+        };
+        if (checkoutDraft.guest_email) intentBody.guest_email = checkoutDraft.guest_email;
+
         const intentRes = await callApi('/payments/create-intent', {
           method: 'POST',
-          headers: intentHeaders,
-          body: JSON.stringify(intentPayload),
+          body: JSON.stringify(intentBody),
         });
         const clientSecret = intentRes.client_secret;
         if (!clientSecret) throw new Error('Could not start payment');
 
-        const stripe = Stripe(publishableKey);
-        const elements = stripe.elements({ clientSecret });
-        const amountCents = Math.round(Number(createdOrder.total_amount) * 100);
-        const currencyLower = String(currency || 'usd')
-          .trim()
-          .toLowerCase();
-        let prCountry =
-          (paymentRequestCountry && String(paymentRequestCountry).trim()) ||
-          createdOrder.shippingCountry ||
-          'US';
-        prCountry = String(prCountry).trim().toUpperCase().slice(0, 2);
-        if (!/^[A-Z]{2}$/.test(prCountry)) prCountry = 'US';
-
-        cancelLink.href =
-          '/checkout-cancel.html?order_id=' +
-          createdOrder.id +
-          '&number=' +
-          encodeURIComponent(createdOrder.order_number);
-
-        if (!createdOrder.preferApplePay) {
-          setPaymentIntro('Enter your card below. Your items are locked in for this order.');
-          const paymentElement = elements.create('payment', {
-            wallets: { applePay: 'auto', googlePay: 'never' },
-          });
-          paymentElement.mount('#payment-element');
-          bindCardFormSubmit(stripe, elements);
-          return;
+        if (intentRes.total_amount != null) {
+          checkoutDraft.total_amount = intentRes.total_amount;
+          document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(
+            null,
+            intentRes.total_amount
+          );
         }
 
-        setPaymentIntro('Complete your purchase with Apple Pay.');
-        const paymentRequest = stripe.paymentRequest({
-          country: prCountry,
-          currency: currencyLower,
-          total: {
-            label: 'Order ' + createdOrder.order_number,
-            amount: amountCents,
-          },
-          requestPayerName: true,
-          requestPayerEmail: true,
-        });
-
-        const can = await paymentRequest.canMakePayment();
-
-        if (paymentRequestSupportsApplePay(can)) {
-          paymentForm.style.display = 'none';
-          payBtn.style.display = 'none';
-          appleWrap.style.display = 'block';
-          switchToCardBtn.style.display = 'block';
-
-          const prButton = elements.create('paymentRequestButton', {
-            paymentRequest,
-            style: {
-              paymentRequestButton: {
-                type: 'buy',
-                theme: 'dark',
-                height: '48px',
-              },
-            },
-          });
-          prButton.mount('#payment-request-button');
-
-          paymentRequest.on('paymentmethod', async (ev) => {
-            messageEl.style.display = 'none';
-            messageEl.textContent = '';
-            try {
-              const { error, paymentIntent } = await stripe.confirmCardPayment(
-                clientSecret,
-                { payment_method: ev.paymentMethod.id },
-                { handleActions: true }
-              );
-              if (error) {
-                ev.complete('fail');
-                messageEl.textContent = error.message || 'Payment failed';
-                messageEl.style.display = 'block';
-                return;
-              }
-              if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'processing')) {
-                ev.complete('success');
-                try {
-                  await syncPaymentWithServer(paymentIntent.id);
-                } catch (syncErr) {
-                  console.warn('[checkout] Could not sync payment status:', syncErr);
-                }
-                window.location.assign(returnUrl);
-                return;
-              }
-              ev.complete('fail');
-              messageEl.textContent = 'Could not complete this payment. Please try again or use a card.';
-              messageEl.style.display = 'block';
-            } catch (err) {
-              try {
-                ev.complete('fail');
-              } catch (_) {}
-              messageEl.textContent = err.message || 'Payment failed';
-              messageEl.style.display = 'block';
-            }
-          });
-
-          switchToCardBtn.onclick = () => {
-            try {
-              prButton.unmount();
-            } catch (_) {}
-            appleWrap.style.display = 'none';
-            switchToCardBtn.style.display = 'none';
-            paymentForm.style.display = 'block';
-            payBtn.style.display = '';
-            setPaymentIntro('Enter your card to complete this order.');
-            paymentElHost.innerHTML = '';
-            const paymentElement = elements.create('payment', {
-              wallets: { applePay: 'auto', googlePay: 'never' },
-            });
-            paymentElement.mount('#payment-element');
-            bindCardFormSubmit(stripe, elements);
-          };
-          return;
-        }
-
-        setPaymentIntro('Apple Pay isn’t available on this device or browser. You can pay with a card below.');
+        stripe = Stripe(publishableKey);
+        elements = stripe.elements({ clientSecret });
         const paymentElement = elements.create('payment', {
-          wallets: { applePay: 'auto', googlePay: 'never' },
+          wallets: { applePay: 'never', googlePay: 'never' },
         });
         paymentElement.mount('#payment-element');
-        bindCardFormSubmit(stripe, elements);
       } catch (err) {
         messageEl.textContent = err.message || 'Payment could not be loaded';
         messageEl.style.display = 'block';
-        paymentElHost.innerHTML = '<p>Unable to load payment form. <a href="/cart.html">Return to cart</a>.</p>';
+        paymentElHost.innerHTML =
+          '<p>Unable to load payment form. <a href="/cart.html">Return to cart</a>.</p>';
         payBtn.style.display = 'none';
       }
     }
+
+    let stripe;
+    let elements;
 
     document.addEventListener('DOMContentLoaded', async () => {
       await loadBrandSettings();
