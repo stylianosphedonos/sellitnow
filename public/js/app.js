@@ -532,34 +532,51 @@ function bindLoadAllProductsFromCategorySection() {
   });
 }
 
+function hasCustomCategoryIconSize(c) {
+  return (
+    (c.icon_width_px != null && c.icon_width_px > 0) ||
+    (c.icon_height_px != null && c.icon_height_px > 0) ||
+    (c.icon_size_px != null && c.icon_size_px > 0)
+  );
+}
+
 function getCategoryIconDimensions(c) {
   const legacyHeight =
     c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : null;
-  const height =
+  let height =
     c.icon_height_px != null && c.icon_height_px > 0
       ? c.icon_height_px
-      : legacyHeight != null
-        ? legacyHeight
-        : 140;
-  const width =
+      : legacyHeight;
+  let width =
     c.icon_width_px != null && c.icon_width_px > 0 ? c.icon_width_px : null;
+  if (width != null && height == null) height = width;
   return { width, height };
 }
 
+function getCategoryIconMediaClasses(c, layout) {
+  const isBanner = layout === 'banner-left' || layout === 'banner-right';
+  let classes = isBanner
+    ? 'category-card__media category-card__media--banner'
+    : 'category-card__media category-card__media--tile';
+  if (!hasCustomCategoryIconSize(c)) return classes;
+  classes += ' category-card__media--sized';
+  const { width } = getCategoryIconDimensions(c);
+  if (width != null) classes += ' category-card__media--custom-width';
+  return classes;
+}
+
 function getCategoryIconMediaStyle(c) {
+  if (!hasCustomCategoryIconSize(c)) return '';
   const { width, height } = getCategoryIconDimensions(c);
-  const parts = ['aspect-ratio:unset'];
-  if (width != null) {
-    parts.push(`width:${width}px`, 'max-width:100%', 'align-self:center');
-  } else {
-    parts.push('width:100%');
-  }
-  parts.push(`height:${height}px`, `min-height:${height}px`);
+  const parts = [];
+  if (width != null) parts.push(`--category-media-width:${width}px`);
+  if (height != null) parts.push(`--category-media-height:${height}px`);
   return parts.join(';');
 }
 
 function getCategoryIconSizePx(c) {
-  return getCategoryIconDimensions(c).height;
+  const { height } = getCategoryIconDimensions(c);
+  return height != null ? height : 140;
 }
 
 function getCategoryWebsiteLayout(c) {
@@ -569,16 +586,14 @@ function getCategoryWebsiteLayout(c) {
 }
 
 function renderCategoryCardMedia(c, layout) {
-  const isBanner = layout === 'banner-left' || layout === 'banner-right';
-  const mediaClass = isBanner
-    ? 'category-card__media category-card__media--banner'
-    : 'category-card__media category-card__media--tile';
+  const mediaClass = getCategoryIconMediaClasses(c, layout);
   const mediaStyle = getCategoryIconMediaStyle(c);
+  const styleAttr = mediaStyle ? ` style="${mediaStyle}"` : '';
   const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
   if (imgUrl) {
-    return `<div class="${mediaClass}" style="${mediaStyle}"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
+    return `<div class="${mediaClass}"${styleAttr}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
   }
-  return `<div class="${mediaClass} category-card__media--placeholder" style="${mediaStyle}"><span class="icon" aria-hidden="true">🛒</span></div>`;
+  return `<div class="${mediaClass} category-card__media--placeholder"${styleAttr}><span class="icon" aria-hidden="true">🛒</span></div>`;
 }
 
 function renderStorefrontCategoryCard(c) {

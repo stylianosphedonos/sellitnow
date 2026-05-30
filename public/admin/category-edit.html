@@ -97,6 +97,10 @@
               </div>
             </div>
             <small>Leave width empty to span the full tile or banner. Height applies to both uploaded images and placeholders.</small>
+            <div id="categorySizePreview" style="margin-top:12px;padding:16px;background:#f9f9f9;border-radius:8px;border:1px solid #eee">
+              <div style="font-size:12px;color:#666;margin-bottom:8px">Website preview</div>
+              <div id="categoryImagePreview"></div>
+            </div>
           </div>
           <div class="form-group">
             <label class="checkbox-label">
@@ -110,16 +114,15 @@
             <div id="categoryCurrentImage" style="margin-bottom:12px">
               ${category.image_url
                 ? `<div style="position:relative;display:inline-block">
-                    <img src="${escapeHtml(category.image_url)}" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #eee">
                     <button
                       type="button"
                       class="btn btn-secondary remove-category-image-btn"
-                      style="position:absolute;bottom:4px;left:4px;right:4px;padding:4px 6px;font-size:12px"
+                      style="margin-top:8px;padding:4px 10px;font-size:12px"
                     >
-                      Remove
+                      Remove image
                     </button>
                   </div>`
-                : '<span style="color:#999">No image yet</span>'}
+                : '<span style="color:#999">No image yet — upload below to see it in the preview above</span>'}
             </div>
           </div>
           <div class="form-group">
@@ -135,6 +138,7 @@
       `;
       const form = document.getElementById('editForm');
       form.addEventListener('submit', handleSubmit);
+      bindCategorySizePreview(form);
       form.addEventListener('click', async (e) => {
         const removeBtn = e.target.closest('.remove-category-image-btn');
         if (!removeBtn) return;
@@ -158,6 +162,48 @@
           removingCategoryImage = false;
         }
       });
+    }
+
+    function getPreviewCategoryFromForm(form) {
+      const widthVal = form.icon_width_px.value.trim();
+      const heightVal = form.icon_height_px.value.trim();
+      return {
+        ...category,
+        name: form.name.value.trim() || category.name,
+        website_layout: form.website_layout.value,
+        icon_width_px: widthVal === '' ? null : parseInt(widthVal, 10),
+        icon_height_px: heightVal === '' ? null : parseInt(heightVal, 10),
+      };
+    }
+
+    function updateCategorySizePreview(form) {
+      const previewEl = document.getElementById('categoryImagePreview');
+      if (!previewEl) return;
+      const previewCategory = getPreviewCategoryFromForm(form);
+      const layout = getCategoryWebsiteLayout(previewCategory);
+      const isBanner = layout === 'banner-left' || layout === 'banner-right';
+      const wrapStyle = isBanner ? 'max-width:100%' : 'max-width:280px';
+      previewEl.innerHTML = `<div style="${wrapStyle}">${renderCategoryCardMedia(previewCategory, layout)}</div>`;
+    }
+
+    function bindCategorySizePreview(form) {
+      ['icon_width_px', 'icon_height_px', 'website_layout', 'name'].forEach((name) => {
+        const el = form[name];
+        if (!el) return;
+        el.addEventListener('input', () => updateCategorySizePreview(form));
+        el.addEventListener('change', () => updateCategorySizePreview(form));
+      });
+      form.querySelector('input[name="image"]')?.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          category = { ...category, image_url: reader.result };
+          updateCategorySizePreview(form);
+        };
+        reader.readAsDataURL(file);
+      });
+      updateCategorySizePreview(form);
     }
 
     function escapeHtml(str) {
