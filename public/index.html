@@ -27,35 +27,91 @@
     </div>
   </header>
 
-  <section class="hero">
-    <div class="hero__frame">
-      <div class="hero__banner" aria-hidden="true"></div>
-      <div class="hero__inner">
-        <h1 id="heroTitle">Up to 90% Off</h1>
-        <p id="heroSubtitle">Discover amazing deals on electronics, fashion & more</p>
-      </div>
+  <div id="zone-top" class="site-zone site-zone--bar" hidden></div>
+
+  <div class="site-body">
+    <aside id="zone-left" class="site-zone site-zone--side" hidden></aside>
+
+    <div class="site-body__center">
+      <div id="zone-top-left" class="site-zone site-zone--float site-zone--top-left" hidden></div>
+      <div id="zone-top-right" class="site-zone site-zone--float site-zone--top-right" hidden></div>
+
+      <section class="hero">
+        <div class="hero__frame">
+          <div class="hero__banner" aria-hidden="true"></div>
+          <div class="hero__inner">
+            <h1 id="heroTitle">Up to 90% Off</h1>
+            <p id="heroSubtitle">Discover amazing deals on electronics, fashion & more</p>
+          </div>
+        </div>
+      </section>
+
+      <main class="main">
+        <section class="categories" id="categories">
+          <h2>Shop by Category</h2>
+          <div class="category-grid" id="categoryGrid"></div>
+        </section>
+
+        <section class="products">
+          <div class="products-toolbar" id="productsBrowseBar" hidden>
+            <button type="button" class="btn-back-to-categories" id="backToCategoriesBtn">Back to categories</button>
+          </div>
+          <h2 id="productsSectionHeading">Trending Deals</h2>
+          <div class="product-grid" id="productGrid"></div>
+          <div class="pagination" id="pagination"></div>
+        </section>
+      </main>
+
+      <div id="zone-bottom-left" class="site-zone site-zone--float site-zone--bottom-left" hidden></div>
+      <div id="zone-bottom-right" class="site-zone site-zone--float site-zone--bottom-right" hidden></div>
     </div>
-  </section>
 
-  <main class="main">
-    <section class="categories" id="categories">
-      <h2>Shop by Category</h2>
-      <div class="category-grid" id="categoryGrid"></div>
-    </section>
+    <aside id="zone-right" class="site-zone site-zone--side" hidden></aside>
+  </div>
 
-    <section class="products">
-      <div class="products-toolbar" id="productsBrowseBar" hidden>
-        <button type="button" class="btn-back-to-categories" id="backToCategoriesBtn">Back to categories</button>
-      </div>
-      <h2 id="productsSectionHeading">Trending Deals</h2>
-      <div class="product-grid" id="productGrid"></div>
-      <div class="pagination" id="pagination"></div>
-    </section>
-  </main>
+  <div id="zone-bottom" class="site-zone site-zone--bar" hidden></div>
 
   <footer class="footer">
     <p>&copy; 3nityLab. All rights reserved.</p>
   </footer>
+
+  <div id="categoryRequestModal" class="request-modal" hidden aria-hidden="true">
+    <div class="request-modal__backdrop" data-close-request-modal></div>
+    <div class="request-modal__panel" role="dialog" aria-modal="true" aria-labelledby="categoryRequestTitle">
+      <button type="button" class="request-modal__close" data-close-request-modal aria-label="Close">&times;</button>
+      <h2 id="categoryRequestTitle">Request a product</h2>
+      <p id="categoryRequestPrompt" class="request-modal__prompt"></p>
+      <form id="categoryRequestForm" class="request-modal__form">
+        <input type="hidden" name="category_id" id="categoryRequestCategoryId">
+        <div class="form-group">
+          <label for="categoryRequestName">Your name *</label>
+          <input type="text" id="categoryRequestName" name="name" required maxlength="120">
+        </div>
+        <div class="form-group">
+          <label for="categoryRequestEmail">Your email *</label>
+          <input type="email" id="categoryRequestEmail" name="email" required maxlength="254">
+        </div>
+        <div class="form-group">
+          <label for="categoryRequestMessage">Message</label>
+          <textarea id="categoryRequestMessage" name="message" rows="4" maxlength="5000" placeholder="Describe the product you are looking for…"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="categoryRequestPhoto">Attach a photo (optional)</label>
+          <input type="file" id="categoryRequestPhoto" name="photo" accept="image/jpeg,image/png,image/webp,image/gif">
+          <small>JPEG, PNG, WebP or GIF. Max 5MB.</small>
+        </div>
+        <div id="categoryRequestError" class="alert alert-error" style="display:none"></div>
+        <div class="request-modal__actions">
+          <button type="submit" class="btn" id="categoryRequestSubmit">Send request</button>
+          <button type="button" class="btn btn-secondary" data-close-request-modal>Cancel</button>
+        </div>
+      </form>
+      <div id="categoryRequestSuccess" class="request-modal__success" hidden>
+        <p>Thank you! Your request was sent. We will get back to you soon.</p>
+        <button type="button" class="btn" data-close-request-modal>Close</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>

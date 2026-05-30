@@ -43,6 +43,15 @@ async function runPostgresMigrations(pool) {
   await pool.query(
     "ALTER TABLE categories ADD COLUMN IF NOT EXISTS website_layout TEXT DEFAULT 'tile'"
   );
+  await pool.query(
+    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS category_type TEXT DEFAULT 'browse'"
+  );
+  await pool.query(
+    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS website_zone TEXT DEFAULT 'home-main'"
+  );
+  await pool.query(
+    'ALTER TABLE categories ADD COLUMN IF NOT EXISTS request_prompt TEXT'
+  );
   await pool.query(`
     UPDATE categories SET website_layout = CASE
       WHEN icon_align = 'left' THEN 'banner-left'

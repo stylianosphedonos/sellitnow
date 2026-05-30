@@ -7,8 +7,20 @@ const MIN_ICON_DIMENSION_PX = 48;
 const MAX_ICON_WIDTH_PX = 1200;
 const MAX_ICON_HEIGHT_PX = 600;
 const WEBSITE_LAYOUTS = ['tile', 'banner-left', 'banner-right'];
+const CATEGORY_TYPES = ['browse', 'icon'];
+const WEBSITE_ZONES = [
+  'home-main',
+  'top',
+  'bottom',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'left',
+  'right',
+];
 const CATEGORY_FIELDS =
-  'id, name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, show_on_website';
+  'id, name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, category_type, website_zone, request_prompt, show_on_website';
 
 function parseNullableInteger(value, fieldName) {
   if (value === undefined || value === null || value === '') return null;
@@ -57,6 +69,30 @@ function parseWebsiteLayout(value) {
   return normalized;
 }
 
+function parseCategoryType(value) {
+  if (value === undefined || value === null || value === '') return 'browse';
+  const normalized = String(value).trim().toLowerCase();
+  if (!CATEGORY_TYPES.includes(normalized)) {
+    throw new Error('Category type must be browse or icon.');
+  }
+  return normalized;
+}
+
+function parseWebsiteZone(value) {
+  if (value === undefined || value === null || value === '') return 'home-main';
+  const normalized = String(value).trim().toLowerCase();
+  if (!WEBSITE_ZONES.includes(normalized)) {
+    throw new Error('Website zone is invalid.');
+  }
+  return normalized;
+}
+
+function parseRequestPrompt(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 function normalizeCategoryRow(row) {
   if (!row) return row;
   return {
@@ -66,6 +102,9 @@ function normalizeCategoryRow(row) {
     icon_width_px: row.icon_width_px != null ? row.icon_width_px : null,
     icon_height_px: row.icon_height_px != null ? row.icon_height_px : null,
     website_layout: parseWebsiteLayout(row.website_layout),
+    category_type: parseCategoryType(row.category_type),
+    website_zone: parseWebsiteZone(row.website_zone),
+    request_prompt: row.request_prompt != null ? row.request_prompt : null,
   };
 }
 
@@ -219,9 +258,12 @@ class CategoryService {
         : parseIconHeightPx(data.icon_size_px);
     const showOnWebsite = parseShowOnWebsite(data.show_on_website);
     const websiteLayout = parseWebsiteLayout(data.website_layout);
+    const categoryType = parseCategoryType(data.category_type);
+    const websiteZone = parseWebsiteZone(data.website_zone);
+    const requestPrompt = parseRequestPrompt(data.request_prompt);
     const result = await pool.query(
-      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, show_on_website)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, category_type, website_zone, request_prompt, show_on_website)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING ${CATEGORY_FIELDS}`,
       [
         name,
@@ -233,6 +275,9 @@ class CategoryService {
         iconWidthPx,
         iconHeightPx,
         websiteLayout,
+        categoryType,
+        websiteZone,
+        requestPrompt,
         showOnWebsite,
       ]
     );
@@ -293,6 +338,18 @@ class CategoryService {
       updates.push(`website_layout = $${i++}`);
       values.push(parseWebsiteLayout(data.website_layout));
     }
+    if (data.category_type !== undefined) {
+      updates.push(`category_type = $${i++}`);
+      values.push(parseCategoryType(data.category_type));
+    }
+    if (data.website_zone !== undefined) {
+      updates.push(`website_zone = $${i++}`);
+      values.push(parseWebsiteZone(data.website_zone));
+    }
+    if (data.request_prompt !== undefined) {
+      updates.push(`request_prompt = $${i++}`);
+      values.push(parseRequestPrompt(data.request_prompt));
+    }
 
     if (updates.length === 0) throw new Error('No fields to update');
 
@@ -314,5 +371,7 @@ CategoryService.DEFAULT_ICON_SIZE_PX = DEFAULT_ICON_HEIGHT_PX;
 CategoryService.MIN_ICON_SIZE_PX = MIN_ICON_DIMENSION_PX;
 CategoryService.MAX_ICON_SIZE_PX = MAX_ICON_HEIGHT_PX;
 CategoryService.WEBSITE_LAYOUTS = WEBSITE_LAYOUTS;
+CategoryService.CATEGORY_TYPES = CATEGORY_TYPES;
+CategoryService.WEBSITE_ZONES = WEBSITE_ZONES;
 
 module.exports = new CategoryService();

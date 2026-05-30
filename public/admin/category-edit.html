@@ -55,6 +55,8 @@
 
     function renderForm() {
       const layout = category.website_layout || 'tile';
+      const categoryType = category.category_type || 'browse';
+      const websiteZone = category.website_zone || 'home-main';
       document.getElementById('formContainer').innerHTML = `
         <form id="editForm" style="max-width:600px;background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
           <div class="form-group">
@@ -66,13 +68,41 @@
             <input type="text" name="slug" value="${escapeHtml(category.slug || '')}" placeholder="URL segment; leave as-is or change manually">
           </div>
           <div class="form-group">
+            <label>Category type</label>
+            <select name="category_type" id="categoryTypeSelect">
+              <option value="browse"${optionSelected('browse', categoryType)}>Browse products</option>
+              <option value="icon"${optionSelected('icon', categoryType)}>Request icon (email + photo)</option>
+            </select>
+            <small>Browse opens products. Request icon opens a form so customers can email support with an optional photo.</small>
+          </div>
+          <div class="form-group" id="requestPromptGroup" style="${categoryType === 'icon' ? '' : 'display:none'}">
+            <label>Request form message</label>
+            <textarea name="request_prompt" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px" placeholder="Tell us what product you need and we will reply by email.">${escapeHtml(category.request_prompt || '')}</textarea>
+            <small>Shown above the request form when customers click this icon.</small>
+          </div>
+          <div class="form-group">
             <label>Description</label>
             <textarea name="description" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(category.description || '')}</textarea>
           </div>
           <div class="form-group">
             <label>Position on website (sort order)</label>
             <input type="number" name="display_order" step="1" min="0" value="${category.display_order ?? ''}" placeholder="e.g. 1, 2, 3 — lower appears first">
-            <small>Controls left-to-right order in “Shop by Category”. Leave empty to sort by ID.</small>
+            <small>Order within the chosen website zone. Leave empty to sort by ID.</small>
+          </div>
+          <div class="form-group">
+            <label>Website zone (placement)</label>
+            <select name="website_zone">
+              <option value="home-main"${optionSelected('home-main', websiteZone)}>Main — Shop by Category grid</option>
+              <option value="top"${optionSelected('top', websiteZone)}>Top (above hero)</option>
+              <option value="bottom"${optionSelected('bottom', websiteZone)}>Bottom (below products)</option>
+              <option value="top-left"${optionSelected('top-left', websiteZone)}>Top left (floating)</option>
+              <option value="top-right"${optionSelected('top-right', websiteZone)}>Top right (floating)</option>
+              <option value="bottom-left"${optionSelected('bottom-left', websiteZone)}>Bottom left (floating)</option>
+              <option value="bottom-right"${optionSelected('bottom-right', websiteZone)}>Bottom right (floating)</option>
+              <option value="left"${optionSelected('left', websiteZone)}>Left sidebar</option>
+              <option value="right"${optionSelected('right', websiteZone)}>Right sidebar</option>
+            </select>
+            <small>Where this icon appears on the storefront. Request icons work best in corners or sidebars.</small>
           </div>
           <div class="form-group">
             <label>Layout on website</label>
@@ -138,6 +168,10 @@
       `;
       const form = document.getElementById('editForm');
       form.addEventListener('submit', handleSubmit);
+      form.querySelector('#categoryTypeSelect')?.addEventListener('change', (e) => {
+        const group = document.getElementById('requestPromptGroup');
+        if (group) group.style.display = e.target.value === 'icon' ? '' : 'none';
+      });
       bindCategorySizePreview(form);
       form.addEventListener('click', async (e) => {
         const removeBtn = e.target.closest('.remove-category-image-btn');
@@ -228,7 +262,10 @@
         description: form.description.value.trim() === '' ? null : form.description.value,
         display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
         show_on_website: form.show_on_website.checked,
-        website_layout: form.website_layout.value
+        website_layout: form.website_layout.value,
+        category_type: form.category_type.value,
+        website_zone: form.website_zone.value,
+        request_prompt: form.request_prompt.value.trim() === '' ? null : form.request_prompt.value.trim()
       };
       payload.icon_width_px = form.icon_width_px.value === '' ? null : parseInt(form.icon_width_px.value, 10);
       payload.icon_height_px = form.icon_height_px.value === '' ? null : parseInt(form.icon_height_px.value, 10);

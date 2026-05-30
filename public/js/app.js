@@ -454,6 +454,26 @@ function renderProductCardMarkup(p) {
 
 /** Populated in `loadCategories` for section titles when filtering by category. */
 const sellitnowCategoryLabels = new Map();
+const sellitnowCategoriesById = new Map();
+
+const WEBSITE_ZONE_CONTAINER_IDS = {
+  'home-main': 'categoryGrid',
+  top: 'zone-top',
+  bottom: 'zone-bottom',
+  'top-left': 'zone-top-left',
+  'top-right': 'zone-top-right',
+  'bottom-left': 'zone-bottom-left',
+  'bottom-right': 'zone-bottom-right',
+  left: 'zone-left',
+  right: 'zone-right',
+};
+
+const FLOATING_WEBSITE_ZONES = new Set([
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+]);
 
 /** Scroll so the products section title sits below the sticky header. */
 function scrollProductsBrowseIntoView() {
@@ -487,23 +507,150 @@ function applyProductsBrowseMode(categoryId, categoryLabel) {
   }
 }
 
-function bindCategoryGridNavigation() {
-  const grid = document.getElementById('categoryGrid');
-  if (!grid || grid.dataset.sellitnowCategoryNavBound === '1') return;
-  grid.dataset.sellitnowCategoryNavBound = '1';
-  grid.addEventListener('click', (ev) => {
+function isIconCategory(c) {
+  return c && c.category_type === 'icon';
+}
+
+function getCategoryWebsiteZone(c) {
+  const zone = c && c.website_zone;
+  if (zone && WEBSITE_ZONE_CONTAINER_IDS[zone]) return zone;
+  return 'home-main';
+}
+
+function renderCompactCategoryIcon(c) {
+  const hasImage = Boolean(c.image_url);
+  const media = renderCategoryCardMedia(c, 'tile');
+  const typeClass = isIconCategory(c) ? ' category-icon--request' : '';
+  return `
+    <button type="button" class="category-icon${typeClass}" data-category-id="${c.id}" aria-label="${escapeHtml(c.name)}">
+      ${media}
+      <span class="category-icon__label">${escapeHtml(c.name)}</span>
+    </button>`;
+}
+
+function renderCategoryForZone(c, zone) {
+  if (zone === 'home-main') return renderStorefrontCategoryCard(c);
+  return renderCompactCategoryIcon(c);
+}
+
+function openCategoryRequestModal(category) {
+  const modal = document.getElementById('categoryRequestModal');
+  if (!modal || !category) return;
+  const form = document.getElementById('categoryRequestForm');
+  const successEl = document.getElementById('categoryRequestSuccess');
+  const errEl = document.getElementById('categoryRequestError');
+  const titleEl = document.getElementById('categoryRequestTitle');
+  const promptEl = document.getElementById('categoryRequestPrompt');
+  const idInput = document.getElementById('categoryRequestCategoryId');
+
+  if (form) {
+    form.reset();
+    form.style.display = '';
+  }
+  if (successEl) successEl.hidden = true;
+  if (errEl) errEl.style.display = 'none';
+  if (titleEl) titleEl.textContent = category.name || 'Request a product';
+  if (promptEl) {
+    const prompt = category.request_prompt || category.description || 'Tell us what you need and we will email you back.';
+    promptEl.textContent = prompt;
+    promptEl.style.display = prompt ? '' : 'none';
+  }
+  if (idInput) idInput.value = String(category.id);
+
+  modal.hidden = false;
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('request-modal-open');
+  document.getElementById('categoryRequestName')?.focus();
+}
+
+function closeCategoryRequestModal() {
+  const modal = document.getElementById('categoryRequestModal');
+  if (!modal) return;
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('request-modal-open');
+}
+
+function initCategoryRequestModal() {
+  const modal = document.getElementById('categoryRequestModal');
+  const form = document.getElementById('categoryRequestForm');
+  if (!modal || !form || form.dataset.sellitnowBound === '1') return;
+  form.dataset.sellitnowBound = '1';
+
+  modal.querySelectorAll('[data-close-request-modal]').forEach((el) => {
+    el.addEventListener('click', closeCategoryRequestModal);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden) closeCategoryRequestModal();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('categoryRequestSubmit');
+    const errEl = document.getElementById('categoryRequestError');
+    const successEl = document.getElementById('categoryRequestSuccess');
+    if (errEl) errEl.style.display = 'none';
+
+    const formData = new FormData(form);
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+    }
+
+    try {
+      const res = await sellitnowFetchWithCsrf(
+        (typeof sellitnowApiUrl === 'function' ? sellitnowApiUrl : (p) => apiPrefix() + p)('/category-requests'),
+        { method: 'POST', body: formData }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not send request');
+      form.style.display = 'none';
+      if (successEl) successEl.hidden = false;
+    } catch (err) {
+      if (errEl) {
+        errEl.textContent = err.message || 'Could not send request';
+        errEl.style.display = 'block';
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send request';
+      }
+    }
+  });
+}
+
+function handleCategoryActivation(id) {
+  const category = sellitnowCategoriesById.get(id);
+  if (isIconCategory(category)) {
+    openCategoryRequestModal(category);
+    return;
+  }
+  const url = new URL(location.href);
+  url.searchParams.set('category', String(id));
+  history.replaceState({}, '', url.pathname + url.search);
+  const label = sellitnowCategoryLabels.get(id);
+  applyProductsBrowseMode(id, label);
+  loadProducts(1, id);
+  scrollProductsBrowseIntoView();
+}
+
+function bindCategoryNavigation() {
+  if (document.body.dataset.sellitnowCategoryNavBound === '1') return;
+  document.body.dataset.sellitnowCategoryNavBound = '1';
+  document.addEventListener('click', (ev) => {
     const card = ev.target.closest('[data-category-id]');
-    if (!card) return;
+    if (!card || card.id === 'loadAllProductsBtn') return;
     const id = parseInt(card.getAttribute('data-category-id'), 10);
     if (!Number.isFinite(id) || id <= 0) return;
-    const url = new URL(location.href);
-    url.searchParams.set('category', String(id));
-    history.replaceState({}, '', url.pathname + url.search);
-    const label = sellitnowCategoryLabels.get(id);
-    applyProductsBrowseMode(id, label);
-    loadProducts(1, id);
-    scrollProductsBrowseIntoView();
+    ev.preventDefault();
+    handleCategoryActivation(id);
   });
+}
+
+function bindCategoryGridNavigation() {
+  bindCategoryNavigation();
 }
 
 function bindBackToCategories() {
@@ -625,23 +772,24 @@ function renderStorefrontCategoryCard(c) {
     layout === 'tile' && getCategoryCardTileStyle(c, hasImage)
       ? ' category-card--sized-width'
       : '';
+  const requestClass = isIconCategory(c) ? ' category-card--request-icon' : '';
 
   if (layout === 'banner-left') {
     return `
-      <button type="button" class="category-card category-card--banner category-card--banner-left" data-category-id="${c.id}">
+      <button type="button" class="category-card category-card--banner category-card--banner-left${requestClass}" data-category-id="${c.id}">
         ${media}
         ${label}
       </button>`;
   }
   if (layout === 'banner-right') {
     return `
-      <button type="button" class="category-card category-card--banner category-card--banner-right" data-category-id="${c.id}">
+      <button type="button" class="category-card category-card--banner category-card--banner-right${requestClass}" data-category-id="${c.id}">
         ${media}
         ${label}
       </button>`;
   }
   return `
-      <button type="button" class="category-card category-card--tile${tileWidthClass}" data-category-id="${c.id}"${tileStyleAttr}>
+      <button type="button" class="category-card category-card--tile${tileWidthClass}${requestClass}" data-category-id="${c.id}"${tileStyleAttr}>
         ${media}
         ${label}
       </button>`;
@@ -650,6 +798,16 @@ function renderStorefrontCategoryCard(c) {
 async function loadCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
+
+  Object.entries(WEBSITE_ZONE_CONTAINER_IDS).forEach(([zone, containerId]) => {
+    if (zone === 'home-main') return;
+    const el = document.getElementById(containerId);
+    if (el) {
+      el.innerHTML = '';
+      el.hidden = true;
+    }
+  });
+
   const cachedBrand = readCachedBrandSettings();
   const showAllProductsTile = cachedBrand?.allProductsShowOnWebsite !== false;
   const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
@@ -662,19 +820,57 @@ async function loadCategories() {
         }
         <span class="category-card__label">All products</span>
       </button>` : '';
+
   try {
     const { categories } = await callApi('/categories');
     sellitnowCategoryLabels.clear();
-    for (const c of categories) {
-      if (c && c.id != null) sellitnowCategoryLabels.set(c.id, c.name);
+    sellitnowCategoriesById.clear();
+
+    const byZone = new Map();
+    for (const c of categories || []) {
+      if (!c || c.id == null) continue;
+      sellitnowCategoryLabels.set(c.id, c.name);
+      sellitnowCategoriesById.set(c.id, c);
+      const zone = getCategoryWebsiteZone(c);
+      if (!byZone.has(zone)) byZone.set(zone, []);
+      byZone.get(zone).push(c);
     }
-    grid.innerHTML =
-      allProductsTile +
-      categories
-        .map((c) => renderStorefrontCategoryCard(c))
-        .join('');
+
+    for (const [zone, list] of byZone.entries()) {
+      list.sort((a, b) => {
+        const ao = a.display_order;
+        const bo = b.display_order;
+        if (ao == null && bo == null) return a.id - b.id;
+        if (ao == null) return 1;
+        if (bo == null) return -1;
+        return ao - bo || a.id - b.id;
+      });
+    }
+
+    const homeMain = byZone.get('home-main') || [];
+    grid.innerHTML = allProductsTile + homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
+
+    const categoriesSection = document.getElementById('categories');
+    if (categoriesSection) {
+      categoriesSection.hidden = homeMain.length === 0 && !showAllProductsTile;
+    }
+
+    for (const [zone, containerId] of Object.entries(WEBSITE_ZONE_CONTAINER_IDS)) {
+      if (zone === 'home-main') continue;
+      const el = document.getElementById(containerId);
+      const list = byZone.get(zone) || [];
+      if (!el || !list.length) continue;
+      const isBar = zone === 'top' || zone === 'bottom';
+      const isSide = zone === 'left' || zone === 'right';
+      el.classList.toggle('site-zone--bar-row', isBar);
+      el.classList.toggle('site-zone--side-stack', isSide);
+      el.classList.toggle('site-zone--float-stack', FLOATING_WEBSITE_ZONES.has(zone));
+      el.innerHTML = list.map((c) => renderCategoryForZone(c, zone)).join('');
+      el.hidden = false;
+    }
   } catch (err) {
     sellitnowCategoryLabels.clear();
+    sellitnowCategoriesById.clear();
     grid.innerHTML = allProductsTile + '<p>No categories</p>';
   }
   bindLoadAllProductsFromCategorySection();
@@ -823,6 +1019,7 @@ async function initHomePage() {
   initHomeBrowseHistory();
 
   await loadBrandSettings();
+  initCategoryRequestModal();
   await Promise.all([loadCartCount(), loadCategories(), loadProducts(1, categoryId, q)]);
   syncProductsBrowseChromeFromUrl();
 }

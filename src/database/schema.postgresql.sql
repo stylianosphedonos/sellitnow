@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS categories (
   icon_width_px INTEGER,
   icon_height_px INTEGER,
   website_layout TEXT DEFAULT 'tile',
+  category_type TEXT DEFAULT 'browse',
+  website_zone TEXT DEFAULT 'home-main',
+  request_prompt TEXT,
   show_on_website INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

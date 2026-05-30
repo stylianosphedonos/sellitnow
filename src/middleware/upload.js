@@ -130,11 +130,18 @@ const uploadAllProductsTileImage = multer({
   limits: { fileSize: maxSize },
 }).single('image');
 
+const uploadRequestPhoto = multer({
+  storage: isPostgres ? memory : categoryImageStorage,
+  fileFilter,
+  limits: { fileSize: maxSize },
+}).single('photo');
+
 module.exports = {
   uploadProductImages,
   uploadBanner,
   uploadLogo,
   uploadCategoryImage,
   uploadAllProductsTileImage,
+  uploadRequestPhoto,
   upload,
 };

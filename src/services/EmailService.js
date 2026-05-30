@@ -58,7 +58,7 @@ function formatSmtpError(err) {
 class EmailService {
   constructor() {}
 
-  async send({ to, subject, html, text, replyTo }) {
+  async send({ to, subject, html, text, replyTo, attachments }) {
     const from = await getOutboundEmailFrom();
     const smtp = await getEffectiveSmtpConfig();
     const opts = buildNodemailerOptions(smtp);
@@ -77,6 +77,7 @@ class EmailService {
         subject,
         html: html || text,
         text,
+        attachments: attachments || undefined,
       });
       return { success: true };
     } catch (err) {
@@ -853,6 +854,67 @@ class EmailService {
     return anySuccess
       ? { success: true }
       : { success: false, error: lastError || 'Could not send support notification.' };
+  }
+
+  async sendCategoryRequest({ category, customerName, customerEmail, message, photoFile }) {
+    const recipients = await this.getSupportNotificationRecipients();
+    if (!recipients.length) {
+      return { success: false, error: 'No support email configured.' };
+    }
+
+    const storeName = brandName();
+    const categoryName = escapeHtml(category.name || 'Category');
+    const name = escapeHtml(customerName || 'Customer');
+    const email = escapeHtml(customerEmail || '');
+    const bodyText = String(message || '').trim();
+    const bodyHtml = escapeHtml(bodyText).replace(/\n/g, '<br>');
+    const subject = `Product request: ${category.name || 'Category'}`;
+
+    const html = `
+      <h2>Product request from ${storeName}</h2>
+      <p><strong>Category:</strong> ${categoryName}</p>
+      <p><strong>From:</strong> ${name} &lt;${email}&gt;</p>
+      <p><strong>Message:</strong></p>
+      <p>${bodyHtml || '(no message)'}</p>
+      ${photoFile ? '<p><em>Photo attached.</em></p>' : ''}
+    `;
+
+    const text = [
+      `Product request from ${storeName}`,
+      `Category: ${category.name || 'Category'}`,
+      `From: ${customerName || 'Customer'} <${customerEmail || ''}>`,
+      '',
+      bodyText || '(no message)',
+      photoFile ? '\n(Photo attached.)' : '',
+    ].join('\n');
+
+    const attachments = [];
+    if (photoFile && photoFile.buffer) {
+      attachments.push({
+        filename: photoFile.originalname || 'request-photo.jpg',
+        content: photoFile.buffer,
+        contentType: photoFile.mimetype,
+      });
+    }
+
+    let lastError = null;
+    let anySuccess = false;
+    for (const to of recipients) {
+      const result = await this.send({
+        to,
+        subject,
+        html,
+        text,
+        replyTo: customerEmail,
+        attachments: attachments.length ? attachments : undefined,
+      });
+      if (result.success) anySuccess = true;
+      else lastError = result.error;
+    }
+
+    return anySuccess
+      ? { success: true }
+      : { success: false, error: lastError || 'Could not send request email.' };
   }
 }
 

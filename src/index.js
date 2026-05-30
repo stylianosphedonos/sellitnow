@@ -12,6 +12,7 @@ const { isPostgres } = require('./database/db');
 const authRoutes = require('./routes/auth');
 const productsRoutes = require('./routes/products');
 const categoriesRoutes = require('./routes/categories');
+const categoryRequestsRoutes = require('./routes/categoryRequests');
 const cartRoutes = require('./routes/cart');
 const ordersRoutes = require('./routes/orders');
 const adminRoutes = require('./routes/admin');
@@ -148,6 +149,7 @@ app.use(uploadMount, express.static(config.app.uploadDir));
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/products', productsRoutes);
 app.use('/api/v1/categories', categoriesRoutes);
+app.use('/api/v1/category-requests', categoryRequestsRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', ordersRoutes);
 app.use('/api/v1/brand', brandRoutes);
@@ -335,6 +337,15 @@ function runSchemaMigrations(db) {
         END
       `);
     }
+  }
+  if (!categoryCols.some((c) => c.name === 'category_type')) {
+    db.exec("ALTER TABLE categories ADD COLUMN category_type TEXT DEFAULT 'browse'");
+  }
+  if (!categoryCols.some((c) => c.name === 'website_zone')) {
+    db.exec("ALTER TABLE categories ADD COLUMN website_zone TEXT DEFAULT 'home-main'");
+  }
+  if (!categoryCols.some((c) => c.name === 'request_prompt')) {
+    db.exec('ALTER TABLE categories ADD COLUMN request_prompt TEXT');
   }
 
   const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
