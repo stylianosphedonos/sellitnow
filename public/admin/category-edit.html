@@ -84,9 +84,19 @@
             <small>Moves the whole category icon: grid cell, or a full-width banner on the left or right.</small>
           </div>
           <div class="form-group">
-            <label>Icon size on website (px)</label>
-            <input type="number" name="icon_size_px" step="1" min="48" max="280" value="${category.icon_size_px ?? ''}" placeholder="Default: 140">
-            <small>Photos always fill the full width of the tile or banner. This size only applies when no image is uploaded (placeholder).</small>
+            <label>Icon size on website</label>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="flex:1;min-width:120px">
+                <label for="icon_width_px" style="font-size:12px;color:#666;font-weight:500;display:block;margin-bottom:4px">Width (px)</label>
+                <input type="number" id="icon_width_px" name="icon_width_px" step="1" min="48" max="1200" value="${category.icon_width_px ?? ''}" placeholder="Auto (full width)">
+              </div>
+              <span style="color:#999;padding-top:18px" aria-hidden="true">×</span>
+              <div style="flex:1;min-width:120px">
+                <label for="icon_height_px" style="font-size:12px;color:#666;font-weight:500;display:block;margin-bottom:4px">Height (px)</label>
+                <input type="number" id="icon_height_px" name="icon_height_px" step="1" min="48" max="600" value="${category.icon_height_px ?? category.icon_size_px ?? ''}" placeholder="Default: 140">
+              </div>
+            </div>
+            <small>Leave width empty to span the full tile or banner. Height applies to both uploaded images and placeholders.</small>
           </div>
           <div class="form-group">
             <label class="checkbox-label">
@@ -174,7 +184,8 @@
         show_on_website: form.show_on_website.checked,
         website_layout: form.website_layout.value
       };
-      payload.icon_size_px = form.icon_size_px.value === '' ? null : parseInt(form.icon_size_px.value, 10);
+      payload.icon_width_px = form.icon_width_px.value === '' ? null : parseInt(form.icon_width_px.value, 10);
+      payload.icon_height_px = form.icon_height_px.value === '' ? null : parseInt(form.icon_height_px.value, 10);
       if (slugTrim) payload.slug = slugTrim;
 
       try {

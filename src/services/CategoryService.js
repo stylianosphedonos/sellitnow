@@ -2,12 +2,13 @@ const slugify = require('slugify');
 const { pool } = require('../database/db');
 const { parseOptionsJson } = require('../lib/productOptions');
 
-const DEFAULT_ICON_SIZE_PX = 140;
-const MIN_ICON_SIZE_PX = 48;
-const MAX_ICON_SIZE_PX = 280;
+const DEFAULT_ICON_HEIGHT_PX = 140;
+const MIN_ICON_DIMENSION_PX = 48;
+const MAX_ICON_WIDTH_PX = 1200;
+const MAX_ICON_HEIGHT_PX = 600;
 const WEBSITE_LAYOUTS = ['tile', 'banner-left', 'banner-right'];
 const CATEGORY_FIELDS =
-  'id, name, slug, description, image_url, display_order, icon_size_px, website_layout, show_on_website';
+  'id, name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, show_on_website';
 
 function parseNullableInteger(value, fieldName) {
   if (value === undefined || value === null || value === '') return null;
@@ -18,13 +19,26 @@ function parseNullableInteger(value, fieldName) {
   return parsed;
 }
 
-function parseIconSizePx(value) {
+function parseIconDimension(value, fieldName, maxPx) {
   if (value === undefined || value === null || value === '') return null;
-  const parsed = parseNullableInteger(value, 'Icon size');
-  if (parsed < MIN_ICON_SIZE_PX || parsed > MAX_ICON_SIZE_PX) {
-    throw new Error(`Icon size must be between ${MIN_ICON_SIZE_PX} and ${MAX_ICON_SIZE_PX} pixels.`);
+  const parsed = parseNullableInteger(value, fieldName);
+  if (parsed < MIN_ICON_DIMENSION_PX || parsed > maxPx) {
+    throw new Error(`${fieldName} must be between ${MIN_ICON_DIMENSION_PX} and ${maxPx} pixels.`);
   }
   return parsed;
+}
+
+function parseIconWidthPx(value) {
+  return parseIconDimension(value, 'Icon width', MAX_ICON_WIDTH_PX);
+}
+
+function parseIconHeightPx(value) {
+  return parseIconDimension(value, 'Icon height', MAX_ICON_HEIGHT_PX);
+}
+
+/** @deprecated Legacy single-size field; maps to height when saving. */
+function parseIconSizePx(value) {
+  return parseIconHeightPx(value);
 }
 
 function parseShowOnWebsite(value) {
@@ -49,6 +63,8 @@ function normalizeCategoryRow(row) {
     ...row,
     show_on_website: row.show_on_website === 1 || row.show_on_website === true,
     icon_size_px: row.icon_size_px != null ? row.icon_size_px : null,
+    icon_width_px: row.icon_width_px != null ? row.icon_width_px : null,
+    icon_height_px: row.icon_height_px != null ? row.icon_height_px : null,
     website_layout: parseWebsiteLayout(row.website_layout),
   };
 }
@@ -196,12 +212,16 @@ class CategoryService {
     const slugRaw = data.slug != null ? String(data.slug).trim() : '';
     const slug = slugRaw ? slugRaw : slugify(name, { lower: true });
     const displayOrder = parseNullableInteger(data.display_order, 'Display order');
-    const iconSizePx = parseIconSizePx(data.icon_size_px);
+    const iconWidthPx = parseIconWidthPx(data.icon_width_px);
+    const iconHeightPx =
+      data.icon_height_px !== undefined
+        ? parseIconHeightPx(data.icon_height_px)
+        : parseIconHeightPx(data.icon_size_px);
     const showOnWebsite = parseShowOnWebsite(data.show_on_website);
     const websiteLayout = parseWebsiteLayout(data.website_layout);
     const result = await pool.query(
-      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, website_layout, show_on_website)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, show_on_website)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING ${CATEGORY_FIELDS}`,
       [
         name,
@@ -209,7 +229,9 @@ class CategoryService {
         data.description != null ? data.description : null,
         data.image_url || null,
         displayOrder,
-        iconSizePx,
+        iconHeightPx,
+        iconWidthPx,
+        iconHeightPx,
         websiteLayout,
         showOnWebsite,
       ]
@@ -246,9 +268,22 @@ class CategoryService {
       updates.push(`display_order = $${i++}`);
       values.push(parseNullableInteger(data.display_order, 'Display order'));
     }
-    if (data.icon_size_px !== undefined) {
+    if (data.icon_width_px !== undefined) {
+      updates.push(`icon_width_px = $${i++}`);
+      values.push(parseIconWidthPx(data.icon_width_px));
+    }
+    if (data.icon_height_px !== undefined) {
+      const height = parseIconHeightPx(data.icon_height_px);
+      updates.push(`icon_height_px = $${i++}`);
+      values.push(height);
       updates.push(`icon_size_px = $${i++}`);
-      values.push(parseIconSizePx(data.icon_size_px));
+      values.push(height);
+    } else if (data.icon_size_px !== undefined) {
+      const height = parseIconSizePx(data.icon_size_px);
+      updates.push(`icon_size_px = $${i++}`);
+      values.push(height);
+      updates.push(`icon_height_px = $${i++}`);
+      values.push(height);
     }
     if (data.show_on_website !== undefined) {
       updates.push(`show_on_website = $${i++}`);
@@ -271,9 +306,13 @@ class CategoryService {
   }
 }
 
-CategoryService.DEFAULT_ICON_SIZE_PX = DEFAULT_ICON_SIZE_PX;
-CategoryService.MIN_ICON_SIZE_PX = MIN_ICON_SIZE_PX;
-CategoryService.MAX_ICON_SIZE_PX = MAX_ICON_SIZE_PX;
+CategoryService.DEFAULT_ICON_HEIGHT_PX = DEFAULT_ICON_HEIGHT_PX;
+CategoryService.MIN_ICON_DIMENSION_PX = MIN_ICON_DIMENSION_PX;
+CategoryService.MAX_ICON_WIDTH_PX = MAX_ICON_WIDTH_PX;
+CategoryService.MAX_ICON_HEIGHT_PX = MAX_ICON_HEIGHT_PX;
+CategoryService.DEFAULT_ICON_SIZE_PX = DEFAULT_ICON_HEIGHT_PX;
+CategoryService.MIN_ICON_SIZE_PX = MIN_ICON_DIMENSION_PX;
+CategoryService.MAX_ICON_SIZE_PX = MAX_ICON_HEIGHT_PX;
 CategoryService.WEBSITE_LAYOUTS = WEBSITE_LAYOUTS;
 
 module.exports = new CategoryService();

@@ -302,6 +302,19 @@ function runSchemaMigrations(db) {
   if (!categoryCols.some((c) => c.name === 'icon_size_px')) {
     db.exec('ALTER TABLE categories ADD COLUMN icon_size_px INTEGER');
   }
+  if (!categoryCols.some((c) => c.name === 'icon_width_px')) {
+    db.exec('ALTER TABLE categories ADD COLUMN icon_width_px INTEGER');
+  }
+  if (!categoryCols.some((c) => c.name === 'icon_height_px')) {
+    db.exec('ALTER TABLE categories ADD COLUMN icon_height_px INTEGER');
+  }
+  if (categoryCols.some((c) => c.name === 'icon_size_px')) {
+    db.exec(`
+      UPDATE categories
+      SET icon_height_px = icon_size_px
+      WHERE icon_height_px IS NULL AND icon_size_px IS NOT NULL
+    `);
+  }
   if (!categoryCols.some((c) => c.name === 'show_on_website')) {
     db.exec('ALTER TABLE categories ADD COLUMN show_on_website INTEGER NOT NULL DEFAULT 1');
   }

@@ -21,6 +21,17 @@ async function runPostgresMigrations(pool) {
     'ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_size_px INTEGER'
   );
   await pool.query(
+    'ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_width_px INTEGER'
+  );
+  await pool.query(
+    'ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_height_px INTEGER'
+  );
+  await pool.query(`
+    UPDATE categories
+    SET icon_height_px = icon_size_px
+    WHERE icon_height_px IS NULL AND icon_size_px IS NOT NULL
+  `);
+  await pool.query(
     'ALTER TABLE categories ADD COLUMN IF NOT EXISTS show_on_website INTEGER NOT NULL DEFAULT 1'
   );
   await pool.query(

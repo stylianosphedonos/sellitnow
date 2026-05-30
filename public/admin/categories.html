@@ -60,9 +60,19 @@
             <small>Moves the whole category icon: grid cell, or a full-width banner on the left or right.</small>
           </div>
           <div class="form-group">
-            <label>Icon size on website (px)</label>
-            <input type="number" name="icon_size_px" step="1" min="48" max="280" placeholder="Default: 140">
-            <small>Photos fill the full width of the tile or banner. Size applies only to the placeholder when no image is set.</small>
+            <label>Icon size on website</label>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="flex:1;min-width:120px">
+                <label for="icon_width_px" style="font-size:12px;color:#666;font-weight:500;display:block;margin-bottom:4px">Width (px)</label>
+                <input type="number" id="icon_width_px" name="icon_width_px" step="1" min="48" max="1200" placeholder="Auto (full width)">
+              </div>
+              <span style="color:#999;padding-top:18px" aria-hidden="true">×</span>
+              <div style="flex:1;min-width:120px">
+                <label for="icon_height_px" style="font-size:12px;color:#666;font-weight:500;display:block;margin-bottom:4px">Height (px)</label>
+                <input type="number" id="icon_height_px" name="icon_height_px" step="1" min="48" max="600" placeholder="Default: 140">
+              </div>
+            </div>
+            <small>Leave width empty to span the full tile or banner. Height applies to both uploaded images and placeholders.</small>
           </div>
           <div class="form-group">
             <label class="checkbox-label">
@@ -94,13 +104,20 @@
       return div.innerHTML;
     }
 
+    function formatCategoryIconSize(c) {
+      const width = c.icon_width_px;
+      const height = c.icon_height_px ?? c.icon_size_px ?? 140;
+      const wLabel = width != null && width > 0 ? width : 'auto';
+      return `${wLabel} × ${height}`;
+    }
+
     async function loadCategories() {
       try {
         const { categories } = await callApi('/admin/categories?_=' + Date.now(), { cache: 'no-store' });
         document.getElementById('categories').innerHTML = `
           <div class="admin-table-wrap">
           <table class="table">
-            <thead><tr><th>ID</th><th>Sort</th><th>On site</th><th>Layout</th><th>Icon (px)</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Sort</th><th>On site</th><th>Layout</th><th>Icon (W×H)</th><th>Name</th><th>Slug</th><th>Description</th><th>Actions</th></tr></thead>
             <tbody>
             ${(categories || []).map(c => `
               <tr>
@@ -108,7 +125,7 @@
                 <td>${c.display_order ?? '-'}</td>
                 <td>${c.show_on_website ? 'Yes' : 'No'}</td>
                 <td>${escapeAttr(({ tile: 'Tile', 'banner-left': 'Banner L', 'banner-right': 'Banner R' })[c.website_layout] || 'Tile')}</td>
-                <td>${c.icon_size_px ?? '140'}</td>
+                <td>${formatCategoryIconSize(c)}</td>
                 <td><strong>${escapeAttr(c.name)}</strong></td>
                 <td>${escapeAttr(c.slug)}</td>
                 <td>${escapeAttr((c.description || '').slice(0, 50))}</td>
@@ -139,8 +156,11 @@
         show_on_website: form.show_on_website.checked,
         website_layout: form.website_layout.value
       };
-      if (form.icon_size_px.value !== '') {
-        payload.icon_size_px = parseInt(form.icon_size_px.value, 10);
+      if (form.icon_width_px.value !== '') {
+        payload.icon_width_px = parseInt(form.icon_width_px.value, 10);
+      }
+      if (form.icon_height_px.value !== '') {
+        payload.icon_height_px = parseInt(form.icon_height_px.value, 10);
       }
       if (slugTrim) payload.slug = slugTrim;
       const fileInput = form.querySelector('input[name="image"]');

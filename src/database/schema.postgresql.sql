@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS categories (
   image_url TEXT,
   display_order INTEGER,
   icon_size_px INTEGER,
+  icon_width_px INTEGER,
+  icon_height_px INTEGER,
   website_layout TEXT DEFAULT 'tile',
   show_on_website INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW()

@@ -532,8 +532,34 @@ function bindLoadAllProductsFromCategorySection() {
   });
 }
 
+function getCategoryIconDimensions(c) {
+  const legacyHeight =
+    c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : null;
+  const height =
+    c.icon_height_px != null && c.icon_height_px > 0
+      ? c.icon_height_px
+      : legacyHeight != null
+        ? legacyHeight
+        : 140;
+  const width =
+    c.icon_width_px != null && c.icon_width_px > 0 ? c.icon_width_px : null;
+  return { width, height };
+}
+
+function getCategoryIconMediaStyle(c) {
+  const { width, height } = getCategoryIconDimensions(c);
+  const parts = ['aspect-ratio:unset'];
+  if (width != null) {
+    parts.push(`width:${width}px`, 'max-width:100%', 'align-self:center');
+  } else {
+    parts.push('width:100%');
+  }
+  parts.push(`height:${height}px`, `min-height:${height}px`);
+  return parts.join(';');
+}
+
 function getCategoryIconSizePx(c) {
-  return c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : 140;
+  return getCategoryIconDimensions(c).height;
 }
 
 function getCategoryWebsiteLayout(c) {
@@ -547,12 +573,12 @@ function renderCategoryCardMedia(c, layout) {
   const mediaClass = isBanner
     ? 'category-card__media category-card__media--banner'
     : 'category-card__media category-card__media--tile';
+  const mediaStyle = getCategoryIconMediaStyle(c);
   const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
   if (imgUrl) {
-    return `<div class="${mediaClass}"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
+    return `<div class="${mediaClass}" style="${mediaStyle}"><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
   }
-  const minH = getCategoryIconSizePx(c);
-  return `<div class="${mediaClass} category-card__media--placeholder" style="min-height:${minH}px"><span class="icon" aria-hidden="true">🛒</span></div>`;
+  return `<div class="${mediaClass} category-card__media--placeholder" style="${mediaStyle}"><span class="icon" aria-hidden="true">🛒</span></div>`;
 }
 
 function renderStorefrontCategoryCard(c) {
