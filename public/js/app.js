@@ -532,50 +532,67 @@ function bindLoadAllProductsFromCategorySection() {
   });
 }
 
-function hasCustomCategoryIconSize(c) {
-  return (
-    (c.icon_width_px != null && c.icon_width_px > 0) ||
-    (c.icon_height_px != null && c.icon_height_px > 0) ||
-    (c.icon_size_px != null && c.icon_size_px > 0)
-  );
+function hasCustomCategoryIconSize(c, hasImage) {
+  if (c.icon_width_px != null && Number(c.icon_width_px) > 0) return true;
+  if (c.icon_height_px != null && Number(c.icon_height_px) > 0) return true;
+  if (!hasImage && c.icon_size_px != null && Number(c.icon_size_px) > 0) return true;
+  return false;
 }
 
-function getCategoryIconDimensions(c) {
+function getCategoryIconDimensions(c, hasImage) {
   const legacyHeight =
-    c.icon_size_px != null && c.icon_size_px > 0 ? c.icon_size_px : null;
+    !hasImage && c.icon_size_px != null && Number(c.icon_size_px) > 0
+      ? Number(c.icon_size_px)
+      : null;
   let height =
-    c.icon_height_px != null && c.icon_height_px > 0
-      ? c.icon_height_px
+    c.icon_height_px != null && Number(c.icon_height_px) > 0
+      ? Number(c.icon_height_px)
       : legacyHeight;
   let width =
-    c.icon_width_px != null && c.icon_width_px > 0 ? c.icon_width_px : null;
+    c.icon_width_px != null && Number(c.icon_width_px) > 0
+      ? Number(c.icon_width_px)
+      : null;
   if (width != null && height == null) height = width;
   return { width, height };
 }
 
-function getCategoryIconMediaClasses(c, layout) {
+function getCategoryIconMediaClasses(c, layout, hasImage) {
   const isBanner = layout === 'banner-left' || layout === 'banner-right';
   let classes = isBanner
     ? 'category-card__media category-card__media--banner'
     : 'category-card__media category-card__media--tile';
-  if (!hasCustomCategoryIconSize(c)) return classes;
+  if (!hasCustomCategoryIconSize(c, hasImage)) return classes;
   classes += ' category-card__media--sized';
-  const { width } = getCategoryIconDimensions(c);
-  if (width != null) classes += ' category-card__media--custom-width';
+  const { width } = getCategoryIconDimensions(c, hasImage);
+  if (isBanner && width != null) classes += ' category-card__media--custom-width';
   return classes;
 }
 
-function getCategoryIconMediaStyle(c) {
-  if (!hasCustomCategoryIconSize(c)) return '';
-  const { width, height } = getCategoryIconDimensions(c);
-  const parts = [];
-  if (width != null) parts.push(`--category-media-width:${width}px`);
-  if (height != null) parts.push(`--category-media-height:${height}px`);
+function getCategoryIconMediaStyle(c, layout, hasImage) {
+  if (!hasCustomCategoryIconSize(c, hasImage)) return '';
+  const isBanner = layout === 'banner-left' || layout === 'banner-right';
+  const { width, height } = getCategoryIconDimensions(c, hasImage);
+  const parts = ['aspect-ratio:unset', 'box-sizing:border-box'];
+  if (isBanner && width != null) {
+    parts.push(`width:${width}px`, 'max-width:100%');
+  } else {
+    parts.push('width:100%');
+  }
+  if (height != null) {
+    parts.push(`height:${height}px`, `min-height:${height}px`);
+  }
   return parts.join(';');
 }
 
+function getCategoryCardTileStyle(c, hasImage) {
+  if (!hasCustomCategoryIconSize(c, hasImage)) return '';
+  const { width } = getCategoryIconDimensions(c, hasImage);
+  if (width == null) return '';
+  return `width:${width}px;max-width:100%`;
+}
+
 function getCategoryIconSizePx(c) {
-  const { height } = getCategoryIconDimensions(c);
+  const { height } = getCategoryIconDimensions(c, false);
   return height != null ? height : 140;
 }
 
@@ -586,10 +603,11 @@ function getCategoryWebsiteLayout(c) {
 }
 
 function renderCategoryCardMedia(c, layout) {
-  const mediaClass = getCategoryIconMediaClasses(c, layout);
-  const mediaStyle = getCategoryIconMediaStyle(c);
+  const hasImage = Boolean(c.image_url);
+  const mediaClass = getCategoryIconMediaClasses(c, layout, hasImage);
+  const mediaStyle = getCategoryIconMediaStyle(c, layout, hasImage);
   const styleAttr = mediaStyle ? ` style="${mediaStyle}"` : '';
-  const imgUrl = c.image_url ? mediaUrl(c.image_url) : '';
+  const imgUrl = hasImage ? mediaUrl(c.image_url) : '';
   if (imgUrl) {
     return `<div class="${mediaClass}"${styleAttr}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
   }
@@ -598,8 +616,15 @@ function renderCategoryCardMedia(c, layout) {
 
 function renderStorefrontCategoryCard(c) {
   const layout = getCategoryWebsiteLayout(c);
+  const hasImage = Boolean(c.image_url);
   const media = renderCategoryCardMedia(c, layout);
   const label = `<span class="category-card__label">${escapeHtml(c.name)}</span>`;
+  const tileStyle = layout === 'tile' ? getCategoryCardTileStyle(c, hasImage) : '';
+  const tileStyleAttr = tileStyle ? ` style="${tileStyle}"` : '';
+  const tileWidthClass =
+    layout === 'tile' && getCategoryCardTileStyle(c, hasImage)
+      ? ' category-card--sized-width'
+      : '';
 
   if (layout === 'banner-left') {
     return `
@@ -616,7 +641,7 @@ function renderStorefrontCategoryCard(c) {
       </button>`;
   }
   return `
-      <button type="button" class="category-card category-card--tile" data-category-id="${c.id}">
+      <button type="button" class="category-card category-card--tile${tileWidthClass}" data-category-id="${c.id}"${tileStyleAttr}>
         ${media}
         ${label}
       </button>`;

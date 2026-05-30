@@ -182,8 +182,8 @@
       const previewCategory = getPreviewCategoryFromForm(form);
       const layout = getCategoryWebsiteLayout(previewCategory);
       const isBanner = layout === 'banner-left' || layout === 'banner-right';
-      const wrapStyle = isBanner ? 'max-width:100%' : 'max-width:280px';
-      previewEl.innerHTML = `<div style="${wrapStyle}">${renderCategoryCardMedia(previewCategory, layout)}</div>`;
+      const wrapStyle = isBanner ? 'max-width:100%' : 'max-width:320px';
+      previewEl.innerHTML = `<div class="category-grid" style="${wrapStyle};grid-template-columns:1fr">${renderStorefrontCategoryCard(previewCategory)}</div>`;
     }
 
     function bindCategorySizePreview(form) {
