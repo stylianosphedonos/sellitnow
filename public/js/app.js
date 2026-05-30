@@ -579,7 +579,7 @@ function getCategoryIconMediaStyle(c, layout, hasImage) {
     parts.push('width:100%');
   }
   if (height != null) {
-    parts.push(`height:${height}px`, `min-height:${height}px`);
+    parts.push(`height:${height}px`);
   }
   return parts.join(';');
 }
@@ -609,7 +609,7 @@ function renderCategoryCardMedia(c, layout) {
   const styleAttr = mediaStyle ? ` style="${mediaStyle}"` : '';
   const imgUrl = hasImage ? mediaUrl(c.image_url) : '';
   if (imgUrl) {
-    return `<div class="${mediaClass}"${styleAttr}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
+    return `<div class="${mediaClass} category-card__media--image"${styleAttr}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
   }
   return `<div class="${mediaClass} category-card__media--placeholder"${styleAttr}><span class="icon" aria-hidden="true">🛒</span></div>`;
 }
