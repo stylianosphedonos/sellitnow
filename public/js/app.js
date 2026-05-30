@@ -475,6 +475,30 @@ const FLOATING_WEBSITE_ZONES = new Set([
   'bottom-right',
 ]);
 
+const MOBILE_DOCK_ZONES = new Set([
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+  'left',
+  'right',
+]);
+
+function isMobileSiteDock() {
+  return window.matchMedia('(max-width: 640px)').matches;
+}
+
+function sortCategoriesForZone(list) {
+  return [...list].sort((a, b) => {
+    const ao = a.display_order;
+    const bo = b.display_order;
+    if (ao == null && bo == null) return a.id - b.id;
+    if (ao == null) return 1;
+    if (bo == null) return -1;
+    return ao - bo || a.id - b.id;
+  });
+}
+
 /** Scroll so the products section title sits below the sticky header. */
 function scrollProductsBrowseIntoView() {
   const heading = document.getElementById('productsSectionHeading');
@@ -517,12 +541,12 @@ function getCategoryWebsiteZone(c) {
   return 'home-main';
 }
 
-function renderCompactCategoryIcon(c) {
-  const hasImage = Boolean(c.image_url);
+function renderCompactCategoryIcon(c, inDock) {
   const media = renderCategoryCardMedia(c, 'tile');
   const typeClass = isIconCategory(c) ? ' category-icon--request' : '';
+  const dockClass = inDock ? ' category-icon--dock' : '';
   return `
-    <button type="button" class="category-icon${typeClass}" data-category-id="${c.id}" aria-label="${escapeHtml(c.name)}">
+    <button type="button" class="category-icon${typeClass}${dockClass}" data-category-id="${c.id}" aria-label="${escapeHtml(c.name)}">
       ${media}
       <span class="category-icon__label">${escapeHtml(c.name)}</span>
     </button>`;
@@ -530,7 +554,41 @@ function renderCompactCategoryIcon(c) {
 
 function renderCategoryForZone(c, zone) {
   if (zone === 'home-main') return renderStorefrontCategoryCard(c);
-  return renderCompactCategoryIcon(c);
+  return renderCompactCategoryIcon(c, false);
+}
+
+function renderMobileCategoryDock(byZone) {
+  const dock = document.getElementById('zone-mobile-dock');
+  if (!dock) return;
+
+  const items = [];
+  for (const zone of MOBILE_DOCK_ZONES) {
+    items.push(...(byZone.get(zone) || []));
+  }
+  const sorted = sortCategoriesForZone(items);
+
+  if (!isMobileSiteDock() || !sorted.length) {
+    dock.hidden = true;
+    dock.innerHTML = '';
+    document.body.classList.remove('has-zone-mobile-dock');
+    return;
+  }
+
+  dock.innerHTML = sorted.map((c) => renderCompactCategoryIcon(c, true)).join('');
+  dock.hidden = false;
+  document.body.classList.add('has-zone-mobile-dock');
+}
+
+function initMobileCategoryDockReload(byZoneRef) {
+  if (window.__sellitnowMobileDockResizeBound) return;
+  window.__sellitnowMobileDockResizeBound = true;
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (byZoneRef.current) renderMobileCategoryDock(byZoneRef.current);
+    }, 150);
+  });
 }
 
 function openCategoryRequestModal(category) {
@@ -847,6 +905,13 @@ async function loadCategories() {
       });
     }
 
+    window.__sellitnowCategoriesByZone = byZone;
+    if (!window.__sellitnowMobileDockByZoneRef) {
+      window.__sellitnowMobileDockByZoneRef = { current: null };
+      initMobileCategoryDockReload(window.__sellitnowMobileDockByZoneRef);
+    }
+    window.__sellitnowMobileDockByZoneRef.current = byZone;
+
     const homeMain = byZone.get('home-main') || [];
     grid.innerHTML = allProductsTile + homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
 
@@ -868,9 +933,12 @@ async function loadCategories() {
       el.innerHTML = list.map((c) => renderCategoryForZone(c, zone)).join('');
       el.hidden = false;
     }
+
+    renderMobileCategoryDock(byZone);
   } catch (err) {
     sellitnowCategoryLabels.clear();
     sellitnowCategoriesById.clear();
+    renderMobileCategoryDock(new Map());
     grid.innerHTML = allProductsTile + '<p>No categories</p>';
   }
   bindLoadAllProductsFromCategorySection();

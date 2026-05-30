@@ -3361,6 +3361,18 @@ button.category-card:focus-visible {
 .site-zone--bottom-left { bottom: 20px; left: 12px; }
 .site-zone--bottom-right { bottom: 20px; right: 12px; }
 
+.site-zone--mobile-dock {
+  display: none;
+}
+
+body.has-zone-mobile-dock {
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+
+body.has-zone-mobile-dock.request-modal-open {
+  padding-bottom: 0;
+}
+
 .category-icon {
   appearance: none;
   border: none;
@@ -3508,11 +3520,129 @@ body.request-modal-open {
 }
 
 @media (max-width: 640px) {
+  .site-body {
+    display: block;
+    padding: 0;
+    max-width: none;
+  }
+
+  .site-zone--bar {
+    padding: 8px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .site-zone--bar-row {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    min-width: min-content;
+  }
+
+  .site-zone--bar-row .category-icon {
+    flex: 0 0 auto;
+    width: 64px;
+    max-width: 64px;
+  }
+
   .site-zone--float {
-    max-width: 72px;
+    display: none !important;
+  }
+
+  .site-zone--mobile-dock {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .site-zone--mobile-dock::-webkit-scrollbar {
+    display: none;
+  }
+
+  .site-zone--mobile-dock[hidden] {
+    display: none !important;
+  }
+
+  .category-icon--dock {
+    flex: 0 0 auto;
+    width: 56px;
+    max-width: 56px;
+    padding: 6px;
+    border-radius: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .category-icon--dock .category-card__media {
+    aspect-ratio: 1;
+    border-radius: 10px;
+  }
+
+  .category-icon--dock .category-icon__label {
+    display: none;
+  }
+
+  .category-icon--dock.category-icon--request::after {
+    top: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    line-height: 18px;
   }
 
   .category-icon__label {
     font-size: 10px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .category-card--request-icon::after {
+    width: 18px;
+    height: 18px;
+    font-size: 10px;
+    line-height: 18px;
+    top: 4px;
+    right: 4px;
+  }
+
+  .request-modal {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .request-modal__panel {
+    max-width: none;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+    padding: 20px 16px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .request-modal__actions {
+    flex-direction: column;
+  }
+
+  .request-modal__actions .btn {
+    width: 100%;
+    max-width: none;
   }
 }
