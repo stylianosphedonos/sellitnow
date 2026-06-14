@@ -1061,12 +1061,27 @@ async function loadCategories() {
 
 let currentProductSearch = '';
 let currentProductPageSize = 0;
+let currentProductGridColumns = 0;
+
+const PRODUCT_GRID_ROWS = 4;
+
+function getProductGridColumnCount() {
+  const width = window.innerWidth || document.documentElement.clientWidth || 0;
+  if (width <= 640) return 2;
+  if (width <= 1024) return 4;
+  return 5;
+}
 
 function getResponsiveProductPageSize() {
-  const width = window.innerWidth || document.documentElement.clientWidth || 0;
-  if (width <= 640) return 8;
-  if (width <= 1024) return 12;
-  return 15;
+  return getProductGridColumnCount() * PRODUCT_GRID_ROWS;
+}
+
+async function resolveProductPageSize() {
+  const grid = document.getElementById('productGrid');
+  if (grid && grid.clientWidth <= 0) {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+  return getResponsiveProductPageSize();
 }
 
 function getCurrentCategoryFromUrl() {
@@ -1106,8 +1121,9 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
     currentProductSearch = String(searchQuery).trim();
   }
   const qParam = currentProductSearch ? `&q=${encodeURIComponent(currentProductSearch)}` : '';
-  const pageSize = getResponsiveProductPageSize();
+  const pageSize = await resolveProductPageSize();
   currentProductPageSize = pageSize;
+  currentProductGridColumns = getProductGridColumnCount();
 
   try {
     let data;
@@ -1153,8 +1169,8 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
 
 function initResponsiveProductPageSizeReload() {
   const onResize = () => {
-    const nextPageSize = getResponsiveProductPageSize();
-    if (nextPageSize === currentProductPageSize) return;
+    const nextColumns = getProductGridColumnCount();
+    if (nextColumns === currentProductGridColumns) return;
     const categoryId = getCurrentCategoryFromUrl();
     loadProducts(1, categoryId);
   };
