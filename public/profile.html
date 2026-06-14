@@ -29,11 +29,20 @@
   <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script>
-    const user = getUser();
-    if (!user) { window.location.href = '/login.html'; }
-
-    if (user?.role === 'admin') document.getElementById('adminLink').style.display = 'inline';
     initLogout();
+
+    async function initProfilePage() {
+      await ensureValidSession();
+      if (!getUser()) {
+        window.location.href = '/login.html?redirect=' + encodeURIComponent('/profile.html');
+        return;
+      }
+      const user = getUser();
+      if (user?.role === 'admin') document.getElementById('adminLink').style.display = 'inline';
+      await loadBrandSettings();
+      loadProfile();
+      await loadOrders();
+    }
 
     async function loadProfile() {
       try {
@@ -79,11 +88,7 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', async () => {
-      await loadBrandSettings();
-      loadProfile();
-      await loadOrders();
-    });
+    document.addEventListener('DOMContentLoaded', initProfilePage);
 
     window.addEventListener('pageshow', (e) => {
       if (!e.persisted || typeof loadBrandSettings !== 'function') return;

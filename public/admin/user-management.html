@@ -88,9 +88,6 @@
   <script src="/js/admin-layout.js"></script>
   <script>
     const me = getUser();
-    if (!getToken() || me?.role !== 'admin') {
-      window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/user-management.html');
-    }
 
     const alertEl = document.getElementById('alert');
     const changePasswordHint = document.getElementById('changePasswordHint');

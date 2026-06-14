@@ -40,7 +40,6 @@
   <script src="/js/app.js"></script>
   <script src="/js/admin-layout.js"></script>
   <script>
-    if (!getToken() || getUser()?.role !== 'admin') window.location.href = '/login.html?redirect=' + encodeURIComponent('/admin/customers.html');
 
     function escapeAttr(s) {
       const el = document.createElement('div');

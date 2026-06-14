@@ -143,21 +143,21 @@ class AuthService {
 
   async getProfile(userId) {
     const result = await pool.query(
-      'SELECT id, email, first_name, last_name, phone, email_verified, created_at FROM users WHERE id = $1',
+      'SELECT id, email, first_name, last_name, phone, email_verified, role, created_at FROM users WHERE id = $1',
       [userId]
     );
     if (!result.rows.length) throw new Error('User not found');
-    return result.rows[0];
+    return this.sanitizeUser(result.rows[0]);
   }
 
   async updateProfile(userId, { first_name, last_name, phone }) {
     const result = await pool.query(
       `UPDATE users SET first_name = COALESCE($2, first_name), last_name = COALESCE($3, last_name), phone = COALESCE($4, phone)
-       WHERE id = $1 RETURNING id, email, first_name, last_name, phone, email_verified, created_at`,
+       WHERE id = $1 RETURNING id, email, first_name, last_name, phone, email_verified, role, created_at`,
       [userId, first_name, last_name, phone]
     );
     if (!result.rows.length) throw new Error('User not found');
-    return result.rows[0];
+    return this.sanitizeUser(result.rows[0]);
   }
 
   async deleteAccount(userId) {

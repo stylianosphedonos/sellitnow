@@ -192,10 +192,29 @@ async function ensureValidSession() {
   try {
     const { user } = await callApi('/auth/me');
     if (user) setUser(user);
+    updateNav();
   } catch (err) {
     if (err.sessionExpired) return;
     if (err.status === 401) await handleSessionExpired({ silent: isLoginPage() });
   }
+}
+
+async function sellitnowEnsureAdminAccess() {
+  const path = location.pathname;
+  if (path !== '/admin' && !path.startsWith('/admin/')) return true;
+  await ensureValidSession();
+  const user = getUser();
+  if (!isLoggedInClient() || user?.role !== 'admin') {
+    const redirect = encodeURIComponent(location.pathname + location.search);
+    window.location.replace(`/login.html?redirect=${redirect}`);
+    return false;
+  }
+  updateNav();
+  return true;
+}
+
+if (typeof window !== 'undefined') {
+  window.sellitnowEnsureAdminAccess = sellitnowEnsureAdminAccess;
 }
 
 function getCartSession() {
@@ -386,7 +405,7 @@ function updateNav() {
     if (loginBtn) loginBtn.style.display = 'none';
     if (profileBtn) profileBtn.style.display = 'inline';
     if (logoutBtn) logoutBtn.style.display = 'inline';
-    if (user.role === 'admin' && adminBtn) adminBtn.style.display = 'inline';
+    if (adminBtn) adminBtn.style.display = user.role === 'admin' ? 'inline' : 'none';
   } else {
     if (loginBtn) loginBtn.style.display = 'inline';
     if (adminBtn) adminBtn.style.display = 'none';
@@ -1170,9 +1189,9 @@ function initHomeSearch() {
 }
 
 async function initHomePage() {
-  updateNav();
   initLogout();
   await ensureValidSession();
+  updateNav();
   const categoryId = getCurrentCategoryFromUrl();
   const q = new URLSearchParams(location.search).get('q') || '';
   const searchInput = document.getElementById('searchInput');

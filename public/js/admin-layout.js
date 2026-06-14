@@ -114,7 +114,12 @@
     return '<span class="' + cls + '">' + escapeHtml(String(status || '')) + '</span>';
   };
 
-  function init() {
+  async function init() {
+    if (typeof window.sellitnowEnsureAdminAccess === 'function') {
+      const allowed = await window.sellitnowEnsureAdminAccess();
+      if (!allowed) return;
+    }
+
     var layout = document.querySelector('.admin-layout');
     var sidebar = document.querySelector('.admin-sidebar');
     if (!layout || !sidebar) return;
