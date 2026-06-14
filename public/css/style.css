@@ -661,6 +661,72 @@ body.product-lightbox-open {
   object-fit: contain;
 }
 
+.bundle-includes {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+
+.bundle-includes__heading {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.bundle-includes__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.bundle-includes__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.bundle-includes__item:hover {
+  transform: translateY(-2px);
+}
+
+a.bundle-includes__item:hover .bundle-includes__photo {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.bundle-includes__photo {
+  aspect-ratio: 1;
+  background: var(--white);
+  border: 1px solid #eee;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bundle-includes__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bundle-includes__placeholder {
+  font-size: 32px;
+  color: #999;
+}
+
+.bundle-includes__title {
+  font-size: 13px;
+  line-height: 1.35;
+  color: #444;
+  text-align: center;
+}
+
 /* Pagination */
 .pagination {
   display: flex;
