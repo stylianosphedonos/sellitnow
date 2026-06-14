@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const showRegister = document.getElementById('showRegister');
   const showLogin = document.getElementById('showLogin');
 
+  if (new URLSearchParams(location.search).get('reason') === 'session_expired' && loginError) {
+    loginError.textContent = 'Your session has expired. Please log in again.';
+    loginError.style.display = 'block';
+  }
+
   showRegister?.addEventListener('click', (e) => {
     e.preventDefault();
     loginContainer.style.display = 'none';

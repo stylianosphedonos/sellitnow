@@ -116,6 +116,88 @@ function setUser(user) {
   localStorage.setItem('user', JSON.stringify(user || null));
 }
 
+function clearSession() {
+  clearSellitnowCsrfCache();
+  setToken(null);
+  setUser(null);
+}
+
+function isLoggedInClient() {
+  return Boolean(getUser() || localStorage.getItem('token'));
+}
+
+function isLoginPage() {
+  return /\/login\.html$/i.test(location.pathname);
+}
+
+function isProtectedPage() {
+  const path = location.pathname;
+  return path.startsWith('/admin/') || /\/profile\.html$/i.test(path);
+}
+
+function apiPathFromUrl(url) {
+  const base = apiPrefix();
+  const raw = String(url || '');
+  if (raw.startsWith(base)) return raw.slice(base.length).split('?')[0] || '/';
+  try {
+    const u = new URL(raw, location.origin);
+    const marker = '/api/v1';
+    const idx = u.pathname.indexOf(marker);
+    if (idx >= 0) return u.pathname.slice(idx + marker.length) || '/';
+    return u.pathname;
+  } catch {
+    return raw.split('?')[0] || '/';
+  }
+}
+
+function isAuthExemptApiPath(path, method) {
+  const p = String(path || '').split('?')[0];
+  const m = String(method || 'GET').toUpperCase();
+  if (p === '/auth/login' && m === 'POST') return true;
+  if (p === '/auth/register' && m === 'POST') return true;
+  return false;
+}
+
+let sessionExpiredHandling = false;
+
+async function handleSessionExpired(options = {}) {
+  if (sessionExpiredHandling) return;
+  sessionExpiredHandling = true;
+
+  clearSession();
+  updateNav();
+
+  if (!options.silent && typeof showToast === 'function' && !isLoginPage()) {
+    showToast('Your session has expired. Please log in again.', { type: 'error' });
+  }
+
+  if (isProtectedPage() && !isLoginPage()) {
+    const redirect = encodeURIComponent(location.pathname + location.search);
+    window.location.href = `/login.html?redirect=${redirect}&reason=session_expired`;
+    return;
+  }
+
+  sessionExpiredHandling = false;
+}
+
+async function maybeHandleExpiredSession(status, path, method) {
+  if (status !== 401 || !isLoggedInClient()) return false;
+  if (isAuthExemptApiPath(path, method)) return false;
+  await handleSessionExpired();
+  return true;
+}
+
+async function ensureValidSession() {
+  if (!isLoggedInClient()) return;
+  try {
+    const { user } = await callApi('/auth/me');
+    if (user) setUser(user);
+  } catch (err) {
+    if (err.sessionExpired) return;
+    if (err.status === 401) await handleSessionExpired({ silent: isLoginPage() });
+  }
+}
+
 function getCartSession() {
   let id = localStorage.getItem('cartSession');
   if (!id) {
@@ -180,7 +262,11 @@ function sellitnowAuthHeaderPair() {
 /** Same-origin or cross-origin API calls with session cookie + optional Bearer. */
 function sellitnowFetchWithAuth(url, options = {}) {
   const headers = { ...sellitnowAuthHeaderPair(), ...(options.headers || {}) };
-  return fetch(url, { ...options, headers, credentials: 'include' });
+  const method = String(options.method || 'GET').toUpperCase();
+  return fetch(url, { ...options, headers, credentials: 'include' }).then((res) => {
+    void maybeHandleExpiredSession(res.status, apiPathFromUrl(url), method);
+    return res;
+  });
 }
 
 /** Mutating requests (e.g. multipart) — includes CSRF when the session uses the auth cookie. */
@@ -191,7 +277,9 @@ async function sellitnowFetchWithCsrf(url, options = {}) {
     const csrf = await getCsrfTokenForMutations();
     if (csrf) headers['X-CSRF-Token'] = csrf;
   }
-  return fetch(url, { ...options, headers, credentials: 'include' });
+  const res = await fetch(url, { ...options, headers, credentials: 'include' });
+  void maybeHandleExpiredSession(res.status, apiPathFromUrl(url), method);
+  return res;
 }
 
 async function callApi(path, options = {}) {
@@ -208,6 +296,13 @@ async function callApi(path, options = {}) {
   const res = await fetch(apiPrefix() + path, { ...options, headers, credentials: 'include' });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (await maybeHandleExpiredSession(res.status, path, method)) {
+      const err = new Error(data.error || 'Session expired');
+      err.status = res.status;
+      err.data = data;
+      err.sessionExpired = true;
+      throw err;
+    }
     const err = new Error(data.error || 'Request failed');
     err.status = res.status;
     err.data = data;
@@ -302,14 +397,13 @@ function updateNav() {
 
 function initLogout() {
   const btn = document.getElementById('logoutBtn');
-  if (btn) {
+  if (btn && btn.dataset.bound !== '1') {
+    btn.dataset.bound = '1';
     btn.addEventListener('click', async () => {
       try {
         await callApi('/auth/logout', { method: 'POST' });
       } catch (_) {}
-      clearSellitnowCsrfCache();
-      setToken(null);
-      setUser(null);
+      clearSession();
       window.location.href = '/';
     });
   }
@@ -1078,6 +1172,7 @@ function initHomeSearch() {
 async function initHomePage() {
   updateNav();
   initLogout();
+  await ensureValidSession();
   const categoryId = getCurrentCategoryFromUrl();
   const q = new URLSearchParams(location.search).get('q') || '';
   const searchInput = document.getElementById('searchInput');

@@ -33,11 +33,7 @@
     if (!user) { window.location.href = '/login.html'; }
 
     if (user?.role === 'admin') document.getElementById('adminLink').style.display = 'inline';
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
-      setToken(null);
-      setUser(null);
-      window.location.href = '/';
-    });
+    initLogout();
 
     async function loadProfile() {
       try {
