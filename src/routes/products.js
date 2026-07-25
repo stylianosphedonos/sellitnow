@@ -10,7 +10,14 @@ router.get('/', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const q = String(req.query.q || req.query.search || '').trim();
-    const result = await ProductService.list(page, limit, q);
+    const typeRaw = String(req.query.type || '').trim().toLowerCase();
+    const productType =
+      typeRaw === 'bundle' || typeRaw === 'offer'
+        ? 'bundle'
+        : typeRaw === 'simple' || typeRaw === 'item' || typeRaw === 'items'
+          ? 'simple'
+          : null;
+    const result = await ProductService.list(page, limit, q, { productType });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

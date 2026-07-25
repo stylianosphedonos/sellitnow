@@ -251,19 +251,32 @@ class ProductService {
     return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async list(page = 1, limit = 20, search = '') {
+  async list(page = 1, limit = 20, search = '', options = {}) {
     const offset = (page - 1) * limit;
     const term = search != null ? String(search).trim() : '';
     const pattern = term ? `%${term}%` : null;
+    const productType =
+      options.productType === 'bundle' || options.productType === 'simple'
+        ? options.productType
+        : null;
+
+    const typeSql =
+      productType === 'bundle'
+        ? ` AND p.product_type = 'bundle'`
+        : productType === 'simple'
+          ? ` AND COALESCE(p.product_type, 'simple') = 'simple'`
+          : '';
 
     const countResult = pattern
       ? await pool.query(
           `SELECT COUNT(*)::int FROM products p
            WHERE p.status = 'active'
-             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)`,
+             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)${typeSql}`,
           [pattern]
         )
-      : await pool.query("SELECT COUNT(*)::int FROM products WHERE status = 'active'");
+      : await pool.query(
+          `SELECT COUNT(*)::int FROM products p WHERE p.status = 'active'${typeSql}`
+        );
 
     const total = countResult.rows[0].count;
 
@@ -274,7 +287,7 @@ class ProductService {
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
-             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)
+             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)${typeSql}
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
              p.display_order ASC,
@@ -286,7 +299,7 @@ class ProductService {
           `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
-           WHERE p.status = 'active'
+           WHERE p.status = 'active'${typeSql}
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
              p.display_order ASC,
