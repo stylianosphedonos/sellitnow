@@ -39,6 +39,7 @@
     if (data.primaryDark) root.style.setProperty('--primary-dark', data.primaryDark);
     if (data.secondary) root.style.setProperty('--secondary', data.secondary);
     if (data.accent) root.style.setProperty('--accent', data.accent);
+    if (data.headerShadow) root.style.setProperty('--header-shadow', data.headerShadow);
     if (data.currency) g.__storeCurrency = String(data.currency).toUpperCase();
 
     // Avoid orange hero flash: decide banner vs gradient before first paint when cache exists.

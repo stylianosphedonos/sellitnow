@@ -3,6 +3,7 @@
   --primary-dark: #d4380d;
   --secondary: #ff6633;
   --accent: #ff9000;
+  --header-shadow: #ee4d2d;
   --bg: #f5f5f5;
   --white: #fff;
   --text: #333;
@@ -36,7 +37,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 8px rgba(238, 77, 45, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--header-shadow) 30%, transparent);
 }
 
 .header-inner {

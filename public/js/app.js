@@ -25,6 +25,7 @@ function persistBrandSettings(data) {
       primaryDark: data.primaryDark || '',
       secondary: data.secondary || '',
       accent: data.accent || '',
+      headerShadow: data.headerShadow || '',
       currency: data.currency || '',
       banner: data.banner || '',
       logo: data.logo || '',
@@ -101,6 +102,7 @@ function applyBrandTheme(data, persist = false) {
   if (data.primaryDark) root.style.setProperty('--primary-dark', data.primaryDark);
   if (data.secondary) root.style.setProperty('--secondary', data.secondary);
   if (data.accent) root.style.setProperty('--accent', data.accent);
+  if (data.headerShadow) root.style.setProperty('--header-shadow', data.headerShadow);
   if (persist) persistBrandSettings(data);
 }
 

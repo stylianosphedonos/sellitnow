@@ -63,6 +63,14 @@
                 <input type="text" id="accentHex" value="#ff9000" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace">
               </div>
             </div>
+            <div class="form-group">
+              <label>Header shadow</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="color" id="headerShadowColor" value="#ee4d2d" style="width:48px;height:40px;padding:2px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+                <input type="text" id="headerShadowHex" value="#ee4d2d" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace">
+              </div>
+              <small style="color:var(--text-muted);display:block;margin-top:6px">Glow under the top bar (logo &amp; search).</small>
+            </div>
           </div>
           <button type="button" id="saveColors" class="btn" style="margin-top:16px;max-width:150px">Save Colors</button>
         </section>
@@ -177,7 +185,7 @@
         if (/^#[0-9A-Fa-f]{6}$/.test(v)) colorEl.value = v;
       });
     }
-    ['primary', 'primaryDark', 'secondary', 'accent'].forEach(syncColorInputs);
+    ['primary', 'primaryDark', 'secondary', 'accent', 'headerShadow'].forEach(syncColorInputs);
 
     function syncBannerDimUi() {
       const rangeEl = document.getElementById('heroBannerOverlayRange');
@@ -209,6 +217,8 @@
         document.getElementById('secondaryHex').value = data.secondary || '#ff6633';
         document.getElementById('accentColor').value = data.accent || '#ff9000';
         document.getElementById('accentHex').value = data.accent || '#ff9000';
+        document.getElementById('headerShadowColor').value = data.headerShadow || '#ee4d2d';
+        document.getElementById('headerShadowHex').value = data.headerShadow || '#ee4d2d';
 
         document.getElementById('heroTitleInput').value =
           data.heroTitle != null ? data.heroTitle : '';
@@ -302,9 +312,19 @@
             primary: document.getElementById('primaryHex').value,
             primaryDark: document.getElementById('primaryDarkHex').value,
             secondary: document.getElementById('secondaryHex').value,
-            accent: document.getElementById('accentHex').value
+            accent: document.getElementById('accentHex').value,
+            headerShadow: document.getElementById('headerShadowHex').value,
           })
         });
+        if (typeof applyBrandTheme === 'function') {
+          applyBrandTheme({
+            primary: document.getElementById('primaryHex').value,
+            primaryDark: document.getElementById('primaryDarkHex').value,
+            secondary: document.getElementById('secondaryHex').value,
+            accent: document.getElementById('accentHex').value,
+            headerShadow: document.getElementById('headerShadowHex').value,
+          }, true);
+        }
         showAlert('Colors saved. View your store to see the changes.');
       } catch (err) {
         showAlert(err.message || 'Failed to save colors.', true);
