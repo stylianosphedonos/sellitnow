@@ -1199,7 +1199,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
     if (categoryId) {
       data = await callApi(`/categories/${categoryId}/products?page=${page}&limit=${pageSize}${qParam}`);
     } else {
-      data = await callApi(`/products?page=${page}&limit=${pageSize}&type=simple${qParam}`);
+      data = await callApi(`/products?page=${page}&limit=${pageSize}${qParam}`);
     }
     const items = data.items || [];
     grid.innerHTML = items.length
