@@ -18,6 +18,20 @@
     return String(url);
   }
 
+  function preloadHeroBanner(resolvedUrl) {
+    if (!resolvedUrl || typeof document === 'undefined') return;
+    try {
+      const href = String(resolvedUrl);
+      if (document.querySelector('link[data-hero-preload="1"]')) return;
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = href;
+      link.setAttribute('data-hero-preload', '1');
+      document.head.appendChild(link);
+    } catch (_) {}
+  }
+
   function applyThemeVars(data) {
     if (!data || typeof document === 'undefined') return;
     const root = document.documentElement;
@@ -41,6 +55,7 @@
         if (Number.isFinite(n)) overlay = Math.min(0.85, Math.max(0, n));
       }
       root.style.setProperty('--hero-banner-overlay', String(overlay));
+      preloadHeroBanner(resolved);
     } else {
       root.classList.remove('has-hero-banner');
       root.classList.add('hero-use-gradient');

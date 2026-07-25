@@ -176,7 +176,7 @@ class CategoryService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
+          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -195,7 +195,7 @@ class CategoryService {
           [categoryId, 'active', pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
+          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -213,34 +213,24 @@ class CategoryService {
           [categoryId, 'active', limit, offset]
         );
 
-    const productIds = result.rows.map((row) => row.id);
-    const categoryMap = new Map();
-    if (productIds.length) {
-      const placeholders = productIds.map((_, i) => `$${i + 1}`).join(', ');
-      const categoryRows = await pool.query(
-        `SELECT product_id, category_id FROM product_categories
-         WHERE product_id IN (${placeholders})
-         ORDER BY product_id, category_id`,
-        productIds
-      );
-      for (const row of categoryRows.rows) {
-        if (!categoryMap.has(row.product_id)) categoryMap.set(row.product_id, []);
-        categoryMap.get(row.product_id).push(row.category_id);
-      }
-    }
-
     const items = result.rows.map((row) => {
       const opts = parseOptionsJson(row.options_json);
-      const { options_json: _o, ...rest } = row;
+      const colors = opts.colors || [];
+      const sizes = opts.sizes || [];
       return {
-        ...rest,
-        product_type: rest.product_type || 'simple',
-        category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
-        options: opts,
+        id: row.id,
+        title: row.title,
+        price: row.price,
+        image_url: row.image_url,
+        product_type: row.product_type || 'simple',
+        options: {
+          colors: colors.length ? [''] : [],
+          sizes: sizes.length ? [''] : [],
+        },
       };
     });
     const ProductService = require('./ProductService');
-    const enriched = await ProductService.enrichProductsList(items);
+    const enriched = await ProductService.enrichProductsList(items, { compact: true });
 
     return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }

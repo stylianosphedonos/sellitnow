@@ -21,6 +21,17 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/v1/cart/count — badge only (no line items / tax / shipping)
+router.get('/count', optionalAuth, async (req, res) => {
+  try {
+    const { userId, sessionId } = getCartContext(req);
+    const result = await CartService.getItemCount(userId, sessionId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/v1/cart/items
 router.post('/items', optionalAuth, async (req, res) => {
   try {

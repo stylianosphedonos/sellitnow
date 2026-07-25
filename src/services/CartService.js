@@ -100,6 +100,24 @@ class CartService {
     };
   }
 
+  /** Lightweight badge count — skips line items, tax, and shipping. */
+  async getItemCount(userId = null, sessionId = null) {
+    if (!userId && !sessionId) return { item_count: 0 };
+    let cartResult;
+    if (userId) {
+      cartResult = await pool.query('SELECT id FROM cart WHERE user_id = $1', [userId]);
+    } else {
+      cartResult = await pool.query('SELECT id FROM cart WHERE session_id = $1', [sessionId]);
+    }
+    if (!cartResult.rows.length) return { item_count: 0 };
+    const cartId = cartResult.rows[0].id;
+    const countResult = await pool.query(
+      'SELECT COALESCE(SUM(quantity), 0)::int AS item_count FROM cart_items WHERE cart_id = $1',
+      [cartId]
+    );
+    return { item_count: countResult.rows[0].item_count || 0 };
+  }
+
   /**
    * Add item to cart
    */

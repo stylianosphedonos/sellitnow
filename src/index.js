@@ -143,7 +143,14 @@ app.get(`${uploadMount}/blob/:id`, async (req, res, next) => {
 });
 
 // Static uploads (disk — SQLite / local dev)
-app.use(uploadMount, express.static(config.app.uploadDir));
+app.use(
+  uploadMount,
+  express.static(config.app.uploadDir, {
+    maxAge: '365d',
+    immutable: true,
+    etag: true,
+  })
+);
 
 // API before public static so /api/* is never shadowed by files under public/
 app.use('/api/v1/auth', authRoutes);
@@ -248,8 +255,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Static frontend (public folder)
-app.use(express.static(path.join(process.cwd(), 'public')));
+// Static frontend (public folder) — long cache for hashed-stable assets; HTML still revalidated via etag
+app.use(
+  express.static(path.join(process.cwd(), 'public'), {
+    maxAge: '7d',
+    etag: true,
+    setHeaders(res, filePath) {
+      if (/\.html?$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  })
+);
 
 // SPA fallback - serve index.html for non-API routes that don't match static files
 app.use((req, res, next) => {

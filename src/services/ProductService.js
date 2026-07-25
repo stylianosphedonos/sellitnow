@@ -127,14 +127,15 @@ class ProductService {
     return product;
   }
 
-  async enrichProductsList(items) {
+  async enrichProductsList(items, options = {}) {
+    const compact = Boolean(options.compact);
     if (!Array.isArray(items) || !items.length) return items;
     const bundleIds = items.filter((p) => p.product_type === 'bundle').map((p) => p.id);
     if (!bundleIds.length) {
       return items.map((p) => ({
         ...p,
         product_type: p.product_type || 'simple',
-        bundle_items: [],
+        ...(compact ? {} : { bundle_items: [] }),
         compare_at_price: null,
       }));
     }
@@ -142,16 +143,22 @@ class ProductService {
     return items.map((p) => {
       const productType = p.product_type || 'simple';
       if (productType !== 'bundle') {
-        return { ...p, product_type: productType, bundle_items: [], compare_at_price: null };
+        return {
+          ...p,
+          product_type: productType,
+          ...(compact ? {} : { bundle_items: [] }),
+          compare_at_price: null,
+        };
       }
       const bundleItems = bundleMap.get(p.id) || [];
-      return {
+      const base = {
         ...p,
         product_type: productType,
-        bundle_items: bundleItems,
         compare_at_price: sumComponentPrices(bundleItems),
         stock_quantity: this.computeBundleStockFromItems(bundleItems),
       };
+      if (!compact) base.bundle_items = bundleItems;
+      return base;
     });
   }
   normalizeSku(value) {
@@ -260,9 +267,10 @@ class ProductService {
 
     const total = countResult.rows[0].count;
 
+    // Card payload only — omit description and other unused fields for faster storefront loads
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
+          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
@@ -275,7 +283,7 @@ class ProductService {
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.description, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.display_order, p.product_type,
+          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
@@ -287,18 +295,24 @@ class ProductService {
           [limit, offset]
         );
 
-    const categoryMap = await this.getCategoryIdsByProductIds(result.rows.map((x) => x.id));
     const items = result.rows.map((row) => {
       const opts = parseOptionsJson(row.options_json);
-      const { options_json: _o, ...rest } = row;
+      const colors = opts.colors || [];
+      const sizes = opts.sizes || [];
       return {
-        ...rest,
-        product_type: rest.product_type || 'simple',
-        category_ids: categoryMap.get(row.id) || (row.category_id ? [row.category_id] : []),
-        options: opts,
+        id: row.id,
+        title: row.title,
+        price: row.price,
+        image_url: row.image_url,
+        product_type: row.product_type || 'simple',
+        // Card only needs presence of options, not the full value lists
+        options: {
+          colors: colors.length ? [''] : [],
+          sizes: sizes.length ? [''] : [],
+        },
       };
     });
-    const enriched = await this.enrichProductsList(items);
+    const enriched = await this.enrichProductsList(items, { compact: true });
 
     return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }

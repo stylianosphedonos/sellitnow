@@ -366,36 +366,60 @@ function formatStoreMoney(amount, currencyCode) {
   }
 }
 
-async function loadBrandSettings() {
+function applyBrandLogo(data) {
+  if (!data) return;
+  const logos = document.querySelectorAll('.logo');
+  logos.forEach((el) => {
+    if (data.logo) {
+      el.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = mediaUrl(data.logo);
+      img.alt = '3nityLab';
+      el.appendChild(img);
+    } else {
+      el.textContent = '3nityLab';
+    }
+  });
+}
+
+function applyCachedBrandSettings() {
+  const cached = readCachedBrandSettings();
+  if (!cached) return null;
+  applyBrandTheme(cached, false);
+  applyHeroCopy(cached);
+  applyHeroBannerBackground(cached);
+  applyBrandLogo(cached);
+  return cached;
+}
+
+async function refreshBrandSettingsFromNetwork() {
+  const res = await fetch(apiPrefix() + '/brand');
+  if (!res.ok) return null;
+  const data = await res.json();
+  applyBrandTheme(data, true);
+  applyHeroCopy(data);
+  applyHeroBannerBackground(data);
+  applyBrandLogo(data);
+  return data;
+}
+
+/** Apply cached brand immediately; always refresh from network (await unless skipAwait on cache hit). */
+async function loadBrandSettings(options = {}) {
   try {
-    const cached = readCachedBrandSettings();
-    if (cached) applyBrandTheme(cached, false);
-    applyHeroCopy(cached);
-    applyHeroBannerBackground(cached);
-    const res = await fetch(apiPrefix() + '/brand');
-    if (!res.ok) return;
-    const data = await res.json();
-    applyBrandTheme(data, true);
-    applyHeroCopy(data);
-    applyHeroBannerBackground(data);
-    const logos = document.querySelectorAll('.logo');
-    logos.forEach((el) => {
-      if (data.logo) {
-        el.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = mediaUrl(data.logo);
-        img.alt = '3nityLab';
-        el.appendChild(img);
-      } else {
-        el.textContent = '3nityLab';
-      }
-    });
-  } catch (_) {}
+    const cached = applyCachedBrandSettings();
+    if (cached && options.backgroundRefresh) {
+      void refreshBrandSettingsFromNetwork().catch(() => {});
+      return cached;
+    }
+    return await refreshBrandSettingsFromNetwork();
+  } catch (_) {
+    return null;
+  }
 }
 
 async function loadCartCount() {
   try {
-    const cart = await callApi('/cart');
+    const cart = await callApi('/cart/count');
     const count = cart.item_count || 0;
     const el = document.getElementById('cartCount');
     if (el) el.textContent = count;
@@ -548,7 +572,7 @@ function productCardNeedsOptions(p) {
   return colors.length > 0 || sizes.length > 0;
 }
 
-function renderProductCardMarkup(p) {
+function renderProductCardMarkup(p, opts = {}) {
   const isBundle = p.product_type === 'bundle';
   const needOptions = !isBundle && productCardNeedsOptions(p) ? '1' : '0';
   const offerBadge = isBundle ? '<span class="product-card__offer-badge">Offer</span>' : '';
@@ -556,12 +580,13 @@ function renderProductCardMarkup(p) {
     isBundle && p.compare_at_price > p.price
       ? `<div class="product-price-compare">${formatStoreMoney(p.compare_at_price)}</div>`
       : '';
+  const eager = opts.priority ? ' fetchpriority="high" loading="eager"' : ' loading="lazy"';
   return `
     <article class="product-card product-card--compact${isBundle ? ' product-card--offer' : ''}" data-product-id="${p.id}">
       <a href="/product.html?id=${p.id}" class="product-card__link">
         <div class="product-image">
           ${offerBadge}
-          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}" loading="lazy" decoding="async">` : '📦'}
+          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}"${eager} decoding="async">` : '📦'}
         </div>
         <div class="product-info">
           <div class="product-title">${escapeHtml(p.title)}</div>
@@ -1087,11 +1112,7 @@ function getResponsiveProductPageSize() {
   return getProductGridColumnCount() * PRODUCT_GRID_ROWS;
 }
 
-async function resolveProductPageSize() {
-  const grid = document.getElementById('productGrid');
-  if (grid && grid.clientWidth <= 0) {
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  }
+function resolveProductPageSize() {
   return getResponsiveProductPageSize();
 }
 
@@ -1132,7 +1153,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
     currentProductSearch = String(searchQuery).trim();
   }
   const qParam = currentProductSearch ? `&q=${encodeURIComponent(currentProductSearch)}` : '';
-  const pageSize = await resolveProductPageSize();
+  const pageSize = resolveProductPageSize();
   currentProductPageSize = pageSize;
   currentProductGridColumns = getProductGridColumnCount();
 
@@ -1145,7 +1166,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
     }
     const items = data.items || [];
     grid.innerHTML = items.length
-      ? items.map((p) => renderProductCardMarkup(p)).join('')
+      ? items.map((p, i) => renderProductCardMarkup(p, { priority: i < 4 })).join('')
       : '<p>No products match your search.</p>';
     bindProductCardControls(grid);
 
@@ -1217,7 +1238,6 @@ function initHomeSearch() {
 
 async function initHomePage() {
   initLogout();
-  await ensureValidSession();
   updateNav();
   const categoryId = getCurrentCategoryFromUrl();
   const q = new URLSearchParams(location.search).get('q') || '';
@@ -1226,10 +1246,17 @@ async function initHomePage() {
   initHomeSearch();
   initResponsiveProductPageSizeReload();
   initHomeBrowseHistory();
-
-  await loadBrandSettings();
   initCategoryRequestModal();
-  await Promise.all([loadCartCount(), loadCategories(), loadProducts(1, categoryId, q)]);
+
+  // Paint from cache immediately; fetch everything in parallel (don't gate products on brand/session).
+  applyCachedBrandSettings();
+  await Promise.all([
+    ensureValidSession(),
+    loadBrandSettings({ backgroundRefresh: true }),
+    loadCartCount(),
+    loadCategories(),
+    loadProducts(1, categoryId, q),
+  ]);
   syncProductsBrowseChromeFromUrl();
 }
 
