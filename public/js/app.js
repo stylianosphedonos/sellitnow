@@ -661,14 +661,12 @@ function scrollProductsBrowseIntoView() {
 }
 
 function applyProductsBrowseMode(categoryId, categoryLabel) {
-  const offersEl = document.getElementById('offers');
   const categoriesEl = document.getElementById('categories');
   const browseBar = document.getElementById('productsBrowseBar');
   const heading = document.getElementById('productsSectionHeading');
   const inCategory =
     categoryId != null && Number.isFinite(categoryId) && categoryId > 0;
 
-  if (offersEl) offersEl.hidden = inCategory;
   if (categoriesEl) categoriesEl.hidden = inCategory;
   if (browseBar) browseBar.hidden = !inCategory;
 
@@ -871,7 +869,6 @@ function bindBackToCategories() {
     url.searchParams.delete('category');
     history.replaceState({}, '', url.pathname + url.search);
     applyProductsBrowseMode(null);
-    void loadOffers(currentProductSearch);
     loadProducts(1, null);
     document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
@@ -885,7 +882,6 @@ function bindLoadAllProductsFromCategorySection() {
     url.searchParams.delete('category');
     history.replaceState({}, '', url.pathname + url.search);
     applyProductsBrowseMode(null);
-    void loadOffers(currentProductSearch);
     loadProducts(1, null);
   });
 }
@@ -1144,41 +1140,8 @@ function initHomeBrowseHistory() {
     const searchInput2 = document.getElementById('searchInput');
     if (searchInput2) searchInput2.value = q2;
     syncProductsBrowseChromeFromUrl();
-    void loadOffers(q2);
     loadProducts(1, getCurrentCategoryFromUrl(), q2);
   });
-}
-
-async function loadOffers(searchQuery) {
-  const section = document.getElementById('offers');
-  const grid = document.getElementById('offersGrid');
-  if (!grid) return;
-
-  if (getCurrentCategoryFromUrl()) {
-    if (section) section.hidden = true;
-    return;
-  }
-
-  if (searchQuery !== undefined) {
-    currentProductSearch = String(searchQuery).trim();
-  }
-  const qParam = currentProductSearch ? `&q=${encodeURIComponent(currentProductSearch)}` : '';
-
-  try {
-    const data = await callApi(`/products?page=1&limit=48&type=bundle${qParam}`);
-    const items = data.items || [];
-    if (!items.length) {
-      grid.innerHTML = '';
-      if (section) section.hidden = true;
-      return;
-    }
-    if (section) section.hidden = false;
-    grid.innerHTML = items.map((p, i) => renderProductCardMarkup(p, { priority: i < 4 })).join('');
-    bindProductCardControls(grid);
-  } catch (_) {
-    grid.innerHTML = '';
-    if (section) section.hidden = true;
-  }
 }
 
 async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTop = false) {
@@ -1261,7 +1224,6 @@ function initHomeSearch() {
   const runSearch = () => {
     const q = (input?.value || '').trim();
     syncQueryInUrl(q);
-    void loadOffers(q);
     loadProducts(1, getCurrentCategoryFromUrl(), q);
   };
 
@@ -1293,7 +1255,6 @@ async function initHomePage() {
     loadBrandSettings({ backgroundRefresh: true }),
     loadCartCount(),
     loadCategories(),
-    loadOffers(q),
     loadProducts(1, categoryId, q),
   ]);
   syncProductsBrowseChromeFromUrl();
@@ -1312,5 +1273,5 @@ window.addEventListener('pageshow', (e) => {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = q;
   syncProductsBrowseChromeFromUrl();
-  void Promise.all([loadBrandSettings(), loadOffers(q), loadProducts(1, categoryId, q)]);
+  void Promise.all([loadBrandSettings(), loadProducts(1, categoryId, q)]);
 });
