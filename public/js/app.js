@@ -55,16 +55,23 @@ function parseHeroBannerOverlay(data) {
   return Math.min(0.85, Math.max(0, n));
 }
 
-/** Hero section on index: stacked gradient + image + letterbox (only when data.banner is set). */
+/** Hero section on index: stacked overlay + image + letterbox (only when data.banner is set). */
 function applyHeroBannerBackground(data) {
   const hero = document.querySelector('.hero');
+  const root = document.documentElement;
   if (!hero) return;
+  // No brand payload yet — keep neutral page bg (avoid orange flash before /brand loads).
+  if (!data || typeof data !== 'object') return;
   const bannerEl = hero.querySelector('.hero__banner');
-  const banner = data && data.banner;
+  const banner = data.banner && String(data.banner).trim();
   if (banner && bannerEl) {
     const b = mediaUrl(banner);
     const overlay = parseHeroBannerOverlay(data);
     hero.classList.add('hero--has-image');
+    root.classList.add('has-hero-banner');
+    root.classList.remove('hero-use-gradient');
+    root.style.setProperty('--hero-banner-image', `url(${JSON.stringify(b)})`);
+    root.style.setProperty('--hero-banner-overlay', String(overlay));
     const topLayer =
       overlay > 0
         ? `linear-gradient(135deg, rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay}))`
@@ -72,10 +79,14 @@ function applyHeroBannerBackground(data) {
     bannerEl.style.backgroundImage = [
       topLayer,
       `url(${JSON.stringify(b)})`,
-      'linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%)',
+      'linear-gradient(var(--bg), var(--bg))',
     ].join(', ');
   } else {
     hero.classList.remove('hero--has-image');
+    root.classList.remove('has-hero-banner');
+    root.classList.add('hero-use-gradient');
+    root.style.removeProperty('--hero-banner-image');
+    root.style.removeProperty('--hero-banner-overlay');
     if (bannerEl) bannerEl.style.backgroundImage = '';
   }
 }

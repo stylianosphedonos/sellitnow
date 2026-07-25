@@ -16,6 +16,10 @@
   padding: 0;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg);
@@ -125,17 +129,19 @@ body {
   margin-left: 4px;
 }
 
-/* Hero — banner width matches .main (1200px + 20px side padding) */
+/* Hero — banner width matches .main (1200px + 20px side padding).
+   Neutral --bg until brand JS confirms no banner (avoids orange flash while loading). */
 .hero {
   background: var(--bg);
-  color: var(--white);
+  color: var(--text);
   text-align: center;
   padding: 20px 0 0;
   box-sizing: border-box;
 }
 
-.hero:not(.hero--has-image) {
+html.hero-use-gradient .hero:not(.hero--has-image) {
   background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  color: var(--white);
   padding: clamp(32px, 6vw, 56px) 0;
 }
 
@@ -152,7 +158,7 @@ body {
   justify-content: center;
 }
 
-.hero:not(.hero--has-image) .hero__frame {
+html.hero-use-gradient .hero:not(.hero--has-image) .hero__frame {
   min-height: 0;
 }
 
@@ -160,20 +166,28 @@ body {
   display: none;
 }
 
-.hero--has-image .hero__banner {
+.hero--has-image,
+html.has-hero-banner .hero {
+  color: var(--white);
+}
+
+.hero--has-image .hero__banner,
+html.has-hero-banner .hero .hero__banner {
   display: block;
   position: absolute;
   inset: 0;
   border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-/* Banner photo: full image visible (letterbox uses brand gradient from stacked layers in JS) */
-.hero--has-image .hero__banner {
+  /* Neutral letterbox while the photo loads (not brand orange) */
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(
+      135deg,
+      rgba(0, 0, 0, var(--hero-banner-overlay, 0.35)),
+      rgba(0, 0, 0, var(--hero-banner-overlay, 0.35))
+    ),
+    var(--hero-banner-image, none),
+    linear-gradient(var(--bg), var(--bg));
   background-size: 100% 100%, contain, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -188,7 +202,7 @@ body {
   width: 100%;
 }
 
-.hero:not(.hero--has-image) .hero__inner {
+html.hero-use-gradient .hero:not(.hero--has-image) .hero__inner {
   padding: 0 8px;
 }
 
@@ -197,7 +211,6 @@ body {
   font-weight: 800;
   margin-bottom: 8px;
   line-height: 1.15;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .hero p {
@@ -205,7 +218,15 @@ body {
   opacity: 0.95;
   line-height: 1.5;
   margin: 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.hero--has-image h1,
+.hero--has-image p,
+html.has-hero-banner .hero h1,
+html.has-hero-banner .hero p,
+html.hero-use-gradient .hero:not(.hero--has-image) h1,
+html.hero-use-gradient .hero:not(.hero--has-image) p {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 /* Main */
@@ -2983,6 +3004,10 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 
   .hero:not(.hero--has-image) {
+    padding: 12px 0 0;
+  }
+
+  html.hero-use-gradient .hero:not(.hero--has-image) {
     padding: 28px 0;
   }
 
