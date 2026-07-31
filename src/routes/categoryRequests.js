@@ -52,11 +52,15 @@ router.post('/', requestLimiter, (req, res) => {
       }
 
       let photoFile = req.file || null;
-      if (photoFile && !photoFile.buffer && photoFile.path) {
-        photoFile = {
-          ...photoFile,
-          buffer: fs.readFileSync(photoFile.path),
-        };
+      if (photoFile) {
+        const ImageProcessService = require('../services/ImageProcessService');
+        await ImageProcessService.processMulterFile(photoFile, 'request');
+        if (!photoFile.buffer && photoFile.path) {
+          photoFile = {
+            ...photoFile,
+            buffer: fs.readFileSync(photoFile.path),
+          };
+        }
       }
 
       const result = await EmailService.sendCategoryRequest({

@@ -217,7 +217,7 @@ router.post('/categories/:id/image', uploadCategoryImage, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = await publicUrlForUploadedFile(req.file);
+    const url = await publicUrlForUploadedFile(req.file, { assetType: 'category' });
     const category = await CategoryService.update(id, { image_url: url });
     res.json({ category });
   } catch (err) {
@@ -800,7 +800,7 @@ router.post('/brand/banner', uploadBanner, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = await publicUrlForUploadedFile(req.file);
+    const url = await publicUrlForUploadedFile(req.file, { assetType: 'banner' });
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['banner', url]
@@ -817,7 +817,7 @@ router.post('/brand/logo', uploadLogo, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = await publicUrlForUploadedFile(req.file);
+    const url = await publicUrlForUploadedFile(req.file, { assetType: 'logo' });
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['logo', url]
@@ -834,7 +834,7 @@ router.post('/brand/all-products-image', uploadAllProductsTileImage, async (req,
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
-    const url = await publicUrlForUploadedFile(req.file);
+    const url = await publicUrlForUploadedFile(req.file, { assetType: 'all-products' });
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['allProductsImage', url]

@@ -448,7 +448,7 @@ class ProductService {
 
     if (imageFiles.length) {
       for (let i = 0; i < imageFiles.length; i++) {
-        const imageUrl = await publicUrlForUploadedFile(imageFiles[i]);
+        const imageUrl = await publicUrlForUploadedFile(imageFiles[i], { assetType: 'product' });
         await pool.query(
           'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
           [product.id, imageUrl, i]
@@ -548,7 +548,7 @@ class ProductService {
       const toAdd = Math.min(imageFiles.length, maxTotal - currentCount);
 
       for (let i = 0; i < toAdd; i++) {
-        const imageUrl = await publicUrlForUploadedFile(imageFiles[i]);
+        const imageUrl = await publicUrlForUploadedFile(imageFiles[i], { assetType: 'product' });
         await pool.query(
           'INSERT INTO product_images (product_id, image_url, display_order) VALUES ($1, $2, $3)',
           [id, imageUrl, currentCount + i]
