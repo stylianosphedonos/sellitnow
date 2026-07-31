@@ -1146,6 +1146,75 @@ function initHomeBrowseHistory() {
   });
 }
 
+function renderProductsPagination(paginationEl, data, categoryId) {
+  if (!paginationEl) return;
+  const page = Number(data.page) || 1;
+  const totalPages = Number(data.totalPages) || 1;
+
+  if (totalPages <= 1) {
+    paginationEl.innerHTML = '';
+    return;
+  }
+
+  paginationEl.innerHTML = '';
+
+  const goTo = (target) => {
+    const n = Math.min(totalPages, Math.max(1, Number(target) || 1));
+    if (n === page) return;
+    loadProducts(n, categoryId, undefined, true);
+  };
+
+  const addBtn = (label, targetPage, disabled) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.disabled = Boolean(disabled);
+    if (!disabled) btn.addEventListener('click', () => goTo(targetPage));
+    paginationEl.appendChild(btn);
+    return btn;
+  };
+
+  addBtn('First', 1, page <= 1);
+  addBtn('Prev', page - 1, page <= 1);
+
+  const status = document.createElement('span');
+  status.className = 'pagination__status';
+  status.textContent = `Page ${page} of ${totalPages}`;
+  paginationEl.appendChild(status);
+
+  addBtn('Next', page + 1, page >= totalPages);
+  addBtn('Last', totalPages, page >= totalPages);
+
+  const gotoWrap = document.createElement('form');
+  gotoWrap.className = 'pagination__goto';
+  gotoWrap.setAttribute('aria-label', 'Go to page');
+
+  const label = document.createElement('label');
+  label.htmlFor = 'paginationPageInput';
+  label.textContent = 'Go to';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.id = 'paginationPageInput';
+  input.min = '1';
+  input.max = String(totalPages);
+  input.value = String(page);
+  input.inputMode = 'numeric';
+
+  const goBtn = document.createElement('button');
+  goBtn.type = 'submit';
+  goBtn.textContent = 'Go';
+
+  gotoWrap.appendChild(label);
+  gotoWrap.appendChild(input);
+  gotoWrap.appendChild(goBtn);
+  gotoWrap.addEventListener('submit', (e) => {
+    e.preventDefault();
+    goTo(input.value);
+  });
+  paginationEl.appendChild(gotoWrap);
+}
+
 async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTop = false) {
   const grid = document.getElementById('productGrid');
   const pagination = document.getElementById('pagination');
@@ -1172,27 +1241,8 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
       : '<p>No products match your search.</p>';
     bindProductCardControls(grid);
 
-    if (pagination && data.totalPages > 1) {
-      pagination.innerHTML = '';
-      if (data.page > 1) {
-        const prev = document.createElement('button');
-        prev.textContent = 'Prev';
-        prev.addEventListener('click', () => loadProducts(data.page - 1, categoryId, undefined, true));
-        pagination.appendChild(prev);
-      }
-      const span = document.createElement('span');
-      span.style.padding = '8px';
-      span.textContent = `Page ${data.page} of ${data.totalPages}`;
-      pagination.appendChild(span);
-      if (data.page < data.totalPages) {
-        const next = document.createElement('button');
-        next.textContent = 'Next';
-        next.addEventListener('click', () => loadProducts(data.page + 1, categoryId, undefined, true));
-        pagination.appendChild(next);
-      }
-    } else if (pagination) {
-      pagination.innerHTML = '';
-    }
+    renderProductsPagination(pagination, data, categoryId);
+
     if (scrollToTop) {
       scrollProductsBrowseIntoView();
     }

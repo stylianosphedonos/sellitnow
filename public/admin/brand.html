@@ -72,7 +72,7 @@
               <small style="color:var(--text-muted);display:block;margin-top:6px">Glow under the top bar (logo &amp; search).</small>
             </div>
           </div>
-          <button type="button" id="saveColors" class="btn" style="margin-top:16px;max-width:150px">Save Colors</button>
+          <button type="button" id="saveColors" class="btn" style="margin-top:16px">Save Colors</button>
         </section>
 
         <!-- Logo -->
@@ -87,8 +87,10 @@
             <input type="file" id="logoFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
             <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Recommended: transparent PNG. Auto-resized (max ~800×200). This logo is also stamped on new product photos.</small>
           </div>
-          <button type="button" id="uploadLogo" class="btn" style="max-width:160px" disabled>Upload Logo</button>
-          <button type="button" id="removeLogo" class="btn btn-secondary" style="margin-left:8px;max-width:120px">Remove Logo</button>
+          <div class="brand-actions">
+            <button type="button" id="uploadLogo" class="btn" disabled>Upload Logo</button>
+            <button type="button" id="removeLogo" class="btn btn-secondary">Remove Logo</button>
+          </div>
         </section>
 
         <!-- Banner -->
@@ -111,7 +113,7 @@
             </div>
             <small id="heroBannerOverlayHint" style="color:var(--text-muted);display:block;margin-top:8px">Overlay strength: <strong id="heroBannerOverlayPct">35%</strong>. Lower values make the photo brighter; higher values improve text contrast.</small>
           </div>
-          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px;max-width:220px">Save hero settings</button>
+          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px">Save hero settings</button>
           <div id="bannerPreview" style="width:100%;background:linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);border-radius:8px;margin-bottom:16px;overflow:hidden;position:relative;aspect-ratio:21/9;min-height:140px">
             <span id="bannerPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.9);font-size:16px;text-align:center;padding:16px;z-index:1">Current banner or gradient</span>
             <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;object-position:center;position:absolute;inset:0;z-index:0">
@@ -122,8 +124,10 @@
             <input type="file" id="bannerFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
             <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Auto-resized (~21:9, max 2400×1029). The whole image is shown inside the hero; empty sides use your brand gradient.</small>
           </div>
-          <button type="button" id="uploadBanner" class="btn" style="max-width:180px" disabled>Upload Banner</button>
-          <button type="button" id="removeBanner" class="btn btn-secondary" style="margin-left:8px;max-width:140px">Remove Banner</button>
+          <div class="brand-actions">
+            <button type="button" id="uploadBanner" class="btn" disabled>Upload Banner</button>
+            <button type="button" id="removeBanner" class="btn btn-secondary">Remove Banner</button>
+          </div>
         </section>
 
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
@@ -136,7 +140,7 @@
             </label>
             <small style="color:var(--text-muted);display:block;margin-top:6px">When checked, the "All products" tile appears in Shop by Category on your store.</small>
           </div>
-          <button type="button" id="saveAllProductsVisibility" class="btn" style="margin-bottom:20px;max-width:200px">Save visibility</button>
+          <button type="button" id="saveAllProductsVisibility" class="btn" style="margin-bottom:20px">Save visibility</button>
           <div id="allProductsPreview" style="width:160px;height:120px;border:1px solid var(--border);border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:16px">
             <span id="allProductsPlaceholder" style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px">Current image</span>
             <img id="allProductsImg" src="" alt="All products tile" style="display:none;width:100%;height:100%;object-fit:cover">
@@ -146,8 +150,10 @@
             <input type="file" id="allProductsFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
             <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB.</small>
           </div>
-          <button type="button" id="uploadAllProducts" class="btn" style="max-width:220px" disabled>Upload Tile Image</button>
-          <button type="button" id="removeAllProducts" class="btn btn-secondary" style="margin-left:8px;max-width:140px">Remove Image</button>
+          <div class="brand-actions">
+            <button type="button" id="uploadAllProducts" class="btn" disabled>Upload Tile Image</button>
+            <button type="button" id="removeAllProducts" class="btn btn-secondary">Remove Image</button>
+          </div>
         </section>
       </div>
     </main>

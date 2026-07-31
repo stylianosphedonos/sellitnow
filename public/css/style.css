@@ -773,7 +773,9 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 /* Pagination */
 .pagination {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
   gap: 8px;
   margin-top: 24px;
 }
@@ -796,6 +798,40 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 .pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.pagination__status {
+  padding: 8px 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pagination__goto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.pagination__goto label {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pagination__goto input {
+  width: 4.5rem;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.pagination__goto input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
 }
 
 /* Footer */
@@ -1255,6 +1291,19 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 .admin-content .btn-secondary:hover {
   background: #e2e8f0;
   color: #0f172a;
+}
+
+.brand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.brand-actions .btn {
+  margin: 0;
+  max-width: none;
 }
 
 .admin-content .btn-danger {
@@ -2962,23 +3011,33 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     font-size: 22px;
     flex: 1 1 auto;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    max-width: calc(100% - 8rem);
   }
 
   .logo img {
     height: 32px;
+    max-width: 100%;
+    width: auto;
   }
 
   .nav {
     flex: 0 0 auto;
     flex-wrap: wrap;
     justify-content: flex-end;
+    align-items: center;
     gap: 6px 8px;
     margin-left: auto;
   }
 
   .nav-link {
     font-size: 13px;
-    padding: 6px 10px;
+    padding: 8px 10px;
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
   }
 
   .cart-count {
@@ -3088,11 +3147,41 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 20px;
+    padding: 0 4px;
   }
 
   .pagination button {
-    padding: 10px 14px;
+    padding: 10px 12px;
     min-height: 44px;
+    flex: 1 1 calc(25% - 6px);
+    min-width: 4.5rem;
+    max-width: calc(50% - 4px);
+  }
+
+  .pagination__status {
+    flex: 1 1 100%;
+    text-align: center;
+    padding: 4px 0;
+    order: -1;
+  }
+
+  .pagination__goto {
+    width: 100%;
+    justify-content: center;
+    margin: 4px 0 0;
+    gap: 8px;
+  }
+
+  .pagination__goto input {
+    min-height: 44px;
+    flex: 1 1 auto;
+    max-width: 6rem;
+  }
+
+  .pagination__goto button {
+    flex: 0 0 auto;
+    min-width: 4.5rem;
+    max-width: none;
   }
 
   .btn-back-to-categories {
@@ -3387,6 +3476,19 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     min-height: 40px;
   }
 
+  .brand-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .brand-actions .btn {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
   .order-admin-summary {
     grid-template-columns: 1fr;
   }
@@ -3453,12 +3555,28 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 @media (max-width: 380px) {
   .nav-link {
     font-size: 12px;
-    padding: 5px 8px;
+    padding: 6px 8px;
+    min-height: 34px;
+  }
+
+  .logo img {
+    height: 28px;
   }
 
   .product-grid,
   .category-grid {
     gap: 10px;
+  }
+
+  .pagination button {
+    flex: 1 1 calc(50% - 6px);
+    max-width: none;
+    font-size: 13px;
+    padding: 10px 8px;
+  }
+
+  .pagination__goto label {
+    font-size: 12px;
   }
 }
 
