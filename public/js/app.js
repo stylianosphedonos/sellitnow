@@ -419,8 +419,8 @@ function formatStoreMoney(amount, currencyCode) {
 
 function getHeaderLogoHeight() {
   if (typeof window === 'undefined' || !window.matchMedia) return '88px';
-  if (window.matchMedia('(max-width: 380px)').matches) return '56px';
-  if (window.matchMedia('(max-width: 768px)').matches) return '64px';
+  if (window.matchMedia('(max-width: 380px)').matches) return '44px';
+  if (window.matchMedia('(max-width: 768px)').matches) return '48px';
   return '88px';
 }
 
