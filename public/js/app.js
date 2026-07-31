@@ -417,19 +417,51 @@ function formatStoreMoney(amount, currencyCode) {
   }
 }
 
+function getHeaderLogoHeight() {
+  if (typeof window === 'undefined' || !window.matchMedia) return '88px';
+  if (window.matchMedia('(max-width: 380px)').matches) return '56px';
+  if (window.matchMedia('(max-width: 768px)').matches) return '64px';
+  return '88px';
+}
+
 function applyBrandLogo(data) {
   if (!data) return;
   const logos = document.querySelectorAll('.logo');
+  const h = getHeaderLogoHeight();
   logos.forEach((el) => {
     if (data.logo) {
       el.innerHTML = '';
       const img = document.createElement('img');
       img.src = mediaUrl(data.logo);
       img.alt = '3nityLab';
+      // Force size so a stale CSS cache cannot keep the logo tiny
+      img.style.height = h;
+      img.style.maxHeight = h;
+      img.style.width = 'auto';
+      img.style.maxWidth = 'min(360px, 48vw)';
+      img.style.objectFit = 'contain';
+      img.style.objectPosition = 'left center';
+      img.style.display = 'block';
       el.appendChild(img);
     } else {
       el.textContent = '3nityLab';
     }
+  });
+}
+
+let sellitnowLogoResizeBound = false;
+function initLogoResizeRefresh() {
+  if (sellitnowLogoResizeBound || typeof window === 'undefined') return;
+  sellitnowLogoResizeBound = true;
+  let last = getHeaderLogoHeight();
+  window.addEventListener('resize', () => {
+    const next = getHeaderLogoHeight();
+    if (next === last) return;
+    last = next;
+    document.querySelectorAll('.logo img').forEach((img) => {
+      img.style.height = next;
+      img.style.maxHeight = next;
+    });
   });
 }
 
@@ -440,6 +472,7 @@ function applyCachedBrandSettings() {
   applyHeroCopy(cached);
   applyHeroBannerBackground(cached);
   applyBrandLogo(cached);
+  initLogoResizeRefresh();
   return cached;
 }
 
@@ -451,6 +484,7 @@ async function refreshBrandSettingsFromNetwork() {
   applyHeroCopy(data);
   applyHeroBannerBackground(data);
   applyBrandLogo(data);
+  initLogoResizeRefresh();
   return data;
 }
 

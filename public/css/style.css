@@ -16,8 +16,8 @@
   --fs-lg: 1.125rem;   /* 18 */
   --fs-xl: 1.25rem;    /* 20 */
   --fs-2xl: 1.5rem;    /* 24 */
-  --fs-logo: 2rem;     /* 32 text logo */
-  --logo-height: 72px;
+  --fs-logo: 2.25rem;  /* 36 text logo */
+  --logo-height: 88px;
   --hero-banner-height: clamp(140px, 18vw, 220px);
 }
 
@@ -44,7 +44,7 @@ body {
 .header {
   background: var(--primary);
   color: var(--white);
-  padding: 14px 0;
+  padding: 10px 0;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -57,8 +57,8 @@ body {
   padding: 0 20px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  min-height: var(--logo-height);
+  gap: 20px;
+  min-height: 88px;
 }
 
 .logo {
@@ -71,14 +71,17 @@ body {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
+  height: 88px;
 }
 
 .logo img {
-  height: var(--logo-height);
-  width: auto;
-  max-width: min(320px, 52vw);
+  height: 88px !important;
+  max-height: 88px !important;
+  width: auto !important;
+  max-width: min(360px, 48vw) !important;
   display: block;
   object-fit: contain;
+  object-position: left center;
 }
 
 .search-bar {
@@ -88,14 +91,17 @@ body {
   background: var(--white);
   border-radius: 8px;
   overflow: hidden;
+  height: 48px;
+  align-self: center;
 }
 
 .search-bar input {
   flex: 1;
   border: none;
-  padding: 12px 16px;
+  padding: 0 16px;
   font-size: var(--fs-sm);
   line-height: 1.3;
+  height: 100%;
 }
 
 .search-bar input:focus {
@@ -106,7 +112,8 @@ body {
   background: var(--primary);
   color: var(--white);
   border: none;
-  padding: 12px 20px;
+  padding: 0 20px;
+  height: 100%;
   cursor: pointer;
   font-weight: 600;
   font-size: var(--fs-sm);
@@ -116,7 +123,8 @@ body {
 .nav {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  height: 48px;
 }
 
 .nav-link {
@@ -125,13 +133,16 @@ body {
   font-weight: 600;
   font-size: var(--fs-sm);
   line-height: 1.3;
-  padding: 8px 12px;
+  padding: 0 14px;
   border-radius: 6px;
   transition: background 0.2s;
   background: none;
   border: none;
   cursor: pointer;
   font-family: inherit;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .nav-link:hover {
@@ -3092,15 +3103,15 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 @media (max-width: 768px) {
   /* Header: logo + nav on first row, search full width below */
   .header {
-    padding: 12px 0;
-    --logo-height: 56px;
+    padding: 10px 0;
+    --logo-height: 64px;
   }
 
   .header-inner {
     flex-wrap: wrap;
     gap: 10px 12px;
     padding: 0 16px;
-    min-height: var(--logo-height);
+    min-height: 64px;
   }
 
   .logo {
@@ -3111,12 +3122,14 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     align-items: center;
     line-height: 1;
     max-width: calc(100% - 8rem);
+    height: 64px;
   }
 
   .logo img {
-    height: var(--logo-height);
-    max-width: min(240px, 55vw);
-    width: auto;
+    height: 64px !important;
+    max-height: 64px !important;
+    max-width: min(280px, 55vw) !important;
+    width: auto !important;
   }
 
   .nav {
@@ -3126,12 +3139,14 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     align-items: center;
     gap: 6px 8px;
     margin-left: auto;
+    height: auto;
   }
 
   .nav-link {
     font-size: var(--fs-sm);
-    padding: 8px 10px;
-    min-height: 36px;
+    padding: 0 10px;
+    min-height: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
   }
@@ -3146,15 +3161,16 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     flex: 1 1 100%;
     width: 100%;
     max-width: none;
+    height: 44px;
   }
 
   .search-bar input {
     font-size: var(--fs-md);
-    padding: 11px 14px;
+    padding: 0 14px;
   }
 
   .btn-search {
-    padding: 11px 16px;
+    padding: 0 16px;
     flex-shrink: 0;
     font-size: var(--fs-sm);
   }
@@ -3657,17 +3673,27 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
 @media (max-width: 380px) {
   .header {
-    --logo-height: 48px;
+    --logo-height: 56px;
+  }
+
+  .header-inner {
+    min-height: 56px;
+  }
+
+  .logo {
+    height: 56px;
   }
 
   .nav-link {
     font-size: var(--fs-xs);
-    padding: 6px 8px;
-    min-height: 34px;
+    padding: 0 8px;
+    min-height: 36px;
+    height: 36px;
   }
 
   .logo img {
-    height: var(--logo-height);
+    height: 56px !important;
+    max-height: 56px !important;
   }
 
   .product-grid,
