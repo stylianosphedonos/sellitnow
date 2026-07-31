@@ -10,12 +10,15 @@ const PRESETS = {
   product: {
     size: 1200,
     background: '#f3f1ec',
-    logoMaxWidth: 480,
-    logoMaxHeight: 100,
-    logoTop: 40,
-    productTop: 168,
+    /** Reserved top band for the logo (logo is fitted inside this). */
+    logoBandTop: 28,
+    logoBandHeight: 120,
+    logoMaxWidth: 520,
+    logoMaxHeight: 96,
     productBottom: 56,
     productSide: 72,
+    /** Gap between logo band bottom and product. */
+    productGap: 20,
     /** Dark fill used when brand logo is light/white (header logos). */
     darkLogoColor: { r: 42, g: 42, b: 42 },
     format: 'jpeg',
@@ -86,7 +89,6 @@ async function loadBrandLogoBuffer() {
       return Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
     }
 
-    // Relative /uploads/filename or bare filename
     let pathname = s;
     try {
       if (/^https?:\/\//i.test(s)) pathname = new URL(s).pathname;
@@ -96,7 +98,6 @@ async function loadBrandLogoBuffer() {
     let filename = path.basename(pathname.split('?')[0]);
     if (pathname.startsWith(prefix + '/')) {
       filename = pathname.slice(prefix.length + 1).split('?')[0];
-      // e.g. blob/uuid already handled; nested paths take basename
       filename = path.basename(filename);
     }
     if (filename && !filename.includes('..')) {
@@ -106,7 +107,6 @@ async function loadBrandLogoBuffer() {
       }
     }
 
-    // Last resort: fetch absolute URL (cross-origin / CDN)
     if (/^https?:\/\//i.test(s)) {
       const res = await fetch(s);
       if (!res.ok) {
@@ -125,17 +125,18 @@ async function loadBrandLogoBuffer() {
 }
 
 /**
- * Resize logo for the studio canvas. Light/white logos (typical header marks)
- * are redrawn in dark charcoal so they read on the cream background.
+ * Resize logo to fill the studio logo band. Always enlarges small logos so they stay readable.
+ * Light/white logos are redrawn dark so they read on the cream background.
  */
 async function prepareStudioLogo(logoBuf, preset) {
+  // Allow enlargement so a small header logo still fills the reserved band.
   const resized = await sharp(logoBuf)
     .rotate()
     .resize({
       width: preset.logoMaxWidth,
       height: preset.logoMaxHeight,
       fit: 'inside',
-      withoutEnlargement: true,
+      withoutEnlargement: false,
     })
     .ensureAlpha()
     .raw()
@@ -164,53 +165,80 @@ async function prepareStudioLogo(logoBuf, preset) {
     }
   }
 
-  const png = await sharp(data, {
+  return sharp(data, {
     raw: { width: info.width, height: info.height, channels: 4 },
   })
     .png()
     .toBuffer({ resolveWithObject: true });
+}
 
-  return png;
+function brandNameFallbackSvg(preset) {
+  const name = String(config.email?.businessName || '3nityLab')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/"/g, '&quot;');
+  const w = preset.logoMaxWidth;
+  const h = preset.logoMaxHeight;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+  <text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle"
+    font-family="Helvetica, Arial, sans-serif" font-size="48" font-weight="700"
+    fill="rgb(42,42,42)">${name}</text>
+</svg>`;
+  return Buffer.from(svg);
 }
 
 async function composeProductStudio(inputBuffer, preset) {
   const size = preset.size;
   const layers = [];
 
+  let logoLayer = null;
   const logoBuf = await loadBrandLogoBuffer();
-  if (logoBuf) {
-    try {
-      const logo = await prepareStudioLogo(logoBuf, preset);
-      const left = Math.round((size - logo.info.width) / 2);
-      layers.push({
-        input: logo.data,
-        left,
-        top: preset.logoTop,
-      });
-    } catch (err) {
-      console.warn('[ImageProcess] Logo composite failed:', err.message);
+  try {
+    if (logoBuf) {
+      logoLayer = await prepareStudioLogo(logoBuf, preset);
+    } else {
+      logoLayer = await sharp(brandNameFallbackSvg(preset))
+        .png()
+        .toBuffer({ resolveWithObject: true });
     }
+  } catch (err) {
+    console.warn('[ImageProcess] Logo prepare failed, using text fallback:', err.message);
+    logoLayer = await sharp(brandNameFallbackSvg(preset))
+      .png()
+      .toBuffer({ resolveWithObject: true });
   }
 
+  if (logoLayer) {
+    const left = Math.round((size - logoLayer.info.width) / 2);
+    const top =
+      preset.logoBandTop +
+      Math.round((preset.logoBandHeight - logoLayer.info.height) / 2);
+    layers.push({
+      input: logoLayer.data,
+      left: Math.max(0, left),
+      top: Math.max(0, top),
+    });
+  }
+
+  const productTop = preset.logoBandTop + preset.logoBandHeight + preset.productGap;
   const productBoxW = size - preset.productSide * 2;
-  const productBoxH = size - preset.productTop - preset.productBottom;
+  const productBoxH = size - productTop - preset.productBottom;
   const product = await sharp(inputBuffer)
     .rotate()
     .resize({
       width: productBoxW,
-      height: productBoxH,
+      height: Math.max(100, productBoxH),
       fit: 'inside',
       withoutEnlargement: false,
     })
     .toBuffer({ resolveWithObject: true });
 
   const productLeft = Math.round((size - product.info.width) / 2);
-  const productTop =
-    preset.productTop + Math.round((productBoxH - product.info.height) / 2);
+  const productY = productTop + Math.round((productBoxH - product.info.height) / 2);
   layers.push({
     input: product.data,
     left: productLeft,
-    top: productTop,
+    top: productY,
   });
 
   return sharp({
@@ -295,16 +323,20 @@ async function processBuffer(inputBuffer, assetType) {
 
 /**
  * Process a multer file in place (buffer and/or disk path) for the given asset type.
+ * Safe to call twice — skips if already processed for the same type.
  * @param {Express.Multer.File} file
  * @param {keyof typeof PRESETS} assetType
  */
 async function processMulterFile(file, assetType) {
   if (!file || !assetType) return file;
+  if (file._imageProcessed === assetType) return file;
+
   const input = await readMulterBuffer(file);
   const { buffer, mimetype, ext } = await processBuffer(input, assetType);
 
   file.mimetype = mimetype;
   file.size = buffer.length;
+  file._imageProcessed = assetType;
 
   if (file.path) {
     const dir = path.dirname(file.path);

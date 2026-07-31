@@ -545,7 +545,18 @@ class ProductService {
       const existing = await pool.query('SELECT id FROM product_images WHERE product_id = $1', [id]);
       const currentCount = existing.rows.length;
       const maxTotal = config.app.maxImagesPerProduct;
-      const toAdd = Math.min(imageFiles.length, maxTotal - currentCount);
+      const slots = maxTotal - currentCount;
+      if (slots <= 0) {
+        throw new Error(
+          `This product already has the maximum of ${maxTotal} images. Remove one before uploading another.`
+        );
+      }
+      const toAdd = Math.min(imageFiles.length, slots);
+      if (toAdd < imageFiles.length) {
+        console.warn(
+          `[ProductService] Only adding ${toAdd} of ${imageFiles.length} images (max ${maxTotal}).`
+        );
+      }
 
       for (let i = 0; i < toAdd; i++) {
         const imageUrl = await publicUrlForUploadedFile(imageFiles[i], { assetType: 'product' });

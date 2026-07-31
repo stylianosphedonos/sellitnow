@@ -102,39 +102,83 @@ const upload = multer({
 });
 
 /**
- * Upload up to 5 product images
+ * Run ImageProcessService after multer so create/edit uploads always get resized + logo.
  */
-const uploadProductImages = upload.array('images', config.app.maxImagesPerProduct);
+function withProcessedImages(multerMiddleware, assetType) {
+  return (req, res, next) => {
+    multerMiddleware(req, res, async (err) => {
+      if (err) return next(err);
+      try {
+        const ImageProcessService = require('../services/ImageProcessService');
+        const files = Array.isArray(req.files)
+          ? req.files
+          : req.file
+            ? [req.file]
+            : [];
+        for (const file of files) {
+          await ImageProcessService.processMulterFile(file, assetType);
+        }
+        next();
+      } catch (processErr) {
+        console.error('[upload] image processing failed:', processErr);
+        next(processErr);
+      }
+    });
+  };
+}
 
-const uploadBanner = multer({
-  storage: bannerStorage,
-  fileFilter,
-  limits: { fileSize: maxSize },
-}).single('banner');
+/**
+ * Upload up to 5 product images (always studio-processed: 1200² + logo)
+ */
+const uploadProductImages = withProcessedImages(
+  upload.array('images', config.app.maxImagesPerProduct),
+  'product'
+);
 
-const uploadLogo = multer({
-  storage: logoStorage,
-  fileFilter,
-  limits: { fileSize: maxSize },
-}).single('logo');
+const uploadBanner = withProcessedImages(
+  multer({
+    storage: bannerStorage,
+    fileFilter,
+    limits: { fileSize: maxSize },
+  }).single('banner'),
+  'banner'
+);
 
-const uploadCategoryImage = multer({
-  storage: categoryImageStorage,
-  fileFilter,
-  limits: { fileSize: maxSize },
-}).single('image');
+const uploadLogo = withProcessedImages(
+  multer({
+    storage: logoStorage,
+    fileFilter,
+    limits: { fileSize: maxSize },
+  }).single('logo'),
+  'logo'
+);
 
-const uploadAllProductsTileImage = multer({
-  storage: allProductsTileImageStorage,
-  fileFilter,
-  limits: { fileSize: maxSize },
-}).single('image');
+const uploadCategoryImage = withProcessedImages(
+  multer({
+    storage: categoryImageStorage,
+    fileFilter,
+    limits: { fileSize: maxSize },
+  }).single('image'),
+  'category'
+);
 
-const uploadRequestPhoto = multer({
-  storage: isPostgres ? memory : categoryImageStorage,
-  fileFilter,
-  limits: { fileSize: maxSize },
-}).single('photo');
+const uploadAllProductsTileImage = withProcessedImages(
+  multer({
+    storage: allProductsTileImageStorage,
+    fileFilter,
+    limits: { fileSize: maxSize },
+  }).single('image'),
+  'all-products'
+);
+
+const uploadRequestPhoto = withProcessedImages(
+  multer({
+    storage: isPostgres ? memory : categoryImageStorage,
+    fileFilter,
+    limits: { fileSize: maxSize },
+  }).single('photo'),
+  'request'
+);
 
 module.exports = {
   uploadProductImages,

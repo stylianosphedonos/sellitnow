@@ -154,6 +154,9 @@ router.post('/products/:id/images', uploadProductImages, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const files = req.files || [];
+    if (!files.length) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
     const product = await ProductService.update(id, {}, files);
     res.json({ product });
   } catch (err) {

@@ -14,7 +14,8 @@ function uploadPrefix() {
  * @param {{ assetType?: string }} [options] - When set, resizes/composites before storing
  */
 async function publicUrlForUploadedFile(file, options = {}) {
-  if (options.assetType) {
+  // Prefer middleware-processed files; still process here if a caller skipped middleware.
+  if (options.assetType && file && file._imageProcessed !== options.assetType) {
     try {
       await ImageProcessService.processMulterFile(file, options.assetType);
     } catch (err) {
