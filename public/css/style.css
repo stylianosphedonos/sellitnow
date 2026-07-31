@@ -9,6 +9,16 @@
   --text: #333;
   --text-muted: #999;
   --border: #eee;
+  /* Shared type scale — keep storefront letter sizes consistent */
+  --fs-xs: 0.75rem;    /* 12 */
+  --fs-sm: 0.875rem;   /* 14 */
+  --fs-md: 1rem;       /* 16 */
+  --fs-lg: 1.125rem;   /* 18 */
+  --fs-xl: 1.25rem;    /* 20 */
+  --fs-2xl: 1.5rem;    /* 24 */
+  --fs-logo: 2rem;     /* 32 text logo */
+  --logo-height: 72px;
+  --hero-banner-height: clamp(100px, 13vw, 148px);
 }
 
 * {
@@ -25,6 +35,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+  font-size: var(--fs-md);
   line-height: 1.5;
   min-height: 100vh;
 }
@@ -33,7 +44,7 @@ body {
 .header {
   background: var(--primary);
   color: var(--white);
-  padding: 12px 0;
+  padding: 14px 0;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -47,19 +58,25 @@ body {
   display: flex;
   align-items: center;
   gap: 24px;
+  min-height: var(--logo-height);
 }
 
 .logo {
-  font-size: 28px;
+  font-size: var(--fs-logo);
   font-weight: 800;
   color: var(--white);
   text-decoration: none;
-  letter-spacing: -1px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
 }
 
 .logo img {
-  height: 36px;
+  height: var(--logo-height);
   width: auto;
+  max-width: min(320px, 52vw);
   display: block;
   object-fit: contain;
 }
@@ -76,8 +93,9 @@ body {
 .search-bar input {
   flex: 1;
   border: none;
-  padding: 10px 16px;
-  font-size: 14px;
+  padding: 12px 16px;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
 }
 
 .search-bar input:focus {
@@ -88,23 +106,26 @@ body {
   background: var(--primary);
   color: var(--white);
   border: none;
-  padding: 10px 20px;
+  padding: 12px 20px;
   cursor: pointer;
   font-weight: 600;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
 }
 
 .nav {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
 }
 
 .nav-link {
   color: var(--white);
   text-decoration: none;
   font-weight: 600;
-  font-size: 14px;
-  padding: 6px 12px;
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+  padding: 8px 12px;
   border-radius: 6px;
   transition: background 0.2s;
   background: none;
@@ -124,7 +145,7 @@ body {
 .cart-count {
   background: var(--accent);
   color: var(--white);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 2px 6px;
   border-radius: 10px;
   margin-left: 4px;
@@ -136,14 +157,14 @@ body {
   background: var(--bg);
   color: var(--text);
   text-align: center;
-  padding: 8px 0 0;
+  padding: 12px 0 0;
   box-sizing: border-box;
 }
 
 html.hero-use-gradient .hero:not(.hero--has-image) {
   background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
   color: var(--white);
-  padding: clamp(32px, 6vw, 56px) 0;
+  padding: clamp(20px, 3.5vw, 36px) 0;
 }
 
 .hero__frame {
@@ -152,7 +173,7 @@ html.hero-use-gradient .hero:not(.hero--has-image) {
   padding: 0 20px;
   width: 100%;
   position: relative;
-  min-height: clamp(160px, 22vw, 300px);
+  min-height: var(--hero-banner-height);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -161,6 +182,14 @@ html.hero-use-gradient .hero:not(.hero--has-image) {
 
 html.hero-use-gradient .hero:not(.hero--has-image) .hero__frame {
   min-height: 0;
+}
+
+/* Image-only hero (common when titles are cleared in Brand admin) */
+.hero--has-image:not(.hero--has-copy) .hero__frame,
+html.has-hero-banner .hero:not(.hero--has-copy) .hero__frame {
+  min-height: 0;
+  height: var(--hero-banner-height);
+  aspect-ratio: auto;
 }
 
 .hero__banner {
@@ -180,7 +209,7 @@ html.has-hero-banner .hero .hero__banner {
   border-radius: 12px;
   overflow: hidden;
   /* Neutral letterbox while the photo loads (not brand orange) */
-  background-color: var(--bg);
+  background-color: #111;
   background-image:
     linear-gradient(
       135deg,
@@ -188,7 +217,7 @@ html.has-hero-banner .hero .hero__banner {
       rgba(0, 0, 0, var(--hero-banner-overlay, 0.35))
     ),
     var(--hero-banner-image, none),
-    linear-gradient(var(--bg), var(--bg));
+    linear-gradient(#111, #111);
   background-size: 100% 100%, contain, cover;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -199,7 +228,7 @@ html.has-hero-banner .hero .hero__banner {
   z-index: 1;
   max-width: 40rem;
   margin: 0 auto;
-  padding: clamp(32px, 6vw, 56px) 8px;
+  padding: clamp(18px, 3vw, 28px) 8px;
   width: 100%;
 }
 
@@ -207,18 +236,34 @@ html.hero-use-gradient .hero:not(.hero--has-image) .hero__inner {
   padding: 0 8px;
 }
 
+/* Collapse empty hero copy so the banner alone sets height */
+.hero--has-image:not(.hero--has-copy) .hero__inner,
+html.has-hero-banner .hero:not(.hero--has-copy) .hero__inner {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .hero h1 {
-  font-size: clamp(28px, 5vw, 42px);
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 800;
-  margin-bottom: 8px;
-  line-height: 1.15;
+  margin-bottom: 6px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .hero p {
-  font-size: clamp(15px, 2.5vw, 18px);
+  font-size: var(--fs-md);
   opacity: 0.95;
-  line-height: 1.5;
+  line-height: 1.45;
   margin: 0;
+  font-weight: 500;
 }
 
 .hero--has-image h1,
@@ -234,17 +279,20 @@ html.hero-use-gradient .hero:not(.hero--has-image) p {
 .main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 8px 20px 32px;
+  padding: 16px 20px 32px;
 }
 
 section {
-  margin-bottom: 40px;
+  margin-bottom: 32px;
 }
 
 section h2 {
-  font-size: 22px;
-  margin-bottom: 20px;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  margin-bottom: 16px;
   color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
 }
 
 /* Categories */
@@ -371,28 +419,40 @@ button.category-card:focus-visible {
 .category-card--banner .category-card__media--banner:not(.category-card__media--sized) {
   width: 100%;
   max-width: none;
-  aspect-ratio: 21 / 9;
-  min-height: 140px;
+  aspect-ratio: 4 / 1;
+  min-height: 96px;
+  max-height: 140px;
   margin: 0;
   border-radius: 0;
 }
 
+.category-card--banner .category-card__media--banner.category-card__media--sized {
+  max-height: 140px;
+}
+
 .category-card--banner .category-card__media--banner img {
-  object-fit: fill;
+  object-fit: cover;
   object-position: center;
+  width: 100%;
+  height: 100%;
 }
 
 .category-card--banner .category-card__label {
-  font-size: 18px;
+  font-size: var(--fs-md);
   font-weight: 600;
-  padding: 14px 20px;
+  padding: 10px 16px;
   flex: none;
 }
 
 @media (max-width: 640px) {
   .category-card--banner .category-card__media--banner:not(.category-card__media--sized) {
-    aspect-ratio: 16 / 10;
-    min-height: 120px;
+    aspect-ratio: 16 / 7;
+    min-height: 88px;
+    max-height: 120px;
+  }
+
+  .category-card--banner .category-card__media--banner.category-card__media--sized {
+    max-height: 120px;
   }
 }
 
@@ -419,7 +479,7 @@ button.category-card:focus-visible {
 .category-card__label {
   display: block;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-sm);
   line-height: 1.3;
   padding: 0 4px 4px;
 }
@@ -619,23 +679,25 @@ button.category-card:focus-visible {
 }
 
 .product-title {
-  font-size: 14px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   margin-bottom: 8px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.35;
 }
 
 .product-price {
-  font-size: 18px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--primary);
+  line-height: 1.3;
 }
 
 .product-stock {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   margin-top: 4px;
 }
@@ -842,7 +904,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   margin-top: 48px;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--fs-sm);
 }
 
 /* Forms */
@@ -2998,17 +3060,19 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 @media (max-width: 768px) {
   /* Header: logo + nav on first row, search full width below */
   .header {
-    padding: 10px 0;
+    padding: 12px 0;
+    --logo-height: 56px;
   }
 
   .header-inner {
     flex-wrap: wrap;
     gap: 10px 12px;
     padding: 0 16px;
+    min-height: var(--logo-height);
   }
 
   .logo {
-    font-size: 22px;
+    font-size: var(--fs-2xl);
     flex: 1 1 auto;
     min-width: 0;
     display: flex;
@@ -3018,8 +3082,8 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 
   .logo img {
-    height: 32px;
-    max-width: 100%;
+    height: var(--logo-height);
+    max-width: min(240px, 55vw);
     width: auto;
   }
 
@@ -3033,7 +3097,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 
   .nav-link {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     padding: 8px 10px;
     min-height: 36px;
     display: inline-flex;
@@ -3041,7 +3105,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 
   .cart-count {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     padding: 2px 5px;
   }
 
@@ -3053,39 +3117,45 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 
   .search-bar input {
-    font-size: 16px;
+    font-size: var(--fs-md);
     padding: 11px 14px;
   }
 
   .btn-search {
     padding: 11px 16px;
     flex-shrink: 0;
+    font-size: var(--fs-sm);
   }
 
   /* Hero */
   .hero {
-    padding: 8px 0 0;
+    padding: 10px 0 0;
+    --hero-banner-height: clamp(80px, 20vw, 112px);
   }
 
   .hero__frame {
     padding: 0 16px;
-    min-height: 120px;
+    min-height: var(--hero-banner-height);
   }
 
   .hero:not(.hero--has-image) {
-    padding: 8px 0 0;
+    padding: 10px 0 0;
   }
 
   html.hero-use-gradient .hero:not(.hero--has-image) {
-    padding: 20px 0;
+    padding: 16px 0;
   }
 
   .hero__inner {
-    padding: 20px 4px;
+    padding: 16px 4px;
   }
 
   .hero h1 {
-    font-size: 26px;
+    font-size: var(--fs-2xl);
+  }
+
+  .hero p {
+    font-size: var(--fs-sm);
   }
 
   .hero--has-image .hero__banner {
@@ -3094,22 +3164,22 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
   /* Main content */
   .main {
-    padding: 8px 16px 32px;
+    padding: 12px 16px 32px;
   }
 
   section {
-    margin-bottom: 32px;
+    margin-bottom: 28px;
   }
 
   section h2,
   .main > h1 {
-    font-size: 20px;
-    margin-bottom: 16px;
+    font-size: var(--fs-lg);
+    margin-bottom: 14px;
   }
 
   .main > h2 {
-    font-size: 18px;
-    margin-top: 24px;
+    font-size: var(--fs-md);
+    margin-top: 20px;
   }
 
   .category-grid {
@@ -3553,14 +3623,18 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 }
 
 @media (max-width: 380px) {
+  .header {
+    --logo-height: 48px;
+  }
+
   .nav-link {
-    font-size: 12px;
+    font-size: var(--fs-xs);
     padding: 6px 8px;
     min-height: 34px;
   }
 
   .logo img {
-    height: 28px;
+    height: var(--logo-height);
   }
 
   .product-grid,

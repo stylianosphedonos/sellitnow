@@ -255,15 +255,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Static frontend (public folder) — long cache for hashed-stable assets; HTML still revalidated via etag
+// Static frontend (public folder).
+// JS/CSS/HTML are not content-hashed, so always revalidate (ETag) — otherwise deploys
+// look "missing" in production for up to maxAge (was 7d).
 app.use(
   express.static(path.join(process.cwd(), 'public'), {
-    maxAge: '7d',
     etag: true,
     setHeaders(res, filePath) {
-      if (/\.html?$/i.test(filePath)) {
+      if (/\.(html?|js|css|mjs|map)$/i.test(filePath)) {
         res.setHeader('Cache-Control', 'no-cache');
+        return;
       }
+      // Images, fonts, etc. under public/ — short browser cache is fine
+      res.setHeader('Cache-Control', 'public, max-age=86400');
     },
   })
 );

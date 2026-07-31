@@ -38,12 +38,24 @@ function persistBrandSettings(data) {
   } catch (_) {}
 }
 
+function syncHeroHasCopyClass() {
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const h1 = document.getElementById('heroTitle');
+  const sub = document.getElementById('heroSubtitle');
+  const hasCopy =
+    Boolean(h1 && String(h1.textContent || '').trim()) ||
+    Boolean(sub && String(sub.textContent || '').trim());
+  hero.classList.toggle('hero--has-copy', hasCopy);
+}
+
 function applyHeroCopy(data) {
   if (!data || typeof data !== 'object') return;
   const h1 = document.getElementById('heroTitle');
   const sub = document.getElementById('heroSubtitle');
   if (h1 && data.heroTitle !== undefined) h1.textContent = data.heroTitle;
   if (sub && data.heroSubtitle !== undefined) sub.textContent = data.heroSubtitle;
+  syncHeroHasCopyClass();
 }
 
 const DEFAULT_HERO_BANNER_OVERLAY = 0.35;
@@ -80,7 +92,7 @@ function applyHeroBannerBackground(data) {
     bannerEl.style.backgroundImage = [
       topLayer,
       `url(${JSON.stringify(b)})`,
-      'linear-gradient(var(--bg), var(--bg))',
+      'linear-gradient(#111, #111)',
     ].join(', ');
   } else {
     hero.classList.remove('hero--has-image');
@@ -90,6 +102,7 @@ function applyHeroBannerBackground(data) {
     root.style.removeProperty('--hero-banner-overlay');
     if (bannerEl) bannerEl.style.backgroundImage = '';
   }
+  syncHeroHasCopyClass();
 }
 
 function applyBrandTheme(data, persist = false) {
