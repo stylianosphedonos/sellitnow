@@ -750,6 +750,20 @@ button.category-card:focus-visible {
   font-size: 14px;
 }
 
+.product-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.product-page__actions .btn {
+  width: auto;
+  max-width: none;
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+
 .product-image--clickable {
   cursor: zoom-in;
 }

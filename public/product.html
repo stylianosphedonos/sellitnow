@@ -40,7 +40,10 @@
           <label>Quantity</label>
           <input type="number" id="qty" value="1" min="1" style="width:100%">
         </div>
-        <button class="btn" id="addToCart" style="max-width:200px">Add to Cart</button>
+        <div class="product-page__actions">
+          <button class="btn" id="addToCart">Add to Cart</button>
+          <button type="button" class="btn btn-secondary" id="shareProduct" aria-label="Share product link">Share</button>
+        </div>
       </div>
     </div>
   </main>
@@ -234,6 +237,50 @@
         loadCartCount();
       } catch (err) {
         showToast(err.message, { type: 'error' });
+      }
+    });
+
+    function getProductShareUrl() {
+      const productId = product?.id || id;
+      if (!productId) return location.href.split('#')[0];
+      return `${location.origin}/product.html?id=${productId}`;
+    }
+
+    async function copyProductLink(url) {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        return;
+      }
+      const input = document.createElement('input');
+      input.value = url;
+      input.setAttribute('readonly', '');
+      input.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      input.remove();
+    }
+
+    document.getElementById('shareProduct')?.addEventListener('click', async () => {
+      if (!product && !id) {
+        showToast('Product not loaded yet', { type: 'error' });
+        return;
+      }
+      const url = getProductShareUrl();
+      const title = product?.title || document.title;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title, text: title, url });
+          return;
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+        }
+      }
+      try {
+        await copyProductLink(url);
+        showToast('Link copied', { type: 'success' });
+      } catch (_) {
+        showToast('Could not share link', { type: 'error' });
       }
     });
 
