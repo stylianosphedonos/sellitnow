@@ -100,19 +100,6 @@
       return `<div class="bundle-includes__item bundle-includes__item--static">${body}</div>`;
     }
 
-    function addOptionToSelect(select, raw) {
-      const v = (raw || '').trim();
-      if (!v || !select) return;
-      const exists = [...select.options].some((o) => o.value === v);
-      if (!exists) {
-        const opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        select.appendChild(opt);
-      }
-      select.value = v;
-    }
-
     function openProductImageLightbox(src, alt) {
       const lightbox = document.getElementById('productImageLightbox');
       const img = document.getElementById('productImageLightboxImg');
@@ -158,22 +145,12 @@
       const sizeOpts = sizes.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
       let html = '';
       if (colors.length) {
-        html += `<div class="form-group" style="max-width:280px"><label>Color</label><select id="selColor" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${colorOpts}</select></div>
-          <div style="display:flex;gap:8px;max-width:280px;margin-bottom:12px"><input type="text" id="newColor" placeholder="Add a color" style="flex:1;padding:10px;border:1px solid #eee;border-radius:8px"><button type="button" class="btn" style="max-width:80px;padding:10px" id="btnAddColor">Add</button></div>`;
+        html += `<div class="form-group" style="max-width:280px"><label>Color</label><select id="selColor" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${colorOpts}</select></div>`;
       }
       if (sizes.length) {
-        html += `<div class="form-group" style="max-width:280px"><label>Size</label><select id="selSize" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${sizeOpts}</select></div>
-          <div style="display:flex;gap:8px;max-width:280px;margin-bottom:12px"><input type="text" id="newSize" placeholder="Add a size" style="flex:1;padding:10px;border:1px solid #eee;border-radius:8px"><button type="button" class="btn" style="max-width:80px;padding:10px" id="btnAddSize">Add</button></div>`;
+        html += `<div class="form-group" style="max-width:280px"><label>Size</label><select id="selSize" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${sizeOpts}</select></div>`;
       }
       wrap.innerHTML = html;
-      document.getElementById('btnAddColor')?.addEventListener('click', () => {
-        addOptionToSelect(document.getElementById('selColor'), document.getElementById('newColor').value);
-        document.getElementById('newColor').value = '';
-      });
-      document.getElementById('btnAddSize')?.addEventListener('click', () => {
-        addOptionToSelect(document.getElementById('selSize'), document.getElementById('newSize').value);
-        document.getElementById('newSize').value = '';
-      });
     }
 
     async function loadProduct() {
