@@ -47,6 +47,16 @@ function syncHeroHasCopyClass() {
     Boolean(h1 && String(h1.textContent || '').trim()) ||
     Boolean(sub && String(sub.textContent || '').trim());
   hero.classList.toggle('hero--has-copy', hasCopy);
+  syncHeroEmptyState();
+}
+
+function syncHeroEmptyState() {
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const hasImage = hero.classList.contains('hero--has-image');
+  const hasCopy = hero.classList.contains('hero--has-copy');
+  hero.classList.toggle('hero--empty', !hasImage && !hasCopy);
+  hero.hidden = !hasImage && !hasCopy;
 }
 
 function applyHeroCopy(data) {
@@ -68,7 +78,7 @@ function parseHeroBannerOverlay(data) {
   return Math.min(0.85, Math.max(0, n));
 }
 
-/** Hero section on index: stacked overlay + image + letterbox (only when data.banner is set). */
+/** Hero section on index: centered image (+ optional headline overlay). */
 function applyHeroBannerBackground(data) {
   const hero = document.querySelector('.hero');
   const root = document.documentElement;
@@ -76,8 +86,9 @@ function applyHeroBannerBackground(data) {
   // No brand payload yet — keep neutral page bg (avoid orange flash before /brand loads).
   if (!data || typeof data !== 'object') return;
   const bannerEl = hero.querySelector('.hero__banner');
+  const centerImg = document.getElementById('heroCenterImg');
   const banner = data.banner && String(data.banner).trim();
-  if (banner && bannerEl) {
+  if (banner) {
     const b = mediaUrl(banner);
     const overlay = parseHeroBannerOverlay(data);
     hero.classList.add('hero--has-image');
@@ -85,22 +96,47 @@ function applyHeroBannerBackground(data) {
     root.classList.remove('hero-use-gradient');
     root.style.setProperty('--hero-banner-image', `url(${JSON.stringify(b)})`);
     root.style.setProperty('--hero-banner-overlay', String(overlay));
-    const topLayer =
-      overlay > 0
-        ? `linear-gradient(135deg, rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay}))`
-        : 'linear-gradient(135deg, transparent, transparent)';
-    bannerEl.style.backgroundImage = [
-      topLayer,
-      `url(${JSON.stringify(b)})`,
-      'linear-gradient(#111, #111)',
-    ].join(', ');
+    if (centerImg) {
+      centerImg.hidden = false;
+      centerImg.removeAttribute('hidden');
+      if (centerImg.getAttribute('src') !== b) centerImg.src = b;
+      centerImg.alt = '';
+    }
+    // Dim layer only when headline text sits on top of the image
+    if (bannerEl) {
+      const h1 = document.getElementById('heroTitle');
+      const sub = document.getElementById('heroSubtitle');
+      const hasCopy =
+        Boolean(h1 && String(h1.textContent || '').trim()) ||
+        Boolean(sub && String(sub.textContent || '').trim()) ||
+        Boolean(String(data.heroTitle || '').trim()) ||
+        Boolean(String(data.heroSubtitle || '').trim());
+      if (hasCopy && overlay > 0) {
+        bannerEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay}))`;
+      } else {
+        bannerEl.style.backgroundImage = '';
+      }
+    }
   } else {
     hero.classList.remove('hero--has-image');
     root.classList.remove('has-hero-banner');
-    root.classList.add('hero-use-gradient');
     root.style.removeProperty('--hero-banner-image');
     root.style.removeProperty('--hero-banner-overlay');
+    if (centerImg) {
+      centerImg.removeAttribute('src');
+      centerImg.hidden = true;
+      centerImg.setAttribute('hidden', '');
+    }
     if (bannerEl) bannerEl.style.backgroundImage = '';
+    const h1 = document.getElementById('heroTitle');
+    const sub = document.getElementById('heroSubtitle');
+    const hasCopy =
+      Boolean(h1 && String(h1.textContent || '').trim()) ||
+      Boolean(sub && String(sub.textContent || '').trim()) ||
+      Boolean(String(data.heroTitle || '').trim()) ||
+      Boolean(String(data.heroSubtitle || '').trim());
+    if (hasCopy) root.classList.add('hero-use-gradient');
+    else root.classList.remove('hero-use-gradient');
   }
   syncHeroHasCopyClass();
 }

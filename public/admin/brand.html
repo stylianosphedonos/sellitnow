@@ -24,7 +24,7 @@
       <header class="admin-page-head">
         <div class="admin-page-head__text">
           <h1>Brand</h1>
-          <p class="admin-lead">Customize your store colors, logo, hero banner image, and the headline text shown on the home page. Currency, tax, and the <strong>customer From email</strong> for order messages are under <a href="/admin/settings.html#from-email">Settings → From email</a>.</p>
+          <p class="admin-lead">Customize your store colors, logo, and the centered home image under the header. Currency, tax, and the <strong>customer From email</strong> for order messages are under <a href="/admin/settings.html#from-email">Settings → From email</a>.</p>
         </div>
       </header>
 
@@ -93,40 +93,41 @@
           </div>
         </section>
 
-        <!-- Banner -->
+        <!-- Center home image -->
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-          <h2 style="font-size:18px;margin-bottom:20px">Hero Banner</h2>
+          <h2 style="font-size:18px;margin-bottom:8px">Home center image</h2>
+          <p style="color:var(--text-muted);margin:0 0 20px;line-height:1.45">Upload any image to show <strong>centered</strong> under the header (the space where the old full-width hero sat). Optional headline text can sit on top.</p>
           <div class="form-group">
-            <label for="heroTitleInput">Headline</label>
-            <input type="text" id="heroTitleInput" maxlength="200" placeholder="Main hero title" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+            <label for="heroTitleInput">Headline (optional)</label>
+            <input type="text" id="heroTitleInput" maxlength="200" placeholder="Leave blank to show only the image" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
           </div>
           <div class="form-group">
-            <label for="heroSubtitleInput">Subheading</label>
+            <label for="heroSubtitleInput">Subheading (optional)</label>
             <textarea id="heroSubtitleInput" rows="2" maxlength="400" placeholder="Supporting line under the headline" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
           </div>
           <div class="form-group" style="margin-bottom:16px">
-            <label for="heroBannerOverlayRange" id="heroBannerOverlayLabel">Banner dimming (for headline readability)</label>
+            <label for="heroBannerOverlayRange" id="heroBannerOverlayLabel">Image dimming (only when headline is set)</label>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
               <span style="font-size:13px;color:var(--text-muted);min-width:5rem">Brighter</span>
               <input type="range" id="heroBannerOverlayRange" min="0" max="85" value="35" step="5" style="flex:1;min-width:160px;max-width:360px" aria-labelledby="heroBannerOverlayLabel">
               <span style="font-size:13px;color:var(--text-muted);min-width:5rem;text-align:right">Darker</span>
             </div>
-            <small id="heroBannerOverlayHint" style="color:var(--text-muted);display:block;margin-top:8px">Overlay strength: <strong id="heroBannerOverlayPct">35%</strong>. Lower values make the photo brighter; higher values improve text contrast.</small>
+            <small id="heroBannerOverlayHint" style="color:var(--text-muted);display:block;margin-top:8px">Overlay strength: <strong id="heroBannerOverlayPct">35%</strong>. Used only if you add a headline over the image.</small>
           </div>
-          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px">Save hero settings</button>
-          <div id="bannerPreview" style="width:100%;background:linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);border-radius:8px;margin-bottom:16px;overflow:hidden;position:relative;aspect-ratio:21/9;min-height:140px">
-            <span id="bannerPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.9);font-size:16px;text-align:center;padding:16px;z-index:1">Current banner or gradient</span>
-            <img id="bannerImg" src="" alt="" style="display:none;width:100%;height:100%;object-fit:contain;object-position:center;position:absolute;inset:0;z-index:0">
+          <button type="button" id="saveHeroText" class="btn" style="margin-bottom:20px">Save text settings</button>
+          <div id="bannerPreview" style="width:100%;background:var(--bg);border:1px dashed var(--border);border-radius:8px;margin-bottom:16px;overflow:hidden;position:relative;min-height:140px;display:flex;align-items:center;justify-content:center">
+            <span id="bannerPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:15px;text-align:center;padding:16px;z-index:1">No image yet — upload one to center it on the home page</span>
+            <img id="bannerImg" src="" alt="" style="display:none;max-width:100%;max-height:220px;width:auto;height:auto;object-fit:contain;object-position:center;position:relative;z-index:0;margin:12px auto">
             <div id="bannerDimPreview" aria-hidden="true" style="display:none;position:absolute;inset:0;pointer-events:none;background:rgba(0,0,0,0.35);z-index:2"></div>
           </div>
           <div class="form-group">
-            <label>Upload New Banner Image</label>
+            <label>Upload image</label>
             <input type="file" id="bannerFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
-            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Auto-resized (~21:9, max 2400×1029). The whole image is shown inside the hero; empty sides use your brand gradient.</small>
+            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Shown centered under the header (not stretched full-width).</small>
           </div>
           <div class="brand-actions">
-            <button type="button" id="uploadBanner" class="btn" disabled>Upload Banner</button>
-            <button type="button" id="removeBanner" class="btn btn-secondary">Remove Banner</button>
+            <button type="button" id="uploadBanner" class="btn" disabled>Upload image</button>
+            <button type="button" id="removeBanner" class="btn btn-secondary">Remove image</button>
           </div>
         </section>
 
@@ -198,10 +199,13 @@
       const pctEl = document.getElementById('heroBannerOverlayPct');
       const dimPrev = document.getElementById('bannerDimPreview');
       const bannerImg = document.getElementById('bannerImg');
+      const title = (document.getElementById('heroTitleInput')?.value || '').trim();
+      const subtitle = (document.getElementById('heroSubtitleInput')?.value || '').trim();
       const v = Number(rangeEl.value);
       const safe = Number.isFinite(v) ? Math.min(85, Math.max(0, v)) : 35;
       pctEl.textContent = `${safe}%`;
-      if (bannerImg.style.display === 'block') {
+      const showDim = bannerImg.style.display === 'block' && (title || subtitle);
+      if (showDim) {
         dimPrev.style.display = 'block';
         dimPrev.style.background = `rgba(0,0,0,${safe / 100})`;
       } else {
@@ -210,6 +214,8 @@
     }
 
     document.getElementById('heroBannerOverlayRange').addEventListener('input', syncBannerDimUi);
+    document.getElementById('heroTitleInput').addEventListener('input', syncBannerDimUi);
+    document.getElementById('heroSubtitleInput').addEventListener('input', syncBannerDimUi);
 
     async function loadBrand() {
       try {
@@ -300,12 +306,12 @@
             heroBannerOverlay: overlay,
           }),
         });
-        showAlert('Hero settings saved. Refresh the store home page to confirm.');
+        showAlert('Home image text settings saved. Refresh the store home page to confirm.');
       } catch (err) {
         showAlert(err.message || 'Failed to save hero settings.', true);
       }
       btn.disabled = false;
-      btn.textContent = 'Save hero settings';
+      btn.textContent = 'Save text settings';
     });
 
     saveColorsBtn.addEventListener('click', async () => {
@@ -363,12 +369,12 @@
         syncBannerDimUi();
         bannerFile.value = '';
         uploadBannerBtn.disabled = true;
-        showAlert('Banner uploaded successfully.');
+        showAlert('Home center image uploaded. Refresh the store to see it.');
       } catch (err) {
         showAlert(err.message || 'Failed to upload banner.', true);
       }
       uploadBannerBtn.disabled = false;
-      uploadBannerBtn.textContent = 'Upload Banner';
+      uploadBannerBtn.textContent = 'Upload image';
     });
 
     removeBannerBtn.addEventListener('click', async () => {
@@ -379,7 +385,7 @@
         });
       } catch (_) {}
       await loadBrand();
-      showAlert('Banner removed. Store will show the gradient again.');
+      showAlert('Home center image removed.');
     });
 
     logoFile.addEventListener('change', () => {
