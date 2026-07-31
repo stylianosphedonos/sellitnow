@@ -520,14 +520,16 @@ function updateNav() {
   const adminBtn = document.getElementById('adminBtn');
   const profileBtn = document.getElementById('profileBtn');
   const logoutBtn = document.getElementById('logoutBtn');
+  // Keep header links as inline-flex so vertical alignment matches Cart/Login
+  const show = 'inline-flex';
 
   if (user) {
     if (loginBtn) loginBtn.style.display = 'none';
-    if (profileBtn) profileBtn.style.display = 'inline';
-    if (logoutBtn) logoutBtn.style.display = 'inline';
-    if (adminBtn) adminBtn.style.display = user.role === 'admin' ? 'inline' : 'none';
+    if (profileBtn) profileBtn.style.display = show;
+    if (logoutBtn) logoutBtn.style.display = show;
+    if (adminBtn) adminBtn.style.display = user.role === 'admin' ? show : 'none';
   } else {
-    if (loginBtn) loginBtn.style.display = 'inline';
+    if (loginBtn) loginBtn.style.display = show;
     if (adminBtn) adminBtn.style.display = 'none';
     if (profileBtn) profileBtn.style.display = 'none';
     if (logoutBtn) logoutBtn.style.display = 'none';
