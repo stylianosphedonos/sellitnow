@@ -136,7 +136,7 @@ body {
   background: var(--bg);
   color: var(--text);
   text-align: center;
-  padding: 12px 0 0;
+  padding: 8px 0 0;
   box-sizing: border-box;
 }
 
@@ -152,7 +152,7 @@ html.hero-use-gradient .hero:not(.hero--has-image) {
   padding: 0 20px;
   width: 100%;
   position: relative;
-  min-height: clamp(200px, 28vw, 380px);
+  min-height: clamp(160px, 22vw, 300px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -234,7 +234,7 @@ html.hero-use-gradient .hero:not(.hero--has-image) p {
 .main {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 16px 20px 32px;
+  padding: 8px 20px 32px;
 }
 
 section {
@@ -3005,24 +3005,24 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
   /* Hero */
   .hero {
-    padding: 12px 0 0;
+    padding: 8px 0 0;
   }
 
   .hero__frame {
     padding: 0 16px;
-    min-height: 140px;
+    min-height: 120px;
   }
 
   .hero:not(.hero--has-image) {
-    padding: 12px 0 0;
+    padding: 8px 0 0;
   }
 
   html.hero-use-gradient .hero:not(.hero--has-image) {
-    padding: 28px 0;
+    padding: 20px 0;
   }
 
   .hero__inner {
-    padding: 24px 4px;
+    padding: 20px 4px;
   }
 
   .hero h1 {
@@ -3035,7 +3035,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
   /* Main content */
   .main {
-    padding: 12px 16px 32px;
+    padding: 8px 16px 32px;
   }
 
   section {
