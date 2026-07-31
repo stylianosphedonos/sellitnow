@@ -31,6 +31,7 @@ function persistBrandSettings(data) {
       logo: data.logo || '',
       allProductsImage: data.allProductsImage || '',
       allProductsShowOnWebsite: data.allProductsShowOnWebsite !== false,
+      requestIconImage: data.requestIconImage || '',
       heroTitle: data.heroTitle,
       heroSubtitle: data.heroSubtitle,
       heroBannerOverlay: data.heroBannerOverlay,
@@ -1044,11 +1045,17 @@ function getCategoryWebsiteLayout(c) {
 }
 
 function renderCategoryCardMedia(c, layout) {
-  const hasImage = Boolean(c.image_url);
+  const cachedBrand = readCachedBrandSettings();
+  const brandIconImage =
+    isIconCategory(c) && cachedBrand?.requestIconImage
+      ? String(cachedBrand.requestIconImage).trim()
+      : '';
+  const imageSource = brandIconImage || c.image_url;
+  const hasImage = Boolean(imageSource);
   const mediaClass = getCategoryIconMediaClasses(c, layout, hasImage);
   const mediaStyle = getCategoryIconMediaStyle(c, layout, hasImage);
   const styleAttr = mediaStyle ? ` style="${mediaStyle}"` : '';
-  const imgUrl = hasImage ? mediaUrl(c.image_url) : '';
+  const imgUrl = hasImage ? mediaUrl(imageSource) : '';
   if (imgUrl) {
     return `<div class="${mediaClass} category-card__media--image"${styleAttr}><img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(c.name)}" loading="lazy" decoding="async"></div>`;
   }

@@ -13,6 +13,7 @@ const {
   uploadLogo,
   uploadCategoryImage,
   uploadAllProductsTileImage,
+  uploadRequestIconImage,
 } = require('../middleware/upload');
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
@@ -630,6 +631,7 @@ router.put('/brand', async (req, res) => {
       logo,
       allProductsImage,
       allProductsShowOnWebsite,
+      requestIconImage,
       currency,
       taxRatePercent,
       heroTitle,
@@ -651,6 +653,7 @@ router.put('/brand', async (req, res) => {
         key: 'allProductsShowOnWebsite',
         value: allProductsShowOnWebsite === true || allProductsShowOnWebsite === 'true' || allProductsShowOnWebsite === 1 || allProductsShowOnWebsite === '1' ? 'true' : 'false',
       },
+      requestIconImage !== undefined && { key: 'requestIconImage', value: String(requestIconImage || '') },
       heroTitle !== undefined && { key: 'heroTitle', value: String(heroTitle) },
       heroSubtitle !== undefined && { key: 'heroSubtitle', value: String(heroSubtitle) },
     ].filter(Boolean);
@@ -765,6 +768,14 @@ router.put('/brand', async (req, res) => {
       );
     }
 
+    if (requestIconImage !== undefined && String(requestIconImage || '').trim() === '') {
+      try {
+        await pool.query(
+          `UPDATE categories SET image_url = NULL WHERE category_type = 'icon'`
+        );
+      } catch (_) {}
+    }
+
     const settings = await getBrandSettings();
     res.json(settings);
   } catch (err) {
@@ -842,6 +853,30 @@ router.post('/brand/all-products-image', uploadAllProductsTileImage, async (req,
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['allProductsImage', url]
     );
+    const settings = await getBrandSettings();
+    res.json(settings);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/brand/request-icon-image', uploadRequestIconImage, async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file uploaded' });
+    }
+    const url = await publicUrlForUploadedFile(req.file, { assetType: 'request-icon' });
+    await pool.query(
+      'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['requestIconImage', url]
+    );
+    // Keep icon-type categories in sync so Category admin shows the same photo
+    try {
+      await pool.query(
+        `UPDATE categories SET image_url = $1 WHERE category_type = 'icon'`,
+        [url]
+      );
+    } catch (_) {}
     const settings = await getBrandSettings();
     res.json(settings);
   } catch (err) {

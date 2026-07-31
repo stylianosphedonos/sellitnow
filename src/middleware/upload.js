@@ -79,12 +79,26 @@ function allProductsTileDiskStorage() {
   });
 }
 
+function requestIconDiskStorage() {
+  return multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const ext = path.extname(file.originalname) || '.jpg';
+      cb(null, `request-icon-${unique}${ext}`);
+    },
+  });
+}
+
 const memory = multer.memoryStorage();
 const storage = isPostgres ? memory : productDiskStorage();
 const bannerStorage = isPostgres ? memory : bannerDiskStorage();
 const logoStorage = isPostgres ? memory : logoDiskStorage();
 const categoryImageStorage = isPostgres ? memory : categoryDiskStorage();
 const allProductsTileImageStorage = isPostgres ? memory : allProductsTileDiskStorage();
+const requestIconImageStorage = isPostgres ? memory : requestIconDiskStorage();
 
 const fileFilter = (req, file, cb) => {
   const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -171,6 +185,15 @@ const uploadAllProductsTileImage = withProcessedImages(
   'all-products'
 );
 
+const uploadRequestIconImage = withProcessedImages(
+  multer({
+    storage: requestIconImageStorage,
+    fileFilter,
+    limits: { fileSize: maxSize },
+  }).single('image'),
+  'request-icon'
+);
+
 const uploadRequestPhoto = withProcessedImages(
   multer({
     storage: isPostgres ? memory : categoryImageStorage,
@@ -186,6 +209,7 @@ module.exports = {
   uploadLogo,
   uploadCategoryImage,
   uploadAllProductsTileImage,
+  uploadRequestIconImage,
   uploadRequestPhoto,
   upload,
 };

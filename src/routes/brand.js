@@ -14,6 +14,7 @@ const DEFAULTS = {
   logo: '',
   allProductsImage: '',
   allProductsShowOnWebsite: true,
+  requestIconImage: '',
   currency: 'usd',
   heroTitle: 'Up to 90% Off',
   heroSubtitle: 'Discover amazing deals on electronics, fashion & more',
@@ -203,6 +204,7 @@ async function getBrandSettings() {
       stored.allProductsShowOnWebsite,
       DEFAULTS.allProductsShowOnWebsite
     ),
+    requestIconImage: stored.requestIconImage || DEFAULTS.requestIconImage,
     currency,
     taxRatePercent,
     heroTitle,

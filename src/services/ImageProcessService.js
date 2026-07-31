@@ -45,6 +45,11 @@ const PRESETS = {
     format: 'jpeg',
     quality: 82,
   },
+  'request-icon': {
+    size: 400,
+    format: 'jpeg',
+    quality: 82,
+  },
   request: {
     maxEdge: 1600,
     format: 'jpeg',
@@ -294,7 +299,7 @@ async function processBuffer(inputBuffer, assetType) {
     return { buffer, mimetype: 'image/png', ext: '.png' };
   }
 
-  if (type === 'category' || type === 'all-products') {
+  if (type === 'category' || type === 'all-products' || type === 'request-icon') {
     const buffer = await sharp(inputBuffer)
       .rotate()
       .resize({

@@ -156,6 +156,24 @@
             <button type="button" id="removeAllProducts" class="btn btn-secondary">Remove Image</button>
           </div>
         </section>
+
+        <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+          <h2 style="font-size:18px;margin-bottom:8px">Tell us what you need icon</h2>
+          <p style="color:var(--text-muted);margin:0 0 16px;line-height:1.45">Photo for the floating request icon on the store (replaces the cart emoji).</p>
+          <div id="requestIconPreview" style="width:120px;height:120px;border:1px solid var(--border);border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:16px">
+            <span id="requestIconPlaceholder" style="color:var(--text-muted);font-size:32px;text-align:center;padding:8px">🛒</span>
+            <img id="requestIconImg" src="" alt="Request icon" style="display:none;width:100%;height:100%;object-fit:cover">
+          </div>
+          <div class="form-group">
+            <label>Upload icon image</label>
+            <input type="file" id="requestIconFile" accept="image/jpeg,image/png,image/webp,image/gif" style="padding:8px 0">
+            <small style="color:var(--text-muted);display:block;margin-top:6px">JPEG, PNG, WebP or GIF. Max 5MB. Square images work best.</small>
+          </div>
+          <div class="brand-actions">
+            <button type="button" id="uploadRequestIcon" class="btn" disabled>Upload icon</button>
+            <button type="button" id="removeRequestIcon" class="btn btn-secondary">Remove image</button>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -174,6 +192,9 @@
     const allProductsFile = document.getElementById('allProductsFile');
     const uploadAllProductsBtn = document.getElementById('uploadAllProducts');
     const removeAllProductsBtn = document.getElementById('removeAllProducts');
+    const requestIconFile = document.getElementById('requestIconFile');
+    const uploadRequestIconBtn = document.getElementById('uploadRequestIcon');
+    const removeRequestIconBtn = document.getElementById('removeRequestIcon');
 
     function showAlert(msg, isError) {
       alertEl.textContent = msg;
@@ -285,6 +306,18 @@
 
         document.getElementById('allProductsShowOnWebsite').checked =
           data.allProductsShowOnWebsite !== false;
+
+        const requestIconImg = document.getElementById('requestIconImg');
+        const requestIconPlaceholder = document.getElementById('requestIconPlaceholder');
+        if (data.requestIconImage) {
+          requestIconImg.src = typeof mediaUrl === 'function' ? mediaUrl(data.requestIconImage) : data.requestIconImage;
+          requestIconImg.style.display = 'block';
+          requestIconPlaceholder.style.display = 'none';
+        } else {
+          requestIconImg.src = '';
+          requestIconImg.style.display = 'none';
+          requestIconPlaceholder.style.display = 'block';
+        }
 
       } catch (err) {
         showAlert('Failed to load brand settings.', true);
@@ -488,6 +521,48 @@
       }
       btn.disabled = false;
       btn.textContent = 'Save visibility';
+    });
+
+    requestIconFile.addEventListener('change', () => {
+      uploadRequestIconBtn.disabled = !requestIconFile.files || requestIconFile.files.length === 0;
+    });
+
+    uploadRequestIconBtn.addEventListener('click', async () => {
+      if (!requestIconFile.files || requestIconFile.files.length === 0) return;
+      uploadRequestIconBtn.disabled = true;
+      uploadRequestIconBtn.textContent = 'Uploading...';
+      try {
+        const formData = new FormData();
+        formData.append('image', requestIconFile.files[0]);
+        const res = await sellitnowFetchWithCsrf(sellitnowApiUrl('/admin/brand/request-icon-image'), {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        document.getElementById('requestIconImg').src =
+          typeof mediaUrl === 'function' ? mediaUrl(data.requestIconImage) : data.requestIconImage;
+        document.getElementById('requestIconImg').style.display = 'block';
+        document.getElementById('requestIconPlaceholder').style.display = 'none';
+        requestIconFile.value = '';
+        uploadRequestIconBtn.disabled = true;
+        showAlert('Request icon uploaded. Refresh the store to see it.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to upload icon.', true);
+      }
+      uploadRequestIconBtn.disabled = false;
+      uploadRequestIconBtn.textContent = 'Upload icon';
+    });
+
+    removeRequestIconBtn.addEventListener('click', async () => {
+      try {
+        await callApi('/admin/brand', {
+          method: 'PUT',
+          body: JSON.stringify({ requestIconImage: '' })
+        });
+      } catch (_) {}
+      await loadBrand();
+      showAlert('Request icon image removed. Store will show the cart emoji again.');
     });
 
     loadBrand();
