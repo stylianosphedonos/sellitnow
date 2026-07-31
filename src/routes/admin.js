@@ -983,8 +983,14 @@ router.post('/users/:id/reset-password', async (req, res) => {
       return res.status(400).json({ error: `Password must be at least ${config.app.passwordMinLength} characters` });
     }
 
-    const userResult = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
+    const userResult = await pool.query(
+      'SELECT id, role FROM users WHERE id = $1',
+      [id]
+    );
     if (!userResult.rows.length) return res.status(404).json({ error: 'User not found' });
+    if (userResult.rows[0].role !== 'admin') {
+      return res.status(400).json({ error: 'Use customer password reset for non-admin accounts' });
+    }
 
     const password_hash = await bcrypt.hash(new_password, 12);
     await pool.query(

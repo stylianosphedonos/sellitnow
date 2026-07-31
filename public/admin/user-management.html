@@ -83,6 +83,32 @@
       </div>
     </main>
   </div>
+
+  <div id="resetPasswordModal" class="request-modal" hidden aria-hidden="true">
+    <div class="request-modal__backdrop" data-close-reset-modal></div>
+    <div class="request-modal__panel" role="dialog" aria-modal="true" aria-labelledby="resetPasswordTitle">
+      <button type="button" class="request-modal__close" data-close-reset-modal aria-label="Close">&times;</button>
+      <h2 id="resetPasswordTitle">Reset password</h2>
+      <p id="resetPasswordHint" class="request-modal__prompt"></p>
+      <form id="resetPasswordForm" class="request-modal__form">
+        <input type="hidden" id="resetPasswordUserId" value="">
+        <div class="form-group">
+          <label for="resetNewPassword">New password *</label>
+          <input type="password" id="resetNewPassword" required minlength="8" autocomplete="new-password" placeholder="Min 8 characters">
+        </div>
+        <div class="form-group">
+          <label for="resetConfirmPassword">Confirm new password *</label>
+          <input type="password" id="resetConfirmPassword" required minlength="8" autocomplete="new-password" placeholder="Re-enter password">
+        </div>
+        <div id="resetPasswordError" class="alert alert-error" style="display:none"></div>
+        <div class="request-modal__actions">
+          <button type="submit" class="btn" id="resetPasswordSubmit">Reset password</button>
+          <button type="button" class="btn btn-secondary" data-close-reset-modal>Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/js/runtime-config.js"></script>
   <script src="/js/app.js"></script>
   <script src="/js/admin-layout.js"></script>
@@ -102,6 +128,37 @@
       setTimeout(() => { alertEl.style.display = 'none'; }, 4000);
     }
 
+    function escapeHtml(str) {
+      if (str == null) return '';
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    }
+
+    function openResetPasswordModal(user) {
+      const modal = document.getElementById('resetPasswordModal');
+      const form = document.getElementById('resetPasswordForm');
+      const errEl = document.getElementById('resetPasswordError');
+      const hint = document.getElementById('resetPasswordHint');
+      document.getElementById('resetPasswordUserId').value = String(user.id);
+      hint.textContent = `Set a new password for ${user.email}.`;
+      if (form) form.reset();
+      document.getElementById('resetPasswordUserId').value = String(user.id);
+      if (errEl) errEl.style.display = 'none';
+      modal.hidden = false;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('request-modal-open');
+      document.getElementById('resetNewPassword')?.focus();
+    }
+
+    function closeResetPasswordModal() {
+      const modal = document.getElementById('resetPasswordModal');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('request-modal-open');
+    }
+
     async function loadUsers() {
       try {
         const data = await callApi('/admin/users');
@@ -110,13 +167,16 @@
           ? `
             <div class="admin-table-wrap">
             <table class="table">
-              <thead><tr><th>Email</th><th>Name</th><th>Created</th></tr></thead>
+              <thead><tr><th>Email</th><th>Name</th><th>Created</th><th></th></tr></thead>
               <tbody>
               ${users.map(u => `
                 <tr>
-                  <td>${u.email}</td>
-                  <td>${u.first_name} ${u.last_name}</td>
+                  <td>${escapeHtml(u.email)}</td>
+                  <td>${escapeHtml(u.first_name)} ${escapeHtml(u.last_name)}</td>
                   <td>${new Date(u.created_at).toLocaleDateString()}</td>
+                  <td style="text-align:right;white-space:nowrap">
+                    <button type="button" class="btn btn-secondary" data-reset-user-id="${u.id}" data-reset-user-email="${escapeHtml(u.email)}" style="padding:8px 12px;font-size:13px">Reset password</button>
+                  </td>
                 </tr>
               `).join('')}
               </tbody>
@@ -124,10 +184,58 @@
             </div>
           `
           : '<p class="admin-empty">No admin users yet.</p>';
+
+        document.querySelectorAll('[data-reset-user-id]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            openResetPasswordModal({
+              id: Number(btn.getAttribute('data-reset-user-id')),
+              email: btn.getAttribute('data-reset-user-email') || 'this user',
+            });
+          });
+        });
       } catch (err) {
         document.getElementById('usersList').innerHTML = '<p>Failed to load users.</p>';
       }
     }
+
+    document.querySelectorAll('[data-close-reset-modal]').forEach((el) => {
+      el.addEventListener('click', closeResetPasswordModal);
+    });
+
+    document.getElementById('resetPasswordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const userId = Number(document.getElementById('resetPasswordUserId').value);
+      const newPwd = document.getElementById('resetNewPassword').value;
+      const confirm = document.getElementById('resetConfirmPassword').value;
+      const errEl = document.getElementById('resetPasswordError');
+      const submitBtn = document.getElementById('resetPasswordSubmit');
+      if (!Number.isInteger(userId) || userId <= 0) {
+        errEl.textContent = 'Invalid user.';
+        errEl.style.display = 'block';
+        return;
+      }
+      if (newPwd !== confirm) {
+        errEl.textContent = 'New password and confirmation do not match.';
+        errEl.style.display = 'block';
+        return;
+      }
+      errEl.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Resetting...';
+      try {
+        await callApi(`/admin/users/${userId}/reset-password`, {
+          method: 'POST',
+          body: JSON.stringify({ new_password: newPwd }),
+        });
+        closeResetPasswordModal();
+        showMsg('Password reset successfully.');
+      } catch (err) {
+        errEl.textContent = err.message || 'Failed to reset password.';
+        errEl.style.display = 'block';
+      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Reset password';
+    });
 
     document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
       e.preventDefault();
