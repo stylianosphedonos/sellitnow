@@ -18,6 +18,7 @@
   --fs-2xl: 1.5rem;    /* 24 */
   --fs-logo: 2.25rem;  /* 36 text logo */
   --logo-height: 88px;
+  --header-sticky-offset: 108px;
   --hero-banner-height: clamp(140px, 18vw, 220px);
 }
 
@@ -2573,7 +2574,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
 .cart-summary {
   position: sticky;
-  top: 88px;
+  top: calc(var(--header-sticky-offset) + 12px);
   background: var(--white);
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -2719,7 +2720,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
 .checkout-aside {
   position: sticky;
-  top: 88px;
+  top: calc(var(--header-sticky-offset) + 12px);
 }
 
 @media (max-width: 900px) {
@@ -3095,6 +3096,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   .header {
     padding: 10px 0;
     --logo-height: 64px;
+    --header-sticky-offset: 140px;
   }
 
   .header-inner {
@@ -3760,8 +3762,8 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   align-items: center;
 }
 
-.site-zone--top-left { top: 76px; left: 12px; }
-.site-zone--top-right { top: 76px; right: 12px; }
+.site-zone--top-left { top: calc(var(--header-sticky-offset) + 12px); left: 12px; }
+.site-zone--top-right { top: calc(var(--header-sticky-offset) + 12px); right: 12px; }
 .site-zone--bottom-left { bottom: 20px; left: 12px; }
 .site-zone--bottom-right { bottom: 20px; right: 12px; }
 
