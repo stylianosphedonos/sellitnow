@@ -15,7 +15,14 @@ function uploadPrefix() {
  */
 async function publicUrlForUploadedFile(file, options = {}) {
   if (options.assetType) {
-    await ImageProcessService.processMulterFile(file, options.assetType);
+    try {
+      await ImageProcessService.processMulterFile(file, options.assetType);
+    } catch (err) {
+      console.error('[ImageProcess] Failed for', options.assetType, err);
+      throw new Error(
+        `Image processing failed (${options.assetType}): ${err.message || 'unknown error'}`
+      );
+    }
   }
 
   const prefix = uploadPrefix();
