@@ -491,7 +491,7 @@ button.category-card:focus-visible {
 .category-card__media img {
   width: 100%;
   height: 100%;
-  object-fit: fill;
+  object-fit: cover;
   object-position: center;
   display: block;
 }
@@ -3221,7 +3221,7 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 
   .category-card__label {
-    font-size: 13px;
+    font-size: var(--fs-sm);
   }
 
   .product-grid {
