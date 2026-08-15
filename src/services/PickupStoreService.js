@@ -325,12 +325,14 @@ class PickupStoreService {
     const activeRaw = input.active;
     const active =
       activeRaw === undefined || activeRaw === null
-        ? true
-        : activeRaw === true || activeRaw === 1 || activeRaw === '1' || activeRaw === 'true';
+        ? 1
+        : activeRaw === true || activeRaw === 1 || activeRaw === '1' || activeRaw === 'true'
+          ? 1
+          : 0;
 
     const display_order = Number(input.display_order);
-    const lat = input.lat != null && input.lat !== '' ? Number(input.lat) : null;
-    const lng = input.lng != null && input.lng !== '' ? Number(input.lng) : null;
+    const latNum = input.lat != null && input.lat !== '' ? Number(input.lat) : null;
+    const lngNum = input.lng != null && input.lng !== '' ? Number(input.lng) : null;
 
     return {
       code,
@@ -343,8 +345,8 @@ class PickupStoreService {
       country: CHECKOUT_COUNTRY,
       phone: String(input.phone || '').trim() || null,
       hours: String(input.hours || '').trim() || null,
-      lat: Number.isFinite(lat) ? lat : null,
-      lng: Number.isFinite(lng) ? lng : null,
+      lat: Number.isFinite(latNum) ? latNum : null,
+      lng: Number.isFinite(lngNum) ? lngNum : null,
       active,
       display_order: Number.isFinite(display_order) ? display_order : 0,
     };
