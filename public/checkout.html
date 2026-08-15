@@ -41,9 +41,10 @@
 
               <div class="form-group">
                 <label for="pickupCity">City *</label>
-                <select id="pickupCity" required>
+                <select id="pickupCity" required class="checkout-city-select">
                   <option value="">Select a city</option>
                 </select>
+                <p id="pickupCityError" class="alert alert-error" style="display:none;margin-top:10px"></p>
               </div>
 
               <div id="pickupAfterCity" style="display:none">
@@ -251,19 +252,44 @@
       const select = document.getElementById('pickupCity');
       if (!select) return;
       const current = select.value;
-      select.innerHTML =
-        '<option value="">Select a city</option>' +
-        pickupCities
-          .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
-          .join('');
+      while (select.firstChild) select.removeChild(select.firstChild);
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = pickupCities.length
+        ? 'Select a city'
+        : 'No cities available';
+      select.appendChild(placeholder);
+
+      const preferred = ['Nicosia', 'Limassol', 'Larnaca', 'Paphos', 'Ammochostos', 'Polis'];
+      const sorted = pickupCities.slice().sort((a, b) => {
+        const ai = preferred.indexOf(a);
+        const bi = preferred.indexOf(b);
+        if (ai !== -1 || bi !== -1) {
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        }
+        return String(a).localeCompare(String(b), undefined, { sensitivity: 'base' });
+      });
+
+      for (const city of sorted) {
+        const opt = document.createElement('option');
+        opt.value = city;
+        opt.textContent = city;
+        select.appendChild(opt);
+      }
       if (current && pickupCities.includes(current)) select.value = current;
+      select.disabled = pickupCities.length === 0;
     }
 
     async function loadPickupCatalog() {
       const loading = document.getElementById('pickupLoadingHint');
       const hint = document.getElementById('pickupChooseCityHint');
+      const cityError = document.getElementById('pickupCityError');
       if (loading) loading.style.display = 'block';
       if (hint) hint.style.display = 'none';
+      if (cityError) {
+        cityError.style.display = 'none';
+        cityError.textContent = '';
+      }
       try {
         const data = await callApi('/pickup-stores');
         pickupCities = Array.isArray(data.cities) ? data.cities : [];
@@ -272,11 +298,10 @@
         catalogReady = true;
         fillCityOptions();
         if (!pickupCities.length) {
-          const empty = document.getElementById('pickupStoresEmpty');
-          if (empty) {
-            empty.style.display = 'block';
-            empty.textContent =
-              'No Cyprus pickup cities are available yet. Please try again in a moment.';
+          if (cityError) {
+            cityError.style.display = 'block';
+            cityError.textContent =
+              'No Cyprus pickup cities are available yet. Please refresh in a moment.';
           }
         }
       } catch (err) {
@@ -284,10 +309,11 @@
         pickupCounts = {};
         pickupActiveTotal = 0;
         catalogReady = false;
-        const empty = document.getElementById('pickupStoresEmpty');
-        if (empty) {
-          empty.style.display = 'block';
-          empty.textContent = err.message || 'Could not load pickup cities. Please refresh.';
+        fillCityOptions();
+        if (cityError) {
+          cityError.style.display = 'block';
+          cityError.textContent =
+            err.message || 'Could not load pickup cities. Please refresh the page.';
         }
       } finally {
         if (loading) loading.style.display = 'none';

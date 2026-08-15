@@ -482,6 +482,25 @@ async function ensureDb() {
       return;
     }
     const { db } = dbMod;
+    // Older SQLite DBs may lack columns referenced by schema indexes (e.g. product_type).
+    // Add critical columns before applying the full schema / index set.
+    try {
+      const productCols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+      if (productCols.length && !productCols.includes('product_type')) {
+        db.exec("ALTER TABLE products ADD COLUMN product_type TEXT DEFAULT 'simple'");
+      }
+      if (productCols.length && !productCols.includes('delivery_cost')) {
+        db.exec('ALTER TABLE products ADD COLUMN delivery_cost REAL');
+      }
+      if (productCols.length && !productCols.includes('display_order')) {
+        db.exec('ALTER TABLE products ADD COLUMN display_order INTEGER');
+      }
+      if (productCols.length && !productCols.includes('options_json')) {
+        db.exec('ALTER TABLE products ADD COLUMN options_json TEXT');
+      }
+    } catch (preErr) {
+      console.warn('SQLite pre-migrate:', preErr.message);
+    }
     const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.sql'), 'utf8');
     db.exec(schema);
     runSchemaMigrations(db);
