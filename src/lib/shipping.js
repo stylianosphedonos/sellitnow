@@ -5,8 +5,12 @@
  *
  * @param {number} defaultDelivery
  * @param {Array<{ quantity: number, delivery_cost?: number | null }>} lines
+ * @param {{ fulfillmentMethod?: string }} [options]
  */
-function computeShippingTotal(defaultDelivery, lines) {
+function computeShippingTotal(defaultDelivery, lines, options = {}) {
+  const method = String(options.fulfillmentMethod || 'delivery').toLowerCase();
+  if (method === 'pickup') return 0;
+
   const D = Number(defaultDelivery);
   const base = Number.isFinite(D) && D >= 0 ? D : 0;
   let deltaSum = 0;

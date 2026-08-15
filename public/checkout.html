@@ -25,38 +25,66 @@
     <div class="checkout-layout">
       <div class="checkout-main">
         <h1 style="font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em">Checkout</h1>
-        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px">Enter shipping details, then pay securely by card. Your order is created only after payment succeeds.</p>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px">Cyprus only — choose home delivery or a pickup store, then pay securely by card. Your order is created only after payment succeeds.</p>
         <div id="checkoutError" class="alert alert-error" style="display:none"></div>
 
         <div id="stepShipping" class="checkout-card" style="max-width:640px">
-          <h2 style="margin:0 0 20px;font-size:18px">Shipping &amp; payment</h2>
+          <h2 style="margin:0 0 20px;font-size:18px">Delivery &amp; payment</h2>
           <form id="checkoutForm">
             <div class="form-group">
               <label>Email *</label>
               <input type="email" name="guest_email" id="guestEmail" required autocomplete="email">
             </div>
 
-            <h3 style="margin:24px 0 12px;font-size:15px">Delivery address</h3>
-            <div class="form-group">
-              <label>Address line 1 *</label>
-              <input type="text" name="address_line1" required autocomplete="street-address">
+            <fieldset class="checkout-payment-options" style="border:0;padding:0;margin:24px 0 8px">
+              <legend class="checkout-payment-options__legend">How would you like to receive your order?</legend>
+              <label class="checkout-payment-option">
+                <input type="radio" name="fulfillment_method" value="delivery" checked>
+                <span class="checkout-payment-option__box">
+                  <span class="checkout-payment-option__title">Home delivery (Cyprus)</span>
+                  <span class="checkout-payment-option__hint">We deliver to addresses in Cyprus only.</span>
+                </span>
+              </label>
+              <label class="checkout-payment-option">
+                <input type="radio" name="fulfillment_method" value="pickup">
+                <span class="checkout-payment-option__box">
+                  <span class="checkout-payment-option__title">Store pickup (Cyprus)</span>
+                  <span class="checkout-payment-option__hint">Collect from a pickup point — free of delivery charge.</span>
+                </span>
+              </label>
+            </fieldset>
+
+            <div id="deliveryAddressFields">
+              <h3 style="margin:24px 0 12px;font-size:15px">Delivery address</h3>
+              <div class="form-group">
+                <label>Address line 1 *</label>
+                <input type="text" name="address_line1" id="checkoutAddress1" autocomplete="street-address">
+              </div>
+              <div class="form-group">
+                <label>City *</label>
+                <input type="text" name="city" id="checkoutCity" autocomplete="address-level2">
+              </div>
+              <div class="form-group">
+                <label>Postal code *</label>
+                <input type="text" name="postal_code" id="checkoutPostal" autocomplete="postal-code">
+              </div>
             </div>
-            <div class="form-group">
-              <label>City *</label>
-              <input type="text" name="city" required autocomplete="address-level2">
+
+            <div id="pickupStoreFields" style="display:none">
+              <h3 style="margin:24px 0 12px;font-size:15px">Choose a pickup store</h3>
+              <p id="pickupStoresEmpty" class="alert alert-error" style="display:none">No pickup stores are available right now. Please choose home delivery or try again later.</p>
+              <div id="pickupStoreList" class="checkout-pickup-list" role="radiogroup" aria-label="Pickup stores"></div>
             </div>
+
             <div class="form-group">
-              <label>Postal code *</label>
-              <input type="text" name="postal_code" required autocomplete="postal-code">
-            </div>
-            <div class="form-group">
-              <label>Country (2-letter code) *</label>
-              <input type="text" name="country" value="CY" required maxlength="2" autocomplete="country">
+              <label>Country</label>
+              <input type="text" name="country" id="checkoutCountry" value="Cyprus (CY)" readonly>
+              <input type="hidden" name="country_code" id="checkoutCountryCode" value="CY">
             </div>
             <div id="checkoutPhoneWrap" class="form-group checkout-phone-field--highlight">
               <label id="checkoutPhoneLabel" for="checkoutPhone">Phone <span id="checkoutPhoneOptional" style="color:var(--text-muted);font-weight:400">(optional)</span></label>
               <input type="tel" name="phone" id="checkoutPhone" autocomplete="tel" inputmode="tel" placeholder="">
-              <p id="checkoutPhoneHint" class="checkout-phone-hint" style="display:none;margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--text-muted)">We’ll use this number if the delivery needs to reach you.</p>
+              <p id="checkoutPhoneHint" class="checkout-phone-hint" style="display:none;margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--text-muted)">We’ll use this number if we need to reach you about delivery or pickup.</p>
             </div>
             <button type="submit" class="btn" id="placeOrderBtn" style="margin-top:24px;max-width:240px">Continue to payment</button>
           </form>
@@ -98,16 +126,112 @@
 
     /** Shipping + totals held between steps; order exists only after payment. */
     let checkoutDraft = null;
+    let pickupStores = [];
+    let lastCartReview = null;
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    }
+
+    function selectedFulfillmentMethod() {
+      const el = document.querySelector('input[name="fulfillment_method"]:checked');
+      return el ? el.value : 'delivery';
+    }
+
+    function cartWithFulfillment(cart, method) {
+      if (!cart) return null;
+      const fulfillment_method = method || selectedFulfillmentMethod();
+      const shipping_estimate =
+        fulfillment_method === 'pickup' ? 0 : Number(cart.shipping_estimate) || 0;
+      const subtotal = Number(cart.subtotal) || 0;
+      const tax_amount = Number(cart.tax_amount) || 0;
+      const total = subtotal + tax_amount + shipping_estimate;
+      return { ...cart, fulfillment_method, shipping_estimate, total };
+    }
+
+    function renderCheckoutReview(cart) {
+      const el = document.getElementById('checkoutOrderReview');
+      const adjusted = cartWithFulfillment(cart, selectedFulfillmentMethod());
+      el.innerHTML = buildOrderReviewPanel(adjusted);
+    }
 
     async function loadCheckoutReview() {
-      const el = document.getElementById('checkoutOrderReview');
       try {
-        const cart = await callApi('/cart');
-        el.innerHTML = buildOrderReviewPanel(cart);
+        lastCartReview = await callApi('/cart');
+        renderCheckoutReview(lastCartReview);
       } catch (err) {
-        el.innerHTML = buildOrderReviewPanel(null);
+        lastCartReview = null;
+        renderCheckoutReview(null);
       }
     }
+
+    function renderPickupStores() {
+      const list = document.getElementById('pickupStoreList');
+      const empty = document.getElementById('pickupStoresEmpty');
+      if (!pickupStores.length) {
+        list.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      list.innerHTML = pickupStores
+        .map((store, idx) => {
+          const hours = store.hours
+            ? `<span class="checkout-payment-option__hint">${escapeHtml(store.hours)}</span>`
+            : '';
+          const addr = [store.address_line1, store.city, store.postal_code]
+            .filter(Boolean)
+            .join(', ');
+          return `
+            <label class="checkout-payment-option">
+              <input type="radio" name="pickup_store_id" value="${escapeHtml(String(store.id))}" ${
+                idx === 0 ? 'checked' : ''
+              }>
+              <span class="checkout-payment-option__box">
+                <span class="checkout-payment-option__title">${escapeHtml(store.name)}</span>
+                <span class="checkout-payment-option__hint">${escapeHtml(addr)}</span>
+                ${hours}
+              </span>
+            </label>`;
+        })
+        .join('');
+    }
+
+    async function loadPickupStores() {
+      try {
+        const data = await callApi('/pickup-stores');
+        pickupStores = Array.isArray(data.stores) ? data.stores : [];
+      } catch (err) {
+        pickupStores = [];
+      }
+      renderPickupStores();
+    }
+
+    function syncFulfillmentUi() {
+      const method = selectedFulfillmentMethod();
+      const deliveryFields = document.getElementById('deliveryAddressFields');
+      const pickupFields = document.getElementById('pickupStoreFields');
+      const address1 = document.getElementById('checkoutAddress1');
+      const city = document.getElementById('checkoutCity');
+      const postal = document.getElementById('checkoutPostal');
+      const isPickup = method === 'pickup';
+
+      deliveryFields.style.display = isPickup ? 'none' : 'block';
+      pickupFields.style.display = isPickup ? 'block' : 'none';
+
+      if (address1) address1.required = !isPickup;
+      if (city) city.required = !isPickup;
+      if (postal) postal.required = !isPickup;
+
+      if (lastCartReview) renderCheckoutReview(lastCartReview);
+    }
+
+    document.querySelectorAll('input[name="fulfillment_method"]').forEach((input) => {
+      input.addEventListener('change', syncFulfillmentUi);
+    });
 
     document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -118,12 +242,31 @@
       btn.disabled = true;
 
       const phoneTrim = (form.phone?.value || '').trim();
-      const shipping_address = {
-        address_line1: form.address_line1.value.trim(),
-        city: form.city.value.trim(),
-        postal_code: form.postal_code.value.trim(),
-        country: form.country.value.trim(),
-      };
+      const fulfillment_method = selectedFulfillmentMethod();
+      let shipping_address;
+
+      if (fulfillment_method === 'pickup') {
+        const selected = form.querySelector('input[name="pickup_store_id"]:checked');
+        if (!selected || !pickupStores.length) {
+          errEl.textContent = 'Please select a Cyprus pickup store.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          return;
+        }
+        shipping_address = {
+          fulfillment_method: 'pickup',
+          pickup_store_id: Number(selected.value),
+          country: 'CY',
+        };
+      } else {
+        shipping_address = {
+          fulfillment_method: 'delivery',
+          address_line1: form.address_line1.value.trim(),
+          city: form.city.value.trim(),
+          postal_code: form.postal_code.value.trim(),
+          country: 'CY',
+        };
+      }
       if (phoneTrim) shipping_address.phone = phoneTrim;
       const guest_email = form.guest_email?.value?.trim() || null;
 
@@ -137,22 +280,22 @@
           return;
         }
 
-        const panelHtml = buildOrderReviewPanel(cartForReview);
-        document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
+        lastCartReview = cartForReview;
+        const adjusted = cartWithFulfillment(cartForReview, fulfillment_method);
+        document.getElementById('checkoutOrderReview').innerHTML = buildOrderReviewPanel(adjusted);
 
-        const total =
-          cartForReview.total != null
-            ? cartForReview.total
-            : (cartForReview.subtotal || 0) +
-              (cartForReview.tax_amount || 0) +
-              (cartForReview.shipping_estimate || 0);
-
-        checkoutDraft = { shipping_address, guest_email, total_amount: total };
+        checkoutDraft = {
+          shipping_address,
+          guest_email,
+          total_amount: adjusted.total,
+        };
 
         document.getElementById('stepShipping').style.display = 'none';
         document.getElementById('stepPayment').style.display = 'block';
-        document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(null, total);
-        document.getElementById('checkoutOrderReview').innerHTML = panelHtml;
+        document.getElementById('paymentOrderBanner').innerHTML = buildPaymentStepOrderBanner(
+          null,
+          adjusted.total
+        );
         initStripePayment();
       } catch (err) {
         errEl.textContent = err.message || 'Could not continue to payment';
@@ -290,7 +433,8 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       await loadBrandSettings();
-      loadCheckoutReview();
+      syncFulfillmentUi();
+      await Promise.all([loadCheckoutReview(), loadPickupStores()]);
       loadCartCount();
       updateNav();
       initLogout();
@@ -302,6 +446,7 @@
       if (payStep && payStep.style.display === 'block') return;
       loadBrandSettings().then(() => {
         loadCheckoutReview();
+        loadPickupStores();
         if (typeof loadCartCount === 'function') loadCartCount();
       });
     });

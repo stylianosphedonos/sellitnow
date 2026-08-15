@@ -17,6 +17,7 @@ const cartRoutes = require('./routes/cart');
 const ordersRoutes = require('./routes/orders');
 const adminRoutes = require('./routes/admin');
 const brandRoutes = require('./routes/brand');
+const pickupStoresRoutes = require('./routes/pickupStores');
 
 const PaymentService = require('./services/PaymentService');
 const { optionalAuth } = require('./middleware/auth');
@@ -160,6 +161,7 @@ app.use('/api/v1/category-requests', categoryRequestsRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', ordersRoutes);
 app.use('/api/v1/brand', brandRoutes);
+app.use('/api/v1/pickup-stores', pickupStoresRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 const paymentsRouter = express.Router();
@@ -430,6 +432,23 @@ function runSchemaMigrations(db) {
   db.exec(
     'CREATE INDEX IF NOT EXISTS idx_order_email_logs_order_id ON order_email_logs(order_id)'
   );
+  db.exec(`CREATE TABLE IF NOT EXISTS pickup_stores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    address_line1 TEXT NOT NULL,
+    city TEXT NOT NULL,
+    postal_code TEXT NOT NULL,
+    country TEXT NOT NULL DEFAULT 'CY',
+    phone TEXT,
+    hours TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_pickup_stores_active_order ON pickup_stores(active, display_order, city)'
+  );
 }
 
 async function ensureDb() {
@@ -504,6 +523,15 @@ async function ensureSeed() {
 async function afterListenStartup() {
   await ensureDb();
   await ensureSeed();
+  try {
+    const PickupStoreService = require('./services/PickupStoreService');
+    const result = await PickupStoreService.ensureDefaultCyprusStores();
+    if (result.seeded) {
+      console.log(`Seeded ${result.count} Cyprus pickup stores`);
+    }
+  } catch (err) {
+    console.warn('Could not seed pickup stores:', err.message);
+  }
   const { startOrderExpiryScheduler } = require('./services/OrderExpiryScheduler');
   startOrderExpiryScheduler();
 }

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pickup stores - Admin - 3nityLab</title>
+  <script src="/js/brand-boot.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/products.html">Products</a>
+      <a href="/admin/categories.html">Categories</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/pickup-stores.html">Pickup stores</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html">Brand</a>
+      <a href="/admin/settings.html">Settings</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Pickup stores</h1>
+          <p class="admin-lead">Cyprus pickup locations shown at checkout. Only active stores appear to buyers.</p>
+        </div>
+      </header>
+
+      <div id="storesMessage" class="admin-flash" role="status"></div>
+
+      <section class="admin-panel" style="margin-bottom:28px">
+        <h2 style="margin:0 0 16px;font-size:17px">Add store</h2>
+        <form id="storeForm" class="admin-form-grid">
+          <div class="form-group">
+            <label for="storeName">Name *</label>
+            <input type="text" id="storeName" required placeholder="Limassol — Makarios Avenue">
+          </div>
+          <div class="form-group">
+            <label for="storeCode">Code (optional)</label>
+            <input type="text" id="storeCode" placeholder="limassol-makarios">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="storeAddress">Address line 1 *</label>
+            <input type="text" id="storeAddress" required>
+          </div>
+          <div class="form-group">
+            <label for="storeCity">City *</label>
+            <input type="text" id="storeCity" required>
+          </div>
+          <div class="form-group">
+            <label for="storePostal">Postal code *</label>
+            <input type="text" id="storePostal" required>
+          </div>
+          <div class="form-group">
+            <label for="storePhone">Phone</label>
+            <input type="text" id="storePhone">
+          </div>
+          <div class="form-group">
+            <label for="storeOrder">Display order</label>
+            <input type="number" id="storeOrder" value="0" step="1">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="storeHours">Hours</label>
+            <input type="text" id="storeHours" placeholder="Mon–Fri 09:00–18:00">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label"><input type="checkbox" id="storeActive" checked> Active</label>
+          </div>
+          <div class="form-group">
+            <button type="submit" class="btn">Add pickup store</button>
+          </div>
+        </form>
+      </section>
+
+      <div id="storesList"></div>
+    </main>
+  </div>
+  <script src="/js/runtime-config.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/admin-layout.js"></script>
+  <script>
+    function showMessage(message, isError = false) {
+      const el = document.getElementById('storesMessage');
+      el.textContent = message;
+      el.className = 'admin-flash' + (isError ? ' admin-flash--error' : '');
+      el.style.display = message ? 'block' : 'none';
+    }
+
+    function esc(s) {
+      return escapeHtml(String(s == null ? '' : s));
+    }
+
+    async function loadStores() {
+      const host = document.getElementById('storesList');
+      try {
+        const { stores } = await callApi('/admin/pickup-stores');
+        if (!stores.length) {
+          host.innerHTML = '<p style="color:var(--text-muted)">No pickup stores yet.</p>';
+          return;
+        }
+        host.innerHTML = `
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Order</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${stores
+                  .map(
+                    (s) => `
+                  <tr data-id="${s.id}">
+                    <td>
+                      <strong>${esc(s.name)}</strong>
+                      <div style="font-size:12px;color:var(--text-muted)">${esc(s.code)}</div>
+                    </td>
+                    <td>${esc(s.address_line1)}<br>${esc(s.city)} ${esc(s.postal_code)} · CY</td>
+                    <td>${s.active ? '<span class="badge badge--active">Active</span>' : '<span class="badge">Inactive</span>'}</td>
+                    <td>${esc(s.display_order)}</td>
+                    <td style="white-space:nowrap">
+                      <button type="button" class="btn btn-sm" data-toggle="${s.id}">${s.active ? 'Deactivate' : 'Activate'}</button>
+                      <button type="button" class="btn btn-sm btn-secondary" data-delete="${s.id}">Delete</button>
+                    </td>
+                  </tr>`
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        host.innerHTML = '';
+        showMessage(err.message || 'Failed to load stores', true);
+      }
+    }
+
+    document.getElementById('storeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showMessage('');
+      try {
+        await callApi('/admin/pickup-stores', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: document.getElementById('storeName').value.trim(),
+            code: document.getElementById('storeCode').value.trim() || undefined,
+            address_line1: document.getElementById('storeAddress').value.trim(),
+            city: document.getElementById('storeCity').value.trim(),
+            postal_code: document.getElementById('storePostal').value.trim(),
+            phone: document.getElementById('storePhone').value.trim() || null,
+            hours: document.getElementById('storeHours').value.trim() || null,
+            display_order: Number(document.getElementById('storeOrder').value) || 0,
+            active: document.getElementById('storeActive').checked,
+            country: 'CY',
+          }),
+        });
+        e.target.reset();
+        document.getElementById('storeActive').checked = true;
+        document.getElementById('storeOrder').value = '0';
+        showMessage('Pickup store added.');
+        await loadStores();
+      } catch (err) {
+        showMessage(err.message || 'Could not add store', true);
+      }
+    });
+
+    document.getElementById('storesList').addEventListener('click', async (e) => {
+      const toggleId = e.target.getAttribute('data-toggle');
+      const deleteId = e.target.getAttribute('data-delete');
+      if (toggleId) {
+        try {
+          const { stores } = await callApi('/admin/pickup-stores');
+          const store = stores.find((s) => String(s.id) === String(toggleId));
+          if (!store) return;
+          await callApi('/admin/pickup-stores/' + toggleId, {
+            method: 'PUT',
+            body: JSON.stringify({ ...store, active: !store.active }),
+          });
+          await loadStores();
+        } catch (err) {
+          showMessage(err.message || 'Update failed', true);
+        }
+      }
+      if (deleteId) {
+        if (!confirm('Delete this pickup store?')) return;
+        try {
+          await callApi('/admin/pickup-stores/' + deleteId, { method: 'DELETE' });
+          await loadStores();
+        } catch (err) {
+          showMessage(err.message || 'Delete failed', true);
+        }
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStores();
+    });
+  </script>
+</body>
+</html>

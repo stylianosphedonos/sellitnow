@@ -56,6 +56,24 @@
       }
     });
 
+    var hasPickupNav = storeLinks.some(function (a) {
+      return (a.getAttribute('href') || '').indexOf('/admin/pickup-stores') !== -1;
+    });
+    if (!hasPickupNav) {
+      var pickupLink = document.createElement('a');
+      pickupLink.href = '/admin/pickup-stores.html';
+      pickupLink.textContent = 'Pickup stores';
+      var ordersIdx = -1;
+      for (var i = 0; i < storeLinks.length; i++) {
+        if ((storeLinks[i].getAttribute('href') || '').indexOf('/admin/orders') !== -1) {
+          ordersIdx = i;
+          break;
+        }
+      }
+      if (ordersIdx >= 0) storeLinks.splice(ordersIdx + 1, 0, pickupLink);
+      else storeLinks.push(pickupLink);
+    }
+
     var brand = document.createElement('div');
     brand.className = 'admin-sidebar__brand';
     brand.innerHTML =

@@ -354,8 +354,14 @@
               <p class="order-admin-card__muted">${esc(order.first_name || '')} ${esc(order.last_name || '')}</p>
             </div>
             <div class="order-admin-card">
-              <h3>Shipping</h3>
+              <h3>${addr?.fulfillment_method === 'pickup' ? 'Pickup' : 'Shipping'}</h3>
+              ${
+                addr?.fulfillment_method === 'pickup' && addr?.pickup_store_name
+                  ? `<p class="order-admin-card__primary">${esc(addr.pickup_store_name)}</p>`
+                  : ''
+              }
               <p>${esc(addr?.address_line1 || '—')}<br>${esc([addr?.city, addr?.postal_code].filter(Boolean).join(' '))} ${esc(addr?.country || '')}</p>
+              ${addr?.hours ? `<p class="order-admin-card__muted" style="margin-top:8px">${esc(addr.hours)}</p>` : ''}
               ${addr?.phone ? `<p class="order-admin-card__muted" style="margin-top:10px"><strong>Phone</strong> ${esc(addr.phone)}</p>` : ''}
             </div>
             <div class="order-admin-card">

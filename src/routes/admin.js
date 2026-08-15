@@ -22,6 +22,7 @@ const OrderEmailLogService = require('../services/OrderEmailLogService');
 const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
 const { createFullBackup, restoreFullBackup } = require('../services/DatabaseBackupService');
+const PickupStoreService = require('../services/PickupStoreService');
 
 const router = express.Router();
 
@@ -1032,6 +1033,45 @@ router.patch('/users/:id/status', async (req, res) => {
     res.json({ user: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// —— Pickup stores (Cyprus) ——
+router.get('/pickup-stores', async (req, res) => {
+  try {
+    const stores = await PickupStoreService.listAll();
+    res.json({ stores });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/pickup-stores', async (req, res) => {
+  try {
+    const store = await PickupStoreService.create(req.body || {});
+    res.status(201).json({ store });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.put('/pickup-stores/:id', async (req, res) => {
+  try {
+    const store = await PickupStoreService.update(req.params.id, req.body || {});
+    res.json({ store });
+  } catch (err) {
+    const status = err.message === 'Pickup store not found' ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+router.delete('/pickup-stores/:id', async (req, res) => {
+  try {
+    await PickupStoreService.remove(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    const status = err.message === 'Pickup store not found' ? 404 : 400;
+    res.status(status).json({ error: err.message });
   }
 });
 

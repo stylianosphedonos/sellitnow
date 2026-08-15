@@ -8,6 +8,11 @@ const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
 const { verifyGuestOrderToken, createGuestOrderToken } = require('../lib/guestOrderToken');
 const { computeShippingTotal } = require('../lib/shipping');
+const PickupStoreService = require('./PickupStoreService');
+const {
+  resolveCheckoutAddress,
+  toPaymentMetadataAddress,
+} = require('../lib/checkoutAddress');
 
 let stripe = null;
 if (config.stripe.secretKey) {
@@ -152,8 +157,11 @@ class PaymentService {
 
     if (!userId && !guestEmail) throw new Error('Email required for guest checkout');
 
+    const resolvedAddress = await resolveCheckoutAddress(shippingAddress, PickupStoreService);
     const brand = await getBrandSettings();
-    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items);
+    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items, {
+      fulfillmentMethod: resolvedAddress.fulfillment_method,
+    });
     const totalAmount = cartData.subtotal + cartData.tax_amount + shippingCost;
     const amountInCents = Math.round(parseFloat(totalAmount) * 100);
     if (amountInCents < 50) throw new Error('Amount too small');
@@ -161,7 +169,7 @@ class PaymentService {
     const { currency: storeCurrency } = brand;
     const stripeCurrency = (storeCurrency || 'usd').toLowerCase();
 
-    const shippingJson = JSON.stringify(shippingAddress);
+    const shippingJson = JSON.stringify(toPaymentMetadataAddress(resolvedAddress));
     if (shippingJson.length > 500) {
       throw new Error('Shipping address is too long');
     }
@@ -182,6 +190,8 @@ class PaymentService {
     return {
       client_secret: paymentIntent.client_secret,
       total_amount: totalAmount,
+      shipping_cost: shippingCost,
+      fulfillment_method: resolvedAddress.fulfillment_method,
     };
   }
 
@@ -254,12 +264,13 @@ class PaymentService {
       throw new Error(`Payment is not complete (status: ${paymentIntent.status})`);
     }
 
-    let shippingAddress;
+    let shippingAddressRaw;
     try {
-      shippingAddress = JSON.parse(meta.shipping_address || '{}');
+      shippingAddressRaw = JSON.parse(meta.shipping_address || '{}');
     } catch {
       throw new Error('Invalid checkout data on payment');
     }
+    const shippingAddress = await resolveCheckoutAddress(shippingAddressRaw, PickupStoreService);
 
     const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
     const sessionId = meta.session_id || actor.sessionId || null;

@@ -256,6 +256,18 @@ class EmailService {
   }
 
   formatShippingAddressHtml(addr) {
+    if (!addr || typeof addr !== 'object') return '—';
+    const isPickup = String(addr.fulfillment_method || '').toLowerCase() === 'pickup';
+    if (isPickup) {
+      const lines = [
+        addr.pickup_store_name ? `Pickup: ${addr.pickup_store_name}` : 'Store pickup',
+        addr.address_line1,
+        [addr.city, addr.postal_code].filter(Boolean).join(' '),
+        addr.country || 'CY',
+        addr.hours ? `Hours: ${addr.hours}` : null,
+      ].filter(Boolean);
+      return lines.map((l) => escapeHtml(l)).join('<br>');
+    }
     const lines = [
       addr.address_line1,
       [addr.city, addr.postal_code].filter(Boolean).join(' '),
@@ -323,9 +335,13 @@ class EmailService {
             <tr><td style="padding:10px 14px;color:#555">Customer email</td><td style="padding:10px 14px"><a href="mailto:${escapeHtml(customerEmail)}" style="color:#1e40af">${escapeHtml(customerEmail)}</a></td></tr>
           </table>
 
-          <p style="font-size:15px;font-weight:600;margin:0 0 10px;color:#333">Ship to</p>
+          <p style="font-size:15px;font-weight:600;margin:0 0 10px;color:#333">${
+            String(addr.fulfillment_method || '').toLowerCase() === 'pickup' ? 'Pickup store' : 'Ship to'
+          }</p>
           <table style="width:100%;border-collapse:collapse;margin:0 0 24px;font-size:14px">
-            <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;width:38%;vertical-align:top">Address</td><td style="padding:8px 12px;border-bottom:1px solid #eee">${this.formatShippingAddressHtml(addr)}</td></tr>
+            <tr><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#555;width:38%;vertical-align:top">${
+              String(addr.fulfillment_method || '').toLowerCase() === 'pickup' ? 'Location' : 'Address'
+            }</td><td style="padding:8px 12px;border-bottom:1px solid #eee">${this.formatShippingAddressHtml(addr)}</td></tr>
             ${phoneRow}
           </table>
 

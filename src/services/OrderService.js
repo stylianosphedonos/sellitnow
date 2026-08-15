@@ -105,7 +105,13 @@ class OrderService {
       const subtotal = cartData.subtotal;
       const taxAmount = cartData.tax_amount;
       const brand = await getBrandSettings();
-      const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items);
+      const fulfillmentMethod =
+        shippingAddress && shippingAddress.fulfillment_method
+          ? String(shippingAddress.fulfillment_method)
+          : 'delivery';
+      const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items, {
+        fulfillmentMethod,
+      });
       const totalAmount = subtotal + taxAmount + shippingCost;
       const orderNumber = this.generateOrderNumber();
 
@@ -262,7 +268,13 @@ class OrderService {
     const subtotal = cartData.subtotal;
     const taxAmount = cartData.tax_amount;
     const brand = await getBrandSettings();
-    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items);
+    const fulfillmentMethod =
+      shippingAddress && shippingAddress.fulfillment_method
+        ? String(shippingAddress.fulfillment_method)
+        : 'delivery';
+    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items, {
+      fulfillmentMethod,
+    });
     const totalAmount = subtotal + taxAmount + shippingCost;
 
     const orderNumber = this.generateOrderNumber();
