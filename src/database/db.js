@@ -47,7 +47,9 @@ function initSqlite() {
   sqliteQueryFn = function query(sql, params = []) {
     let sqliteSql = sql
       .replace(/\bILIKE\b/gi, 'LIKE')
-      .replace(/COUNT\(\*\)::int/gi, 'COUNT(*) as count')
+      // Strip Postgres casts (::int, ::text, ::text[], …) — SQLite rejects ":"
+      .replace(/::[a-zA-Z_]\w*(?:\[\])?/g, '')
+      .replace(/\s+FOR\s+UPDATE\b/gi, '')
       .replace(/\bNOW\(\)/gi, "datetime('now')");
 
     const orderedParams = [];
@@ -58,6 +60,11 @@ function initSqlite() {
     });
 
     try {
+      const trimmed = sqliteSql.trim();
+      if (/^(BEGIN|COMMIT|ROLLBACK)\b/i.test(trimmed)) {
+        sqliteDb.exec(trimmed.split(/\s+/)[0].toUpperCase());
+        return Promise.resolve({ rows: [] });
+      }
       const stmt = sqliteDb.prepare(sqliteSql);
       const hasReturning = /RETURNING/i.test(sql);
       const isSelect = /^\s*SELECT/i.test(sql);
@@ -103,6 +110,11 @@ const pool = config.database.usePostgres
   ? pgPool
   : {
       query: (sql, params) => sqliteQueryFn(sql, params),
+      /** Minimal pg-compatible client so services using pool.connect() work on SQLite. */
+      connect: async () => ({
+        query: (sql, params) => sqliteQueryFn(sql, params),
+        release() {},
+      }),
       end: () => Promise.resolve(),
     };
 

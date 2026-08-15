@@ -115,7 +115,7 @@ class CartService {
     if (!cartResult.rows.length) return { item_count: 0 };
     const cartId = cartResult.rows[0].id;
     const countResult = await pool.query(
-      'SELECT COALESCE(SUM(quantity), 0)::int AS item_count FROM cart_items WHERE cart_id = $1',
+      'SELECT COALESCE(SUM(quantity), 0) AS item_count FROM cart_items WHERE cart_id = $1',
       [cartId]
     );
     return { item_count: countResult.rows[0].item_count || 0 };

@@ -570,7 +570,15 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       await loadBrandSettings();
-      await Promise.all([loadCheckoutReview(), loadPickupCatalog()]);
+      // Load cart + cities independently so a cart API failure cannot block the city list
+      await Promise.all([
+        loadCheckoutReview().catch((error) => {
+          if (typeof showAlert === 'function') {
+            showAlert(error.message || 'Failed to load cart', 'error');
+          }
+        }),
+        loadPickupCatalog(),
+      ]);
       loadCartCount();
       updateNav();
       initLogout();
