@@ -230,12 +230,17 @@ class CourierPickupSyncService {
       !acs.userPassword ||
       !acs.apiKey
     ) {
+      const excelPath = require('../lib/xlsxSimple').resolveDefaultAcsExcelPath();
+      const fs = require('fs');
+      if (fs.existsSync(excelPath)) {
+        return this.syncAcsFromExcel(excelPath);
+      }
       return {
         ok: false,
         provider: 'acs',
         skipped: true,
         error:
-          'ACS credentials not configured (ACS_COMPANY_ID, ACS_COMPANY_PASSWORD, ACS_USER_ID, ACS_USER_PASSWORD, ACS_API_KEY)',
+          'ACS credentials not configured (ACS_COMPANY_ID, ACS_COMPANY_PASSWORD, ACS_USER_ID, ACS_USER_PASSWORD, ACS_API_KEY) and no ACS Excel file found',
       };
     }
 
@@ -363,6 +368,112 @@ class CourierPickupSyncService {
         ok: true,
         provider: 'acs',
         fetched,
+        inserted,
+        updated,
+        active: keepCodes.size,
+      };
+    } catch (err) {
+      return { ok: false, provider: 'acs', error: err.message };
+    }
+  }
+
+  /**
+   * Import ACS Cyprus shops/lockers from the official network locations Excel export.
+   * Columns: city group (A), name (B), kind (C), destination code (D), address (E),
+   * ACS postal (F), hours (G), "lat, lng" (H).
+   */
+  async syncAcsFromExcel(filePath) {
+    const fs = require('fs');
+    const { readXlsxFirstSheet } = require('../lib/xlsxSimple');
+    try {
+      if (!fs.existsSync(filePath)) {
+        return { ok: false, provider: 'acs', error: `Excel file not found: ${filePath}` };
+      }
+      const rows = readXlsxFirstSheet(filePath);
+      const keepCodes = new Set();
+      let inserted = 0;
+      let updated = 0;
+      let city = '';
+
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i] || {};
+        const colA = String(row.A || '').trim();
+        const nameRaw = String(row.B || '').trim();
+        if (!nameRaw || /^ACS Network Locations$/i.test(nameRaw)) {
+          if (colA) city = colA;
+          continue;
+        }
+        if (colA) city = colA;
+
+        const address = String(row.E || '').trim();
+        const dest = String(row.D || '').trim();
+        if (!address && !dest) continue;
+
+        const kind = String(row.C || '').trim() || 'Parcelshop';
+        const postal = String(row.F || '').trim() || '0000';
+        const hours = String(row.G || '').trim() || null;
+        const latLng = String(row.H || '').trim();
+        let lat = null;
+        let lng = null;
+        const coordMatch = latLng.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+        if (coordMatch) {
+          lat = Number(coordMatch[1]);
+          lng = Number(coordMatch[2]);
+        }
+
+        const externalId = dest || `${nameRaw}-${i}`;
+        let codeBase = String(externalId)
+          .normalize('NFKC')
+          .replace(/[Νν]/g, 'N')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        if (!codeBase) {
+          codeBase = String(nameRaw)
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 40) || `row-${i}`;
+        }
+        const coordSuffix =
+          Number.isFinite(lat) && Number.isFinite(lng)
+            ? `-${lat.toFixed(5)}-${lng.toFixed(5)}`.replace(/\./g, '')
+            : '';
+        const code = `acs-${codeBase}${coordSuffix}`;
+        if (!code || code === 'acs-') continue;
+        keepCodes.add(code);
+
+        const displayName = /acs/i.test(nameRaw) ? nameRaw : `ACS — ${nameRaw}`;
+        const action = await PickupStoreService.upsertSyncedStore({
+          code,
+          provider: 'acs',
+          external_id: externalId,
+          name: displayName,
+          address_line1: address || nameRaw,
+          city: normalizeCyprusCity(city) || city || 'Cyprus',
+          postal_code: postal,
+          country: 'CY',
+          hours: hours ? `${kind}: ${hours}` : kind,
+          lat,
+          lng,
+          active: true,
+          display_order: /locker/i.test(kind) ? 50 : 60,
+        });
+        if (action === 'inserted') inserted += 1;
+        else updated += 1;
+      }
+
+      if (!keepCodes.size) {
+        return { ok: false, provider: 'acs', error: 'No ACS rows found in Excel file' };
+      }
+
+      await this.deactivateProviderExcept('acs', keepCodes);
+      return {
+        ok: true,
+        provider: 'acs',
+        source: 'excel',
+        file: filePath,
+        fetched: keepCodes.size,
         inserted,
         updated,
         active: keepCodes.size,
