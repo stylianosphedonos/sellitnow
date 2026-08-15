@@ -64,15 +64,11 @@
   }
 
   function footerHtml(cart) {
-    const shippingLabel =
-      cart && String(cart.fulfillment_method || '').toLowerCase() === 'pickup'
-        ? 'Pickup'
-        : 'Shipping estimate';
     return `
       <div class="order-review__footer">
         <div class="order-review__row"><span>Subtotal</span><span>${money(cart.subtotal)}</span></div>
         <div class="order-review__row"><span>Est. tax (VAT)</span><span>${money(cart.tax_amount)}</span></div>
-        <div class="order-review__row"><span>${shippingLabel}</span><span>${money(cart.shipping_estimate)}</span></div>
+        <div class="order-review__row"><span>Pickup</span><span>${money(cart.shipping_estimate)}</span></div>
         <div class="order-review__row order-review__row--total"><span>Total</span><span>${money(cart.total)}</span></div>
       </div>
     `;

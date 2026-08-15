@@ -435,6 +435,8 @@ function runSchemaMigrations(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_stores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'manual',
+    external_id TEXT,
     name TEXT NOT NULL,
     address_line1 TEXT NOT NULL,
     city TEXT NOT NULL,
@@ -442,13 +444,29 @@ function runSchemaMigrations(db) {
     country TEXT NOT NULL DEFAULT 'CY',
     phone TEXT,
     hours TEXT,
+    lat REAL,
+    lng REAL,
     active INTEGER NOT NULL DEFAULT 1,
     display_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
+  const pickupCols = db.prepare('PRAGMA table_info(pickup_stores)').all().map((c) => c.name);
+  if (!pickupCols.includes('provider')) {
+    db.exec("ALTER TABLE pickup_stores ADD COLUMN provider TEXT NOT NULL DEFAULT 'manual'");
+  }
+  if (!pickupCols.includes('external_id')) {
+    db.exec('ALTER TABLE pickup_stores ADD COLUMN external_id TEXT');
+  }
+  if (!pickupCols.includes('lat')) {
+    db.exec('ALTER TABLE pickup_stores ADD COLUMN lat REAL');
+  }
+  if (!pickupCols.includes('lng')) {
+    db.exec('ALTER TABLE pickup_stores ADD COLUMN lng REAL');
+  }
   db.exec(
     'CREATE INDEX IF NOT EXISTS idx_pickup_stores_active_order ON pickup_stores(active, display_order, city)'
   );
+  db.exec('CREATE INDEX IF NOT EXISTS idx_pickup_stores_provider ON pickup_stores(provider)');
 }
 
 async function ensureDb() {
@@ -524,13 +542,18 @@ async function afterListenStartup() {
   await ensureDb();
   await ensureSeed();
   try {
-    const PickupStoreService = require('./services/PickupStoreService');
-    const result = await PickupStoreService.ensureDefaultCyprusStores();
-    if (result.seeded) {
-      console.log(`Seeded ${result.count} Cyprus pickup stores`);
-    }
+    const CourierPickupSyncService = require('./services/CourierPickupSyncService');
+    const results = await CourierPickupSyncService.syncAll();
+    const summary = Object.values(results)
+      .map((r) => {
+        if (r.skipped) return `${r.provider}: skipped`;
+        if (!r.ok) return `${r.provider}: ${r.error || 'failed'}`;
+        return `${r.provider}: ${r.active} active`;
+      })
+      .join('; ');
+    console.log(`Pickup stores sync — ${summary}`);
   } catch (err) {
-    console.warn('Could not seed pickup stores:', err.message);
+    console.warn('Could not sync pickup stores:', err.message);
   }
   const { startOrderExpiryScheduler } = require('./services/OrderExpiryScheduler');
   startOrderExpiryScheduler();

@@ -259,8 +259,17 @@ class EmailService {
     if (!addr || typeof addr !== 'object') return '—';
     const isPickup = String(addr.fulfillment_method || '').toLowerCase() === 'pickup';
     if (isPickup) {
+      const provider =
+        addr.pickup_provider === 'boxnow'
+          ? 'Box Now'
+          : addr.pickup_provider === 'akis'
+            ? 'Akis Express'
+            : addr.pickup_provider === 'acs'
+              ? 'ACS'
+              : null;
       const lines = [
-        addr.pickup_store_name ? `Pickup: ${addr.pickup_store_name}` : 'Store pickup',
+        provider ? `${provider} pickup` : 'Store pickup',
+        addr.pickup_store_name || null,
         addr.address_line1,
         [addr.city, addr.postal_code].filter(Boolean).join(' '),
         addr.country || 'CY',

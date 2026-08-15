@@ -23,6 +23,7 @@ const { formatMoney } = require('../lib/formatMoney');
 const PDFDocument = require('pdfkit');
 const { createFullBackup, restoreFullBackup } = require('../services/DatabaseBackupService');
 const PickupStoreService = require('../services/PickupStoreService');
+const CourierPickupSyncService = require('../services/CourierPickupSyncService');
 
 const router = express.Router();
 
@@ -1036,11 +1037,38 @@ router.patch('/users/:id/status', async (req, res) => {
   }
 });
 
-// —— Pickup stores (Cyprus) ——
+// —— Pickup stores (Cyprus courier points) ——
 router.get('/pickup-stores', async (req, res) => {
   try {
-    const stores = await PickupStoreService.listAll();
-    res.json({ stores });
+    const provider = String(req.query.provider || '').trim().toLowerCase();
+    const filters = {};
+    if (provider && provider !== 'all') filters.provider = provider;
+    const [stores, counts] = await Promise.all([
+      PickupStoreService.listAll(filters),
+      PickupStoreService.countByProvider(),
+    ]);
+    res.json({
+      stores,
+      counts,
+      providers: PickupStoreService.PROVIDER_LABELS,
+      acs_configured: Boolean(
+        process.env.ACS_COMPANY_ID &&
+          process.env.ACS_COMPANY_PASSWORD &&
+          process.env.ACS_USER_ID &&
+          process.env.ACS_USER_PASSWORD &&
+          process.env.ACS_API_KEY
+      ),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/pickup-stores/sync', async (req, res) => {
+  try {
+    const results = await CourierPickupSyncService.syncAll();
+    const counts = await PickupStoreService.countByProvider();
+    res.json({ results, counts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

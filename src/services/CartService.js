@@ -84,7 +84,10 @@ class CartService {
     const taxRate = Number(brand.taxRatePercent) / 100;
     const taxAmount = subtotal * (Number.isFinite(taxRate) ? taxRate : 0);
     const defaultDelivery = brand.defaultDeliveryCost;
-    const shippingCost = computeShippingTotal(defaultDelivery, items);
+    // Checkout is Cyprus pickup-only; cart totals match pickup (no home delivery fee).
+    const shippingCost = computeShippingTotal(defaultDelivery, items, {
+      fulfillmentMethod: 'pickup',
+    });
     const total = subtotal + taxAmount + shippingCost;
 
     return {

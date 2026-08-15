@@ -1,89 +1,19 @@
 const { pool } = require('../database/db');
 const { CHECKOUT_COUNTRY, normalizeCountry } = require('../lib/checkoutAddress');
 
-const DEFAULT_CYPRUS_STORES = [
-  {
-    code: 'nicosia-makarios',
-    name: 'Nicosia — Makarios Avenue',
-    address_line1: 'Arch. Makarios III Ave 45',
-    city: 'Nicosia',
-    postal_code: '1065',
-    hours: 'Mon–Fri 09:00–18:00, Sat 09:00–14:00',
-    display_order: 10,
-  },
-  {
-    code: 'nicosia-strovolos',
-    name: 'Nicosia — Strovolos',
-    address_line1: 'Strovolos Ave 120',
-    city: 'Nicosia',
-    postal_code: '2042',
-    hours: 'Mon–Fri 09:00–18:00, Sat 09:00–14:00',
-    display_order: 20,
-  },
-  {
-    code: 'limassol-makarios',
-    name: 'Limassol — Makarios Avenue',
-    address_line1: 'Arch. Makarios III Ave 88',
-    city: 'Limassol',
-    postal_code: '3020',
-    hours: 'Mon–Fri 09:00–18:00, Sat 09:00–14:00',
-    display_order: 30,
-  },
-  {
-    code: 'limassol-germanas',
-    name: 'Limassol — Germasogeia',
-    address_line1: 'Georgiou A Ave 15',
-    city: 'Limassol',
-    postal_code: '4047',
-    hours: 'Mon–Fri 09:00–18:00, Sat 09:00–13:00',
-    display_order: 40,
-  },
-  {
-    code: 'larnaca-finikoudes',
-    name: 'Larnaca — City Centre',
-    address_line1: 'Athens Ave 22',
-    city: 'Larnaca',
-    postal_code: '6023',
-    hours: 'Mon–Fri 09:00–18:00, Sat 09:00–14:00',
-    display_order: 50,
-  },
-  {
-    code: 'paphos-harbour',
-    name: 'Paphos — Harbour Area',
-    address_line1: 'Poseidonos Ave 8',
-    city: 'Paphos',
-    postal_code: '8042',
-    hours: 'Mon–Fri 09:00–17:30, Sat 09:00–13:00',
-    display_order: 60,
-  },
-  {
-    code: 'paralimni-centre',
-    name: 'Paralimni — Town Centre',
-    address_line1: '1st April Street 30',
-    city: 'Paralimni',
-    postal_code: '5280',
-    hours: 'Mon–Fri 09:00–17:30, Sat 09:00–13:00',
-    display_order: 70,
-  },
-];
+const PROVIDERS = {
+  boxnow: 'boxnow',
+  akis: 'akis',
+  acs: 'acs',
+  manual: 'manual',
+};
 
-function rowToStore(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    code: row.code,
-    name: row.name,
-    address_line1: row.address_line1,
-    city: row.city,
-    postal_code: row.postal_code,
-    country: normalizeCountry(row.country) || CHECKOUT_COUNTRY,
-    phone: row.phone || null,
-    hours: row.hours || null,
-    active: row.active === true || row.active === 1 || row.active === '1',
-    display_order: Number(row.display_order) || 0,
-    created_at: row.created_at,
-  };
-}
+const PROVIDER_LABELS = {
+  boxnow: 'Box Now',
+  akis: 'Akis Express',
+  acs: 'ACS',
+  manual: 'Manual',
+};
 
 function slugifyCode(value) {
   return String(value || '')
@@ -91,26 +21,100 @@ function slugifyCode(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 64);
+    .slice(0, 80);
+}
+
+function rowToStore(row) {
+  if (!row) return null;
+  const provider = String(row.provider || PROVIDERS.manual).toLowerCase();
+  return {
+    id: row.id,
+    code: row.code,
+    provider,
+    provider_label: PROVIDER_LABELS[provider] || provider,
+    external_id: row.external_id || null,
+    name: row.name,
+    address_line1: row.address_line1,
+    city: row.city,
+    postal_code: row.postal_code,
+    country: normalizeCountry(row.country) || CHECKOUT_COUNTRY,
+    phone: row.phone || null,
+    hours: row.hours || null,
+    lat: row.lat != null && row.lat !== '' ? Number(row.lat) : null,
+    lng: row.lng != null && row.lng !== '' ? Number(row.lng) : null,
+    active: row.active === true || row.active === 1 || row.active === '1',
+    display_order: Number(row.display_order) || 0,
+    created_at: row.created_at,
+  };
 }
 
 class PickupStoreService {
-  async listActive() {
-    const result = await pool.query(
-      `SELECT * FROM pickup_stores
-       WHERE active = TRUE AND UPPER(TRIM(country)) = $1
-       ORDER BY display_order ASC, city ASC, name ASC`,
-      [CHECKOUT_COUNTRY]
-    );
+  async listActive(filters = {}) {
+    const params = [CHECKOUT_COUNTRY];
+    let sql = `SELECT * FROM pickup_stores
+       WHERE active = TRUE AND UPPER(TRIM(country)) = $1`;
+
+    if (filters.provider) {
+      params.push(String(filters.provider).toLowerCase());
+      sql += ` AND LOWER(provider) = $${params.length}`;
+    }
+    if (filters.city) {
+      params.push(String(filters.city).trim());
+      sql += ` AND LOWER(city) = LOWER($${params.length})`;
+    }
+    if (filters.q) {
+      params.push(`%${String(filters.q).trim().toLowerCase()}%`);
+      sql += ` AND (
+        LOWER(name) LIKE $${params.length}
+        OR LOWER(address_line1) LIKE $${params.length}
+        OR LOWER(city) LIKE $${params.length}
+        OR LOWER(postal_code) LIKE $${params.length}
+        OR LOWER(COALESCE(provider, '')) LIKE $${params.length}
+      )`;
+    }
+
+    sql += ' ORDER BY provider ASC, city ASC, name ASC';
+    const result = await pool.query(sql, params);
     return result.rows.map(rowToStore);
   }
 
-  async listAll() {
-    const result = await pool.query(
-      `SELECT * FROM pickup_stores
-       ORDER BY display_order ASC, city ASC, name ASC`
-    );
+  async listAll(filters = {}) {
+    const params = [];
+    let sql = 'SELECT * FROM pickup_stores WHERE 1=1';
+    if (filters.provider) {
+      params.push(String(filters.provider).toLowerCase());
+      sql += ` AND LOWER(provider) = $${params.length}`;
+    }
+    sql += ' ORDER BY provider ASC, city ASC, name ASC';
+    const result = await pool.query(sql, params);
     return result.rows.map(rowToStore);
+  }
+
+  async listCities() {
+    const result = await pool.query(
+      `SELECT DISTINCT city FROM pickup_stores
+       WHERE active = TRUE AND UPPER(TRIM(country)) = $1 AND city IS NOT NULL AND TRIM(city) <> ''
+       ORDER BY city ASC`,
+      [CHECKOUT_COUNTRY]
+    );
+    return result.rows.map((r) => r.city);
+  }
+
+  async countByProvider() {
+    const result = await pool.query(
+      `SELECT provider, COUNT(*) as count,
+              SUM(CASE WHEN active = TRUE OR active = 1 THEN 1 ELSE 0 END) as active_count
+       FROM pickup_stores
+       GROUP BY provider`
+    );
+    const out = {};
+    for (const row of result.rows) {
+      out[String(row.provider || 'manual').toLowerCase()] = {
+        total: Number(row.count) || 0,
+        active: Number(row.active_count) || 0,
+      };
+    }
+    return out;
   }
 
   async getById(id) {
@@ -131,11 +135,13 @@ class PickupStoreService {
     const payload = this.normalizeInput(input, { requireCode: false });
     const result = await pool.query(
       `INSERT INTO pickup_stores
-        (code, name, address_line1, city, postal_code, country, phone, hours, active, display_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        (code, provider, external_id, name, address_line1, city, postal_code, country, phone, hours, lat, lng, active, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         payload.code,
+        payload.provider,
+        payload.external_id,
         payload.name,
         payload.address_line1,
         payload.city,
@@ -143,6 +149,8 @@ class PickupStoreService {
         payload.country,
         payload.phone,
         payload.hours,
+        payload.lat,
+        payload.lng,
         payload.active,
         payload.display_order,
       ]
@@ -157,19 +165,25 @@ class PickupStoreService {
     const result = await pool.query(
       `UPDATE pickup_stores SET
         code = $1,
-        name = $2,
-        address_line1 = $3,
-        city = $4,
-        postal_code = $5,
-        country = $6,
-        phone = $7,
-        hours = $8,
-        active = $9,
-        display_order = $10
-       WHERE id = $11
+        provider = $2,
+        external_id = $3,
+        name = $4,
+        address_line1 = $5,
+        city = $6,
+        postal_code = $7,
+        country = $8,
+        phone = $9,
+        hours = $10,
+        lat = $11,
+        lng = $12,
+        active = $13,
+        display_order = $14
+       WHERE id = $15
        RETURNING *`,
       [
         payload.code,
+        payload.provider,
+        payload.external_id,
         payload.name,
         payload.address_line1,
         payload.city,
@@ -177,6 +191,8 @@ class PickupStoreService {
         payload.country,
         payload.phone,
         payload.hours,
+        payload.lat,
+        payload.lng,
         payload.active,
         payload.display_order,
         existing.id,
@@ -194,20 +210,109 @@ class PickupStoreService {
     return true;
   }
 
+  /**
+   * Upsert a synced courier location. Returns whether inserted or updated.
+   */
+  async upsertSyncedStore(store) {
+    const payload = this.normalizeInput(store, { requireCode: true });
+    const existing = await pool.query('SELECT id FROM pickup_stores WHERE code = $1', [
+      payload.code,
+    ]);
+    if (existing.rows.length) {
+      await pool.query(
+        `UPDATE pickup_stores SET
+          provider = $1,
+          external_id = $2,
+          name = $3,
+          address_line1 = $4,
+          city = $5,
+          postal_code = $6,
+          country = $7,
+          phone = $8,
+          hours = $9,
+          lat = $10,
+          lng = $11,
+          active = $12,
+          display_order = $13
+         WHERE code = $14`,
+        [
+          payload.provider,
+          payload.external_id,
+          payload.name,
+          payload.address_line1,
+          payload.city,
+          payload.postal_code,
+          payload.country,
+          payload.phone,
+          payload.hours,
+          payload.lat,
+          payload.lng,
+          payload.active,
+          payload.display_order,
+          payload.code,
+        ]
+      );
+      return 'updated';
+    }
+    await pool.query(
+      `INSERT INTO pickup_stores
+        (code, provider, external_id, name, address_line1, city, postal_code, country, phone, hours, lat, lng, active, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [
+        payload.code,
+        payload.provider,
+        payload.external_id,
+        payload.name,
+        payload.address_line1,
+        payload.city,
+        payload.postal_code,
+        payload.country,
+        payload.phone,
+        payload.hours,
+        payload.lat,
+        payload.lng,
+        payload.active,
+        payload.display_order,
+      ]
+    );
+    return 'inserted';
+  }
+
+  async deletePlaceholderSeeds() {
+    await pool.query(
+      `DELETE FROM pickup_stores
+       WHERE (provider = 'manual' OR provider IS NULL)
+         AND code IN (
+           'nicosia-makarios','nicosia-strovolos','limassol-makarios','limassol-germanas',
+           'larnaca-finikoudes','paphos-harbour','paralimni-centre'
+         )`
+    );
+  }
+
   normalizeInput(input, { requireCode }) {
     const name = String(input.name || '').trim();
     const address_line1 = String(input.address_line1 || '').trim();
     const city = String(input.city || '').trim();
-    const postal_code = String(input.postal_code || '').trim();
-    if (!name || !address_line1 || !city || !postal_code) {
-      throw new Error('Name, address, city, and postal code are required');
+    const postal_code = String(input.postal_code || '').trim() || '0000';
+    if (!name || !address_line1 || !city) {
+      throw new Error('Name, address, and city are required');
     }
+
+    let provider = String(input.provider || PROVIDERS.manual)
+      .trim()
+      .toLowerCase();
+    if (!PROVIDER_LABELS[provider]) provider = PROVIDERS.manual;
+
+    const external_id = input.external_id != null ? String(input.external_id).trim() : null;
+
     let code = String(input.code || '').trim();
     if (!code) {
       if (requireCode) throw new Error('Store code is required');
-      code = slugifyCode(`${city}-${name}`) || `store-${Date.now()}`;
+      code =
+        slugifyCode(`${provider}-${external_id || city}-${name}`) ||
+        `${provider}-${Date.now()}`;
     } else {
-      code = slugifyCode(code);
+      code = slugifyCode(code) || code;
     }
     if (!code) throw new Error('Invalid store code');
 
@@ -223,8 +328,13 @@ class PickupStoreService {
         : activeRaw === true || activeRaw === 1 || activeRaw === '1' || activeRaw === 'true';
 
     const display_order = Number(input.display_order);
+    const lat = input.lat != null && input.lat !== '' ? Number(input.lat) : null;
+    const lng = input.lng != null && input.lng !== '' ? Number(input.lng) : null;
+
     return {
       code,
+      provider,
+      external_id,
       name,
       address_line1,
       city,
@@ -232,40 +342,14 @@ class PickupStoreService {
       country: CHECKOUT_COUNTRY,
       phone: String(input.phone || '').trim() || null,
       hours: String(input.hours || '').trim() || null,
+      lat: Number.isFinite(lat) ? lat : null,
+      lng: Number.isFinite(lng) ? lng : null,
       active,
       display_order: Number.isFinite(display_order) ? display_order : 0,
     };
   }
-
-  /**
-   * Idempotent seed of default Cyprus pickup points when the table is empty.
-   */
-  async ensureDefaultCyprusStores() {
-    const countRes = await pool.query('SELECT COUNT(*) as count FROM pickup_stores');
-    const count = Number(countRes.rows[0]?.count || 0);
-    if (count > 0) return { seeded: false, count };
-
-    for (const store of DEFAULT_CYPRUS_STORES) {
-      await pool.query(
-        `INSERT INTO pickup_stores
-          (code, name, address_line1, city, postal_code, country, hours, active, display_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8)
-         ON CONFLICT (code) DO NOTHING`,
-        [
-          store.code,
-          store.name,
-          store.address_line1,
-          store.city,
-          store.postal_code,
-          CHECKOUT_COUNTRY,
-          store.hours,
-          store.display_order,
-        ]
-      );
-    }
-    return { seeded: true, count: DEFAULT_CYPRUS_STORES.length };
-  }
 }
 
 module.exports = new PickupStoreService();
-module.exports.DEFAULT_CYPRUS_STORES = DEFAULT_CYPRUS_STORES;
+module.exports.PROVIDERS = PROVIDERS;
+module.exports.PROVIDER_LABELS = PROVIDER_LABELS;

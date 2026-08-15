@@ -108,6 +108,8 @@ async function runPostgresMigrations(pool) {
     CREATE TABLE IF NOT EXISTS pickup_stores (
       id SERIAL PRIMARY KEY,
       code TEXT UNIQUE NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'manual',
+      external_id TEXT,
       name TEXT NOT NULL,
       address_line1 TEXT NOT NULL,
       city TEXT NOT NULL,
@@ -115,13 +117,24 @@ async function runPostgresMigrations(pool) {
       country TEXT NOT NULL DEFAULT 'CY',
       phone TEXT,
       hours TEXT,
+      lat DOUBLE PRECISION,
+      lng DOUBLE PRECISION,
       active BOOLEAN NOT NULL DEFAULT TRUE,
       display_order INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
   await pool.query(
+    "ALTER TABLE pickup_stores ADD COLUMN IF NOT EXISTS provider TEXT NOT NULL DEFAULT 'manual'"
+  );
+  await pool.query('ALTER TABLE pickup_stores ADD COLUMN IF NOT EXISTS external_id TEXT');
+  await pool.query('ALTER TABLE pickup_stores ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION');
+  await pool.query('ALTER TABLE pickup_stores ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION');
+  await pool.query(
     'CREATE INDEX IF NOT EXISTS idx_pickup_stores_active_order ON pickup_stores(active, display_order, city)'
+  );
+  await pool.query(
+    'CREATE INDEX IF NOT EXISTS idx_pickup_stores_provider ON pickup_stores(provider)'
   );
 }
 

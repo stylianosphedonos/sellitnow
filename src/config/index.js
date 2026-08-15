@@ -81,4 +81,31 @@ module.exports = {
     lockoutMinutes: 15,
     passwordMinLength: 8,
   },
+  pickup: {
+    boxnowUrl:
+      process.env.BOXNOW_CY_LOCATIONS_URL ||
+      'https://locationapi-production.boxnow.cy/v1/apms_el-CY.json',
+    akisStoresUrl: process.env.AKIS_STORES_URL || 'https://gapakisexpress.com/stores/',
+    /** Optional ACS REST credentials for Cyprus SmartPoints / shops (see ACS web services PDF) */
+    acs: {
+      companyId: process.env.ACS_COMPANY_ID || '',
+      companyPassword: process.env.ACS_COMPANY_PASSWORD || '',
+      userId: process.env.ACS_USER_ID || '',
+      userPassword: process.env.ACS_USER_PASSWORD || '',
+      /** Required header AcsApiKey / ACSApiKey — issued by ACS (not published in the PDF) */
+      apiKey: process.env.ACS_API_KEY || '',
+      apiUrl:
+        process.env.ACS_API_URL ||
+        'https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest',
+      language: process.env.ACS_LANGUAGE || 'EN',
+      /**
+       * Cyprus ACS_SHOP_KIND values from ACS docs:
+       * 1 = central shops, 4 = Shop-in-a-Shop, 8 = SmartPoints with locker
+       */
+      shopKinds: String(process.env.ACS_SHOP_KINDS || '1,4,8')
+        .split(',')
+        .map((v) => parseInt(v.trim(), 10))
+        .filter((n) => Number.isInteger(n) && n > 0),
+    },
+  },
 };

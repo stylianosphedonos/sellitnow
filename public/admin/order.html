@@ -357,7 +357,17 @@
               <h3>${addr?.fulfillment_method === 'pickup' ? 'Pickup' : 'Shipping'}</h3>
               ${
                 addr?.fulfillment_method === 'pickup' && addr?.pickup_store_name
-                  ? `<p class="order-admin-card__primary">${esc(addr.pickup_store_name)}</p>`
+                  ? `<p class="order-admin-card__primary">${esc(
+                      (addr.pickup_provider === 'boxnow'
+                        ? 'Box Now'
+                        : addr.pickup_provider === 'akis'
+                          ? 'Akis Express'
+                          : addr.pickup_provider === 'acs'
+                            ? 'ACS'
+                            : 'Pickup') +
+                        ' · ' +
+                        addr.pickup_store_name
+                    )}</p>`
                   : ''
               }
               <p>${esc(addr?.address_line1 || '—')}<br>${esc([addr?.city, addr?.postal_code].filter(Boolean).join(' '))} ${esc(addr?.country || '')}</p>
