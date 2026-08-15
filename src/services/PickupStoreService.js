@@ -51,8 +51,9 @@ function rowToStore(row) {
 class PickupStoreService {
   async listActive(filters = {}) {
     const params = [CHECKOUT_COUNTRY];
+    // Postgres boolean columns reject `active = 1`.
     let sql = `SELECT * FROM pickup_stores
-       WHERE (active = TRUE OR active = 1) AND UPPER(TRIM(country)) = $1`;
+       WHERE active = TRUE AND UPPER(TRIM(country)) = $1`;
 
     if (filters.provider) {
       params.push(String(filters.provider).toLowerCase());
@@ -93,7 +94,7 @@ class PickupStoreService {
   async listCities() {
     const result = await pool.query(
       `SELECT DISTINCT city FROM pickup_stores
-       WHERE (active = TRUE OR active = 1) AND UPPER(TRIM(country)) = $1
+       WHERE active = TRUE AND UPPER(TRIM(country)) = $1
          AND city IS NOT NULL AND TRIM(city) <> ''
        ORDER BY city ASC`,
       [CHECKOUT_COUNTRY]
@@ -104,7 +105,7 @@ class PickupStoreService {
   async countByProvider() {
     const result = await pool.query(
       `SELECT provider, COUNT(*) as count,
-              SUM(CASE WHEN active = TRUE OR active = 1 THEN 1 ELSE 0 END) as active_count
+              SUM(CASE WHEN active = TRUE THEN 1 ELSE 0 END) as active_count
        FROM pickup_stores
        GROUP BY provider`
     );
