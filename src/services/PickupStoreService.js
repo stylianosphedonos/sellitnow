@@ -1,5 +1,10 @@
 const { pool } = require('../database/db');
 const { CHECKOUT_COUNTRY, normalizeCountry } = require('../lib/checkoutAddress');
+const {
+  normalizeCyprusCity,
+  cityFilterValues,
+  sortCheckoutCities,
+} = require('../lib/cyprusCities');
 
 const PROVIDERS = {
   boxnow: 'boxnow',
@@ -60,8 +65,17 @@ class PickupStoreService {
       sql += ` AND LOWER(COALESCE(provider, 'manual')) = $${params.length}`;
     }
     if (filters.city) {
-      params.push(String(filters.city).trim());
-      sql += ` AND LOWER(TRIM(city)) = LOWER($${params.length})`;
+      const aliases = cityFilterValues(filters.city);
+      if (aliases.length === 1) {
+        params.push(aliases[0]);
+        sql += ` AND LOWER(TRIM(city)) = LOWER($${params.length})`;
+      } else if (aliases.length > 1) {
+        const placeholders = aliases.map((alias) => {
+          params.push(alias);
+          return `LOWER($${params.length})`;
+        });
+        sql += ` AND LOWER(TRIM(city)) IN (${placeholders.join(', ')})`;
+      }
     }
     if (filters.q) {
       params.push(`%${String(filters.q).trim().toLowerCase()}%`);
@@ -99,7 +113,12 @@ class PickupStoreService {
        ORDER BY city ASC`,
       [CHECKOUT_COUNTRY]
     );
-    return result.rows.map((r) => r.city);
+    const unique = new Set();
+    for (const row of result.rows) {
+      const city = normalizeCyprusCity(row.city);
+      if (city) unique.add(city);
+    }
+    return sortCheckoutCities([...unique]);
   }
 
   async countByProvider() {
@@ -323,6 +342,8 @@ class PickupStoreService {
       throw new Error('Pickup stores must be in Cyprus (CY)');
     }
 
+    const cityNormalized = normalizeCyprusCity(city) || city;
+
     const activeRaw = input.active;
     const active =
       activeRaw === undefined || activeRaw === null
@@ -341,7 +362,7 @@ class PickupStoreService {
       external_id,
       name,
       address_line1,
-      city,
+      city: cityNormalized,
       postal_code,
       country: CHECKOUT_COUNTRY,
       phone: String(input.phone || '').trim() || null,

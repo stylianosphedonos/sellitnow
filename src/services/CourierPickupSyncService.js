@@ -1,5 +1,6 @@
 const config = require('../config');
 const PickupStoreService = require('./PickupStoreService');
+const { normalizeCyprusCity } = require('../lib/cyprusCities');
 
 const FETCH_HEADERS = {
   'User-Agent': 'SellitnowPickupSync/1.0 (+https://3nitylab.com)',
@@ -78,9 +79,14 @@ class CourierPickupSyncService {
         const active = state === 'boxnow-ready';
         const externalId = String(item.id || '').trim();
         if (!externalId) continue;
-        const city = stripHtml(item.addressLine2 || item.region || 'Cyprus');
+        const city = normalizeCyprusCity(stripHtml(item.addressLine2 || item.region || 'Cyprus'));
         const name = stripHtml(item.name || item.title || `Box Now ${externalId}`);
         const address = stripHtml(item.addressLine1 || item.title || name);
+        const locality = stripHtml(item.addressLine2 || '');
+        const addressWithLocality =
+          locality && !address.toLowerCase().includes(locality.toLowerCase())
+            ? `${address}, ${locality}`
+            : address;
         const code = `boxnow-${externalId}`;
         keepCodes.add(code);
         const action = await PickupStoreService.upsertSyncedStore({
@@ -88,7 +94,7 @@ class CourierPickupSyncService {
           provider: 'boxnow',
           external_id: externalId,
           name: `Box Now — ${name}`,
-          address_line1: address,
+          address_line1: addressWithLocality,
           city,
           postal_code: String(item.postalCode || '').trim() || '0000',
           country: 'CY',
@@ -165,7 +171,7 @@ class CourierPickupSyncService {
       const addressRaw = pick(/"address":"((?:\\.|[^"\\])*)"/);
       if (!titleRaw) continue;
 
-      const city = stripHtml(decodeJsString(titleRaw));
+      const city = normalizeCyprusCity(stripHtml(decodeJsString(titleRaw)));
       const addressFull = stripHtml(decodeJsString(addressRaw || ''));
       let phone = null;
       const phoneMatch = addressFull.match(/Telephone:\s*([0-9]+)/i);
@@ -302,8 +308,10 @@ class CourierPickupSyncService {
           if (!station && !branch && !shopId) continue;
           const code = `acs-${externalId}`.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
           keepCodes.add(code);
-          const city = stripHtml(
-            row.ACS_SHOP_AREA_DESCR || row.ACS_SHOP_AREA || row.ACS_SHOP_CITY || 'Cyprus'
+          const city = normalizeCyprusCity(
+            stripHtml(
+              row.ACS_SHOP_AREA_DESCR || row.ACS_SHOP_AREA || row.ACS_SHOP_CITY || 'Cyprus'
+            )
           );
           const name = stripHtml(
             row.ACS_SHOP_STATION_DESCR ||
