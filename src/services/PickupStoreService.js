@@ -52,15 +52,15 @@ class PickupStoreService {
   async listActive(filters = {}) {
     const params = [CHECKOUT_COUNTRY];
     let sql = `SELECT * FROM pickup_stores
-       WHERE active = TRUE AND UPPER(TRIM(country)) = $1`;
+       WHERE (active = TRUE OR active = 1) AND UPPER(TRIM(country)) = $1`;
 
     if (filters.provider) {
       params.push(String(filters.provider).toLowerCase());
-      sql += ` AND LOWER(provider) = $${params.length}`;
+      sql += ` AND LOWER(COALESCE(provider, 'manual')) = $${params.length}`;
     }
     if (filters.city) {
       params.push(String(filters.city).trim());
-      sql += ` AND LOWER(city) = LOWER($${params.length})`;
+      sql += ` AND LOWER(TRIM(city)) = LOWER($${params.length})`;
     }
     if (filters.q) {
       params.push(`%${String(filters.q).trim().toLowerCase()}%`);
@@ -93,7 +93,8 @@ class PickupStoreService {
   async listCities() {
     const result = await pool.query(
       `SELECT DISTINCT city FROM pickup_stores
-       WHERE active = TRUE AND UPPER(TRIM(country)) = $1 AND city IS NOT NULL AND TRIM(city) <> ''
+       WHERE (active = TRUE OR active = 1) AND UPPER(TRIM(country)) = $1
+         AND city IS NOT NULL AND TRIM(city) <> ''
        ORDER BY city ASC`,
       [CHECKOUT_COUNTRY]
     );

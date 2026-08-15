@@ -37,30 +37,35 @@
             </div>
 
             <div id="pickupStoreFields">
-              <h3 style="margin:24px 0 12px;font-size:15px">Choose a pickup store in Cyprus</h3>
-              <div class="checkout-pickup-filters">
-                <div class="checkout-pickup-providers" role="tablist" aria-label="Courier">
-                  <button type="button" class="checkout-pickup-provider is-active" data-provider="all">All</button>
-                  <button type="button" class="checkout-pickup-provider" data-provider="acs">ACS</button>
-                  <button type="button" class="checkout-pickup-provider" data-provider="akis">Akis Express</button>
-                  <button type="button" class="checkout-pickup-provider" data-provider="boxnow">Box Now</button>
-                </div>
-                <div class="checkout-pickup-search-row">
-                  <div class="form-group" style="margin:0;flex:1">
-                    <label for="pickupSearch">Search</label>
-                    <input type="search" id="pickupSearch" placeholder="City, address, or store name" autocomplete="off">
-                  </div>
-                  <div class="form-group" style="margin:0;min-width:160px">
-                    <label for="pickupCity">City</label>
-                    <select id="pickupCity">
-                      <option value="">All cities</option>
-                    </select>
-                  </div>
-                </div>
+              <h3 style="margin:24px 0 12px;font-size:15px">Pickup in Cyprus</h3>
+
+              <div class="form-group">
+                <label for="pickupCity">City *</label>
+                <select id="pickupCity" required>
+                  <option value="">Select a city</option>
+                </select>
               </div>
-              <p id="pickupStoresMeta" style="margin:8px 0 12px;font-size:13px;color:var(--text-muted)"></p>
-              <p id="pickupStoresEmpty" class="alert alert-error" style="display:none">No pickup stores matched. Try another courier, city, or search.</p>
-              <div id="pickupStoreList" class="checkout-pickup-list" role="radiogroup" aria-label="Pickup stores"></div>
+
+              <div id="pickupAfterCity" style="display:none">
+                <div class="checkout-pickup-filters">
+                  <div class="checkout-pickup-providers" role="tablist" aria-label="Courier">
+                    <button type="button" class="checkout-pickup-provider is-active" data-provider="all">All</button>
+                    <button type="button" class="checkout-pickup-provider" data-provider="acs">ACS</button>
+                    <button type="button" class="checkout-pickup-provider" data-provider="akis">Akis Express</button>
+                    <button type="button" class="checkout-pickup-provider" data-provider="boxnow">Box Now</button>
+                  </div>
+                  <div class="form-group" style="margin:0">
+                    <label for="pickupSearch">Search within city</label>
+                    <input type="search" id="pickupSearch" placeholder="Store name or address" autocomplete="off">
+                  </div>
+                </div>
+                <p id="pickupStoresMeta" style="margin:8px 0 12px;font-size:13px;color:var(--text-muted)"></p>
+                <p id="pickupStoresEmpty" class="alert alert-error" style="display:none"></p>
+                <div id="pickupStoreList" class="checkout-pickup-list" role="radiogroup" aria-label="Pickup stores"></div>
+              </div>
+
+              <p id="pickupChooseCityHint" style="margin:8px 0 0;font-size:14px;color:var(--text-muted)">Select your city to see available ACS, Akis Express, and Box Now pickup points.</p>
+              <p id="pickupLoadingHint" style="display:none;margin:8px 0 0;font-size:14px;color:var(--text-muted)">Loading pickup locations…</p>
             </div>
 
             <div class="form-group">
@@ -114,9 +119,11 @@
     let pickupStores = [];
     let pickupCities = [];
     let pickupCounts = {};
+    let pickupActiveTotal = 0;
     let lastCartReview = null;
     let selectedProvider = 'all';
     let searchTimer = null;
+    let catalogReady = false;
 
     function escapeHtml(str) {
       if (str == null) return '';
@@ -154,48 +161,75 @@
       }
     }
 
+    function selectedCity() {
+      return (document.getElementById('pickupCity')?.value || '').trim();
+    }
+
     function selectedStoreId() {
       const el = document.querySelector('input[name="pickup_store_id"]:checked');
       return el ? el.value : '';
+    }
+
+    function syncCityUi() {
+      const city = selectedCity();
+      const after = document.getElementById('pickupAfterCity');
+      const hint = document.getElementById('pickupChooseCityHint');
+      const hasCity = Boolean(city);
+      if (after) after.style.display = hasCity ? 'block' : 'none';
+      if (hint) hint.style.display = hasCity || !catalogReady ? 'none' : 'block';
     }
 
     function renderPickupStores() {
       const list = document.getElementById('pickupStoreList');
       const empty = document.getElementById('pickupStoresEmpty');
       const meta = document.getElementById('pickupStoresMeta');
+      const city = selectedCity();
       const previous = selectedStoreId();
+
+      syncCityUi();
+
+      if (!city) {
+        if (list) list.innerHTML = '';
+        if (empty) empty.style.display = 'none';
+        if (meta) meta.textContent = '';
+        return;
+      }
 
       const parts = [];
       if (pickupCounts.acs?.active) parts.push(`${pickupCounts.acs.active} ACS`);
       if (pickupCounts.akis?.active) parts.push(`${pickupCounts.akis.active} Akis Express`);
       if (pickupCounts.boxnow?.active) parts.push(`${pickupCounts.boxnow.active} Box Now`);
-      meta.textContent = pickupStores.length
-        ? `Showing ${pickupStores.length} location${pickupStores.length === 1 ? '' : 's'}${
-            parts.length ? ` · Network: ${parts.join(', ')}` : ''
-          }`
-        : parts.length
-          ? `No matches in this filter · Network: ${parts.join(', ')}`
-          : 'Pickup locations load from ACS, Akis Express, and Box Now.';
 
       if (!pickupStores.length) {
-        list.innerHTML = '';
-        empty.style.display = 'block';
+        if (list) list.innerHTML = '';
+        if (meta) meta.textContent = '';
+        if (empty) {
+          empty.style.display = 'block';
+          empty.textContent = pickupActiveTotal
+            ? `No pickup points found in ${city} for this filter. Try another courier or clear search.`
+            : 'Pickup locations could not be loaded. Please refresh the page or try again in a moment.';
+        }
         return;
       }
-      empty.style.display = 'none';
 
-      const preferred = previous && pickupStores.some((s) => String(s.id) === String(previous))
-        ? previous
-        : String(pickupStores[0].id);
+      if (empty) empty.style.display = 'none';
+      if (meta) {
+        meta.textContent = `${pickupStores.length} pickup point${
+          pickupStores.length === 1 ? '' : 's'
+        } in ${city}${parts.length ? ` · Network total: ${parts.join(', ')}` : ''}`;
+      }
+
+      const preferred =
+        previous && pickupStores.some((s) => String(s.id) === String(previous))
+          ? previous
+          : String(pickupStores[0].id);
 
       list.innerHTML = pickupStores
         .map((store) => {
           const hours = store.hours
             ? `<span class="checkout-payment-option__hint">${escapeHtml(store.hours)}</span>`
             : '';
-          const addr = [store.address_line1, store.city, store.postal_code]
-            .filter(Boolean)
-            .join(', ');
+          const addr = [store.address_line1, store.postal_code].filter(Boolean).join(', ');
           const badge = store.provider_label || store.provider || '';
           return `
             <label class="checkout-payment-option">
@@ -215,33 +249,78 @@
 
     function fillCityOptions() {
       const select = document.getElementById('pickupCity');
+      if (!select) return;
       const current = select.value;
       select.innerHTML =
-        '<option value="">All cities</option>' +
+        '<option value="">Select a city</option>' +
         pickupCities
           .map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`)
           .join('');
       if (current && pickupCities.includes(current)) select.value = current;
     }
 
-    async function loadPickupStores() {
-      const q = (document.getElementById('pickupSearch')?.value || '').trim();
-      const city = document.getElementById('pickupCity')?.value || '';
-      const params = new URLSearchParams();
-      if (selectedProvider && selectedProvider !== 'all') params.set('provider', selectedProvider);
-      if (q) params.set('q', q);
-      if (city) params.set('city', city);
-      const qs = params.toString();
+    async function loadPickupCatalog() {
+      const loading = document.getElementById('pickupLoadingHint');
+      const hint = document.getElementById('pickupChooseCityHint');
+      if (loading) loading.style.display = 'block';
+      if (hint) hint.style.display = 'none';
       try {
-        const data = await callApi('/pickup-stores' + (qs ? '?' + qs : ''));
-        pickupStores = Array.isArray(data.stores) ? data.stores : [];
+        const data = await callApi('/pickup-stores');
         pickupCities = Array.isArray(data.cities) ? data.cities : [];
         pickupCounts = data.counts || {};
+        pickupActiveTotal = Number(data.active_total) || 0;
+        catalogReady = true;
         fillCityOptions();
+        if (!pickupCities.length) {
+          const empty = document.getElementById('pickupStoresEmpty');
+          if (empty) {
+            empty.style.display = 'block';
+            empty.textContent =
+              'No Cyprus pickup cities are available yet. Please try again in a moment.';
+          }
+        }
       } catch (err) {
-        pickupStores = [];
         pickupCities = [];
         pickupCounts = {};
+        pickupActiveTotal = 0;
+        catalogReady = false;
+        const empty = document.getElementById('pickupStoresEmpty');
+        if (empty) {
+          empty.style.display = 'block';
+          empty.textContent = err.message || 'Could not load pickup cities. Please refresh.';
+        }
+      } finally {
+        if (loading) loading.style.display = 'none';
+        syncCityUi();
+      }
+    }
+
+    async function loadPickupStores() {
+      const city = selectedCity();
+      if (!city) {
+        pickupStores = [];
+        renderPickupStores();
+        return;
+      }
+
+      const q = (document.getElementById('pickupSearch')?.value || '').trim();
+      const params = new URLSearchParams();
+      params.set('city', city);
+      if (selectedProvider && selectedProvider !== 'all') params.set('provider', selectedProvider);
+      if (q) params.set('q', q);
+
+      try {
+        const data = await callApi('/pickup-stores?' + params.toString());
+        pickupStores = Array.isArray(data.stores) ? data.stores : [];
+        if (Array.isArray(data.cities) && data.cities.length) {
+          pickupCities = data.cities;
+          fillCityOptions();
+          document.getElementById('pickupCity').value = city;
+        }
+        pickupCounts = data.counts || pickupCounts;
+        pickupActiveTotal = Number(data.active_total) || pickupActiveTotal;
+      } catch (err) {
+        pickupStores = [];
       }
       renderPickupStores();
     }
@@ -260,7 +339,15 @@
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => loadPickupStores(), 250);
     });
-    document.getElementById('pickupCity')?.addEventListener('change', () => loadPickupStores());
+    document.getElementById('pickupCity')?.addEventListener('change', () => {
+      const search = document.getElementById('pickupSearch');
+      if (search) search.value = '';
+      selectedProvider = 'all';
+      document.querySelectorAll('.checkout-pickup-provider').forEach((b) => {
+        b.classList.toggle('is-active', b.getAttribute('data-provider') === 'all');
+      });
+      loadPickupStores();
+    });
 
     document.getElementById('checkoutForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -270,10 +357,17 @@
       errEl.style.display = 'none';
       btn.disabled = true;
 
+      if (!selectedCity()) {
+        errEl.textContent = 'Please select a city first.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        return;
+      }
+
       const phoneTrim = (form.phone?.value || '').trim();
       const selected = form.querySelector('input[name="pickup_store_id"]:checked');
       if (!selected || !pickupStores.length) {
-        errEl.textContent = 'Please select a Cyprus pickup store.';
+        errEl.textContent = 'Please select a pickup store in your city.';
         errEl.style.display = 'block';
         btn.disabled = false;
         return;
@@ -450,7 +544,7 @@
 
     document.addEventListener('DOMContentLoaded', async () => {
       await loadBrandSettings();
-      await Promise.all([loadCheckoutReview(), loadPickupStores()]);
+      await Promise.all([loadCheckoutReview(), loadPickupCatalog()]);
       loadCartCount();
       updateNav();
       initLogout();
@@ -462,7 +556,7 @@
       if (payStep && payStep.style.display === 'block') return;
       loadBrandSettings().then(() => {
         loadCheckoutReview();
-        loadPickupStores();
+        loadPickupCatalog();
         if (typeof loadCartCount === 'function') loadCartCount();
       });
     });
