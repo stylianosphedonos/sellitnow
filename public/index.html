@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3nityLab - Shop Deals & Save Big</title>
+  <title>3nityLab - 3D Printed Products Made in Cyprus</title>
   <script src="/js/runtime-config.js"></script>
   <script src="/js/brand-boot.js"></script>
   <link rel="stylesheet" href="/css/style.css?v=20260828-search">
@@ -53,8 +53,8 @@
           <img class="hero__center-img" id="heroCenterImg" alt="" hidden>
           <div class="hero__banner" aria-hidden="true"></div>
           <div class="hero__inner">
-            <h1 id="heroTitle">Up to 90% Off</h1>
-            <p id="heroSubtitle">Discover amazing deals on electronics, fashion & more</p>
+            <h1 id="heroTitle">3D Printed Products, Made in Cyprus 🇨🇾</h1>
+            <p id="heroSubtitle">Unique, practical &amp; personalised 3D prints — produced locally and delivered anywhere in Cyprus.</p>
           </div>
         </div>
       </section>
@@ -62,7 +62,8 @@
       <main class="main">
         <section class="categories" id="categories">
           <div class="category-banners" id="categoryBanners" hidden></div>
-          <h2>Shop by Category</h2>
+          <h2>Shop Products</h2>
+          <p class="categories__lead">Browse our range of ready-made prints, or request something made just for you.</p>
           <div class="category-grid" id="categoryGrid"></div>
         </section>
 
@@ -70,7 +71,7 @@
           <div class="products-toolbar" id="productsBrowseBar" hidden>
             <button type="button" class="btn-back-to-categories" id="backToCategoriesBtn">Back to categories</button>
           </div>
-          <h2 id="productsSectionHeading">Items</h2>
+          <h2 id="productsSectionHeading">All Products</h2>
           <div class="product-grid" id="productGrid"></div>
           <div class="pagination" id="pagination"></div>
         </section>
@@ -95,7 +96,7 @@
     <div class="request-modal__backdrop" data-close-request-modal></div>
     <div class="request-modal__panel" role="dialog" aria-modal="true" aria-labelledby="categoryRequestTitle">
       <button type="button" class="request-modal__close" data-close-request-modal aria-label="Close">&times;</button>
-      <h2 id="categoryRequestTitle">Request a product</h2>
+      <h2 id="categoryRequestTitle">Request a Custom Print</h2>
       <p id="categoryRequestPrompt" class="request-modal__prompt"></p>
       <form id="categoryRequestForm" class="request-modal__form">
         <input type="hidden" name="category_id" id="categoryRequestCategoryId">
@@ -109,7 +110,7 @@
         </div>
         <div class="form-group">
           <label for="categoryRequestMessage">Message</label>
-          <textarea id="categoryRequestMessage" name="message" rows="4" maxlength="5000" placeholder="Describe the product you are looking for…"></textarea>
+          <textarea id="categoryRequestMessage" name="message" rows="4" maxlength="5000" placeholder="Describe your idea — size, colour, quantity, or attach a reference photo…"></textarea>
         </div>
         <div class="form-group">
           <label for="categoryRequestPhoto">Attach a photo (optional)</label>

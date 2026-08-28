@@ -1,6 +1,7 @@
 const express = require('express');
 const config = require('../config');
 const { pool } = require('../database/db');
+const { STOREFRONT_HERO } = require('../database/storefrontDefaults');
 
 const router = express.Router();
 
@@ -16,8 +17,8 @@ const DEFAULTS = {
   allProductsShowOnWebsite: true,
   requestIconImage: '',
   currency: 'usd',
-  heroTitle: 'Up to 90% Off',
-  heroSubtitle: 'Discover amazing deals on electronics, fashion & more',
+  heroTitle: STOREFRONT_HERO.heroTitle,
+  heroSubtitle: STOREFRONT_HERO.heroSubtitle,
   /** Black overlay on hero photo (0 = brightest, ~0.35 = previous default) */
   heroBannerOverlay: 0.35,
 };

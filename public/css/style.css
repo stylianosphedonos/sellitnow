@@ -478,6 +478,14 @@ section h2 {
   line-height: 1.3;
 }
 
+.categories__lead {
+  margin: -8px 0 20px;
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  max-width: 52ch;
+}
+
 /* Categories */
 .category-banners {
   display: none;

@@ -21,6 +21,11 @@ const pickupStoresRoutes = require('./routes/pickupStores');
 
 const PaymentService = require('./services/PaymentService');
 const { optionalAuth } = require('./middleware/auth');
+const {
+  SAMPLE_PRODUCTS,
+  upsertStorefrontCategories,
+  migrateLegacyHeroCopy,
+} = require('./database/storefrontDefaults');
 
 const app = express();
 
@@ -515,42 +520,32 @@ async function ensureSeed() {
   try {
     const slugify = require('slugify');
     const { pool } = require('./database/db');
+    await upsertStorefrontCategories(pool);
+    await migrateLegacyHeroCopy(pool);
+
     const r = await pool.query('SELECT COUNT(*) as count FROM products');
     if (r.rows[0]?.count > 0) return;
-    const cat1 = await pool.query(
-      `INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3)
-       ON CONFLICT (slug) DO UPDATE SET name = excluded.name RETURNING id`,
-      ['Electronics', 'electronics', 'Electronic devices and gadgets']
-    );
-    const cat2 = await pool.query(
-      `INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3)
-       ON CONFLICT (slug) DO UPDATE SET name = excluded.name RETURNING id`,
-      ['Clothing', 'clothing', 'Apparel and fashion']
-    );
-    const c1 = cat1.rows[0]?.id || 1;
-    const c2 = cat2.rows[0]?.id || 2;
-    await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       ON CONFLICT (sku) DO NOTHING`,
-      ['SKU-001', 'Wireless Headphones', 'wireless-headphones', 'High-quality wireless headphones', 49.99, 100, c1]
-    );
-    await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       ON CONFLICT (sku) DO NOTHING`,
-      ['SKU-002', 'USB-C Cable', 'usb-c-cable', 'Durable USB-C charging cable', 12.99, 200, c1]
-    );
-    await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       ON CONFLICT (sku) DO NOTHING`,
-      ['SKU-003', 'Cotton T-Shirt', 'cotton-t-shirt', 'Comfortable cotton t-shirt', 19.99, 50, c2]
-    );
-    await pool.query(
-      `UPDATE products SET options_json = $1 WHERE sku = 'SKU-003'`,
-      [JSON.stringify({ colors: ['Black', 'White', 'Navy'], sizes: ['S', 'M', 'L', 'XL'] })]
-    );
+
+    const catRes = await pool.query('SELECT id, slug FROM categories');
+    const catBySlug = new Map(catRes.rows.map((row) => [row.slug, row.id]));
+
+    for (const product of SAMPLE_PRODUCTS) {
+      const categoryId = catBySlug.get(product.categorySlug);
+      await pool.query(
+        `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+         ON CONFLICT (sku) DO NOTHING`,
+        [
+          product.sku,
+          product.title,
+          slugify(product.title, { lower: true }),
+          product.description,
+          product.price,
+          product.stock,
+          categoryId,
+        ]
+      );
+    }
     console.log('Sample products created');
   } catch (err) {
     console.warn('Could not seed:', err.message);

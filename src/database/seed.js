@@ -1,6 +1,10 @@
 const bcrypt = require('bcryptjs');
-const { pool, closeDb } = require('./db');
 const slugify = require('slugify');
+const { pool, closeDb } = require('./db');
+const {
+  SAMPLE_PRODUCTS,
+  upsertStorefrontCategories,
+} = require('./storefrontDefaults');
 
 async function seed() {
   try {
@@ -17,40 +21,28 @@ async function seed() {
       ['admin@sellitnow.com', password_hash, 'Admin', 'User']
     );
 
-    await pool.query(
-      `INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) ON CONFLICT (slug) DO NOTHING`,
-      ['Electronics', 'electronics', 'Electronic devices and gadgets']
-    );
-    await pool.query(
-      `INSERT INTO categories (name, slug, description) VALUES ($1, $2, $3) ON CONFLICT (slug) DO NOTHING`,
-      ['Clothing', 'clothing', 'Apparel and fashion']
-    );
-    const catRes = await pool.query('SELECT id FROM categories ORDER BY id');
-    const catId1 = catRes.rows[0]?.id || 1;
-    const catId2 = catRes.rows[1]?.id || 2;
+    await upsertStorefrontCategories(pool);
 
-    await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       ON CONFLICT (sku) DO NOTHING`,
-      ['SKU-001', 'Wireless Headphones', slugify('Wireless Headphones', { lower: true }), 'High-quality wireless headphones', 49.99, 100, catId1]
-    );
-    await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       ON CONFLICT (sku) DO NOTHING`,
-      ['SKU-002', 'USB-C Cable', slugify('USB-C Cable', { lower: true }), 'Durable USB-C charging cable', 12.99, 200, catId1]
-    );
-    await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       ON CONFLICT (sku) DO NOTHING`,
-      ['SKU-003', 'Cotton T-Shirt', slugify('Cotton T-Shirt', { lower: true }), 'Comfortable cotton t-shirt', 19.99, 50, catId2]
-    );
-    await pool.query(
-      `UPDATE products SET options_json = $1 WHERE sku = 'SKU-003'`,
-      [JSON.stringify({ colors: ['Black', 'White', 'Navy'], sizes: ['S', 'M', 'L', 'XL'] })]
-    );
+    const catRes = await pool.query('SELECT id, slug FROM categories');
+    const catBySlug = new Map(catRes.rows.map((row) => [row.slug, row.id]));
+
+    for (const product of SAMPLE_PRODUCTS) {
+      const categoryId = catBySlug.get(product.categorySlug);
+      await pool.query(
+        `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+         ON CONFLICT (sku) DO NOTHING`,
+        [
+          product.sku,
+          product.title,
+          slugify(product.title, { lower: true }),
+          product.description,
+          product.price,
+          product.stock,
+          categoryId,
+        ]
+      );
+    }
 
     console.log('Seed completed successfully.');
     console.log('Admin: admin@sellitnow.com / admin123');

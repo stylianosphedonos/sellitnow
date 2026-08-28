@@ -933,7 +933,7 @@ function applyProductsBrowseMode(categoryId, categoryLabel) {
       const label = categoryLabel != null && String(categoryLabel).trim() !== '' ? String(categoryLabel).trim() : '';
       heading.textContent = label || 'Products';
     } else {
-      heading.textContent = 'Items';
+      heading.textContent = 'All Products';
     }
   }
 }
