@@ -1055,27 +1055,32 @@ function paintStorefrontCategories(byZone) {
   hideAllZoneContainers();
   hideMobileCategoryDock();
 
-  const homeMain = byZone.get('home-main') || [];
+  const all = flattenCategoriesByZone(byZone);
+  const homeMain = sortCategoriesForZone(byZone.get('home-main') || []);
+  const banners = all.filter(isBannerLayout);
   const showAllProducts = readCachedBrandSettings()?.allProductsShowOnWebsite !== false;
   const mobile = isMobileSiteDock();
+  const stripItems = mobile
+    ? sortCategoriesForZone(all.filter((c) => !isBannerLayout(c)))
+    : homeMain.filter((c) => !isBannerLayout(c));
 
   if (bannersEl) {
-    bannersEl.innerHTML = '';
-    bannersEl.hidden = true;
+    bannersEl.innerHTML = banners.map((c) => renderStorefrontCategoryCard(c)).join('');
+    bannersEl.hidden = banners.length === 0;
   }
 
   grid.classList.remove('category-grid--circles');
   grid.innerHTML =
     renderAllProductsCategoryButton() +
-    homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
+    stripItems.map((c) => renderStorefrontCategoryCard(c)).join('');
 
-  if (heading) heading.hidden = homeMain.length === 0 && !showAllProducts;
+  if (heading) heading.hidden = stripItems.length === 0 && !showAllProducts;
 
   if (!mobile) {
     for (const [zone, containerId] of Object.entries(WEBSITE_ZONE_CONTAINER_IDS)) {
       if (zone === 'home-main') continue;
       const el = document.getElementById(containerId);
-      const list = byZone.get(zone) || [];
+      const list = sortCategoriesForZone(byZone.get(zone) || []);
       if (!el || !list.length) continue;
       const isBar = zone === 'top' || zone === 'bottom';
       const isSide = zone === 'left' || zone === 'right';
@@ -1088,7 +1093,8 @@ function paintStorefrontCategories(byZone) {
   }
 
   if (categoriesSection) {
-    categoriesSection.hidden = homeMain.length === 0 && !showAllProducts;
+    categoriesSection.hidden =
+      banners.length === 0 && stripItems.length === 0 && !showAllProducts;
   }
 
   bindLoadAllProductsFromCategorySection();

@@ -520,11 +520,12 @@ async function ensureSeed() {
   try {
     const slugify = require('slugify');
     const { pool } = require('./database/db');
-    await upsertStorefrontCategories(pool);
     await migrateLegacyHeroCopy(pool);
 
     const r = await pool.query('SELECT COUNT(*) as count FROM products');
     if (r.rows[0]?.count > 0) return;
+
+    await upsertStorefrontCategories(pool);
 
     const catRes = await pool.query('SELECT id, slug FROM categories');
     const catBySlug = new Map(catRes.rows.map((row) => [row.slug, row.id]));

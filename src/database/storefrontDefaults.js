@@ -73,19 +73,13 @@ const SAMPLE_PRODUCTS = [
   },
 ];
 
+/** Insert sample categories only when the slug is new. Never change visibility, order, or other admin settings. */
 async function upsertStorefrontCategories(pool) {
   for (const cat of STOREFRONT_CATEGORIES) {
     await pool.query(
       `INSERT INTO categories (name, slug, description, display_order, category_type, website_zone, request_prompt, show_on_website)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
-       ON CONFLICT (slug) DO UPDATE SET
-         name = excluded.name,
-         description = excluded.description,
-         display_order = excluded.display_order,
-         category_type = excluded.category_type,
-         website_zone = excluded.website_zone,
-         request_prompt = excluded.request_prompt,
-         show_on_website = 1`,
+       ON CONFLICT (slug) DO NOTHING`,
       [
         cat.name,
         cat.slug,

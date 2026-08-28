@@ -2,10 +2,7 @@
  * Incremental PostgreSQL migrations for existing databases.
  * Must run before schema.postgresql.sql (which creates indexes on new columns).
  */
-const {
-  upsertStorefrontCategories,
-  migrateLegacyHeroCopy,
-} = require('./storefrontDefaults');
+const { migrateLegacyHeroCopy } = require('./storefrontDefaults');
 
 async function runPostgresMigrations(pool) {
   await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
@@ -142,7 +139,6 @@ async function runPostgresMigrations(pool) {
     'CREATE INDEX IF NOT EXISTS idx_pickup_stores_provider ON pickup_stores(provider)'
   );
 
-  await upsertStorefrontCategories(pool);
   await migrateLegacyHeroCopy(pool);
 }
 
