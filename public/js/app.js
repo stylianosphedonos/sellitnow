@@ -906,14 +906,16 @@ function sortCategoriesForZone(list) {
   });
 }
 
-/** Scroll so the products section title sits below the sticky header. */
+/** Scroll so the products toolbar (or title) sits below the sticky header. */
 function scrollProductsBrowseIntoView() {
+  const browseBar = document.getElementById('productsBrowseBar');
   const heading = document.getElementById('productsSectionHeading');
-  const target = heading || document.querySelector('.products');
+  const target =
+    browseBar && !browseBar.hidden ? browseBar : heading || document.querySelector('.products');
   if (!target) return;
 
   const header = document.querySelector('.header');
-  const headerOffset = (header ? header.getBoundingClientRect().height : 0) + 12;
+  const headerOffset = (header ? header.getBoundingClientRect().height : 0) + 8;
   const top = target.getBoundingClientRect().top + window.scrollY - headerOffset;
   window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
 }

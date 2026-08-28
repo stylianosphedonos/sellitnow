@@ -4,6 +4,8 @@
   --secondary: #ff6633;
   --accent: #ff9000;
   --header-shadow: #ee4d2d;
+  --brand-hover-shadow: color-mix(in srgb, var(--header-shadow) 22%, transparent);
+  --brand-hover-shadow-strong: color-mix(in srgb, var(--header-shadow) 30%, transparent);
   --bg: #f5f5f5;
   --white: #fff;
   --text: #333;
@@ -618,7 +620,13 @@ button.category-card:focus-visible {
 
 .category-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 16px rgba(238, 77, 45, 0.2);
+  box-shadow: 0 4px 16px var(--brand-hover-shadow-strong);
+}
+
+.category-card--banner:hover,
+.category-card--banner:active {
+  transform: none;
+  box-shadow: 0 4px 16px var(--brand-hover-shadow-strong);
 }
 
 .category-card__media {
@@ -706,10 +714,11 @@ button.category-card:focus-visible {
   min-height: 140px;
   margin: 0;
   border-radius: 0;
+  line-height: 0;
 }
 
 .category-card--banner .category-card__media--banner img {
-  object-fit: fill;
+  object-fit: cover;
   object-position: center;
 }
 
@@ -730,7 +739,7 @@ button.category-card:focus-visible {
 .category-card__media img {
   width: 100%;
   height: 100%;
-  object-fit: fill;
+  object-fit: cover;
   object-position: center;
   display: block;
 }
@@ -758,6 +767,16 @@ button.category-card:focus-visible {
 /* Products browse (category drill-down) */
 .products-toolbar {
   margin-bottom: 16px;
+}
+
+.products-toolbar:not([hidden]) {
+  position: sticky;
+  top: var(--header-sticky-offset);
+  z-index: 90;
+  background: var(--bg);
+  padding: 10px 0 12px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .btn-back-to-categories {
@@ -818,7 +837,12 @@ button.category-card:focus-visible {
 
 .product-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 6px 20px rgba(238, 77, 45, 0.15);
+  box-shadow: 0 6px 20px var(--brand-hover-shadow);
+}
+
+.product-card:active {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px var(--brand-hover-shadow);
 }
 
 .product-card__link {
@@ -923,13 +947,14 @@ button.category-card:focus-visible {
 .product-image {
   position: relative;
   aspect-ratio: 1;
-  background: var(--border);
+  background: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 48px;
   color: var(--text-muted);
   overflow: hidden;
+  line-height: 0;
 }
 
 .product-image img {
@@ -4279,7 +4304,7 @@ body.has-zone-mobile-dock.request-modal-open {
 
 .category-icon:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(238, 77, 45, 0.25);
+  box-shadow: 0 4px 16px var(--brand-hover-shadow-strong);
 }
 
 .category-icon:focus-visible {
