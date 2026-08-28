@@ -819,6 +819,11 @@ async function quickAddProductFromCard(productId, triggerEl) {
 
 function bindProductCardControls(container) {
   container.querySelectorAll('.product-stock').forEach((el) => el.remove());
+  container.querySelectorAll('.product-card__link').forEach((link) => {
+    link.addEventListener('click', () => {
+      saveHomeBrowseStateToSession();
+    });
+  });
   container.querySelectorAll('[data-quick-add]').forEach((btn) => {
     btn.disabled = false;
     if (btn.textContent.trim().toLowerCase() === 'out of stock') {
@@ -1218,6 +1223,9 @@ function handleCategoryActivation(id) {
     openCategoryRequestModal(category);
     return;
   }
+  if (getCurrentCategoryFromUrl() == null) {
+    sellitnowAllProductsReturnState = captureHomeBrowseState();
+  }
   const url = new URL(location.href);
   url.searchParams.set('category', String(id));
   history.replaceState({}, '', url.pathname + url.search);
@@ -1248,17 +1256,18 @@ function bindBackToCategories() {
   const btn = document.getElementById('backToCategoriesBtn');
   if (!btn || btn.dataset.sellitnowBound === '1') return;
   btn.dataset.sellitnowBound = '1';
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
+    const saved = sellitnowAllProductsReturnState;
+    sellitnowAllProductsReturnState = null;
+    if (saved) {
+      await restoreAllProductsBrowse(saved);
+      return;
+    }
     const url = new URL(location.href);
     url.searchParams.delete('category');
     history.replaceState({}, '', url.pathname + url.search);
     applyProductsBrowseMode(null);
-    loadProducts(1, null);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollElementBelowHeader(document.getElementById('categories'), 'smooth');
-      });
-    });
+    await loadProducts(sellitnowProductsBrowseState.page || 1, null);
   });
 }
 
@@ -1452,6 +1461,10 @@ async function loadCategories() {
 let currentProductSearch = '';
 let currentProductPageSize = 0;
 let currentProductGridColumns = 0;
+const HOME_BROWSE_STORAGE_KEY = '3nitylab.homeBrowse';
+let sellitnowProductsBrowseState = { categoryId: null, page: 1 };
+/** Snapshot of the all-products list before drilling into a category. */
+let sellitnowAllProductsReturnState = null;
 
 const PRODUCT_GRID_ROWS = 4;
 
@@ -1478,6 +1491,68 @@ function getCurrentCategoryFromUrl() {
   return Number.isFinite(categoryId) ? categoryId : null;
 }
 
+function captureHomeBrowseState() {
+  return {
+    scrollY: window.scrollY,
+    page: sellitnowProductsBrowseState.page || 1,
+    categoryId: sellitnowProductsBrowseState.categoryId ?? null,
+    q: currentProductSearch || '',
+  };
+}
+
+function saveHomeBrowseStateToSession() {
+  try {
+    sessionStorage.setItem(HOME_BROWSE_STORAGE_KEY, JSON.stringify(captureHomeBrowseState()));
+  } catch (_) {}
+}
+
+function readHomeBrowseStateFromSession() {
+  try {
+    const raw = sessionStorage.getItem(HOME_BROWSE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function browseStatesMatch(saved, categoryId, q) {
+  if (!saved) return false;
+  const savedCat = saved.categoryId ?? null;
+  const currentCat = categoryId ?? null;
+  return savedCat === currentCat && String(saved.q || '') === String(q || '');
+}
+
+function restoreHomeScroll(scrollY) {
+  if (scrollY == null || !Number.isFinite(Number(scrollY))) return;
+  const top = Math.max(0, Number(scrollY));
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top, behavior: 'auto' });
+    });
+  });
+}
+
+function resolveInitialBrowsePage(categoryId, q) {
+  const saved = readHomeBrowseStateFromSession();
+  return browseStatesMatch(saved, categoryId, q) ? saved.page || 1 : 1;
+}
+
+function resolveInitialBrowseScroll(categoryId, q) {
+  const saved = readHomeBrowseStateFromSession();
+  return browseStatesMatch(saved, categoryId, q) ? saved.scrollY : null;
+}
+
+async function restoreAllProductsBrowse(saved) {
+  const url = new URL(location.href);
+  url.searchParams.delete('category');
+  history.replaceState({}, '', url.pathname + url.search);
+  applyProductsBrowseMode(null);
+  await loadProducts(saved?.page || 1, null, saved?.q || '');
+  restoreHomeScroll(saved?.scrollY);
+}
+
 function syncProductsBrowseChromeFromUrl() {
   const cid = getCurrentCategoryFromUrl();
   applyProductsBrowseMode(cid, cid != null ? sellitnowCategoryLabels.get(cid) : null);
@@ -1499,7 +1574,16 @@ function initHomeBrowseHistory() {
       suggestionsEl2.innerHTML = '';
     }
     syncProductsBrowseChromeFromUrl();
-    loadProducts(1, getCurrentCategoryFromUrl(), q2);
+    const cid = getCurrentCategoryFromUrl();
+    if (cid == null && sellitnowAllProductsReturnState) {
+      void restoreAllProductsBrowse(sellitnowAllProductsReturnState).then(() => {
+        sellitnowAllProductsReturnState = null;
+      });
+      return;
+    }
+    loadProducts(resolveInitialBrowsePage(cid, q2), cid, q2).then(() => {
+      restoreHomeScroll(resolveInitialBrowseScroll(cid, q2));
+    });
   });
 }
 
@@ -1518,7 +1602,9 @@ function renderProductsPagination(paginationEl, data, categoryId) {
   const goTo = (target) => {
     const n = Math.min(totalPages, Math.max(1, Number(target) || 1));
     if (n === page) return;
-    loadProducts(n, categoryId, undefined, true);
+    loadProducts(n, categoryId, undefined, true).then(() => {
+      saveHomeBrowseStateToSession();
+    });
   };
 
   const addBtn = (label, targetPage, disabled) => {
@@ -1599,6 +1685,11 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
     bindProductCardControls(grid);
 
     renderProductsPagination(pagination, data, categoryId);
+
+    sellitnowProductsBrowseState = {
+      categoryId: categoryId ?? null,
+      page: Number(data.page) || page,
+    };
 
     if (scrollToTop) {
       scrollProductsBrowseIntoView();
@@ -1838,6 +1929,9 @@ async function initHomePage() {
   initHomeBrowseHistory();
   initCategoryRequestModal();
 
+  const startPage = resolveInitialBrowsePage(categoryId, q);
+  const restoreScroll = resolveInitialBrowseScroll(categoryId, q);
+
   // Paint from cache immediately; fetch everything in parallel (don't gate products on brand/session).
   applyCachedBrandSettings();
   await Promise.all([
@@ -1845,9 +1939,10 @@ async function initHomePage() {
     loadBrandSettings({ backgroundRefresh: true }),
     loadCartCount(),
     loadCategories(),
-    loadProducts(1, categoryId, q),
+    loadProducts(startPage, categoryId, q),
   ]);
   syncProductsBrowseChromeFromUrl();
+  restoreHomeScroll(restoreScroll);
 }
 
 if (document.readyState === 'loading') {
@@ -1863,5 +1958,9 @@ window.addEventListener('pageshow', (e) => {
   const searchInput = document.getElementById('searchInput');
   if (searchInput) searchInput.value = q;
   syncProductsBrowseChromeFromUrl();
-  void Promise.all([loadBrandSettings(), loadProducts(1, categoryId, q)]);
+  const startPage = resolveInitialBrowsePage(categoryId, q);
+  const restoreScroll = resolveInitialBrowseScroll(categoryId, q);
+  void Promise.all([loadBrandSettings(), loadProducts(startPage, categoryId, q)]).then(() => {
+    restoreHomeScroll(restoreScroll);
+  });
 });
