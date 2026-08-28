@@ -4,6 +4,22 @@ const CategoryService = require('../services/CategoryService');
 
 const router = express.Router();
 
+// GET /api/v1/products/suggest - typeahead matches (must be before :idOrSlug)
+router.get('/suggest', async (req, res) => {
+  try {
+    const q = String(req.query.q || req.query.search || '').trim();
+    const limit = parseInt(req.query.limit, 10) || 8;
+    const categoryId = parseInt(req.query.category_id, 10);
+    const result = await ProductService.suggest(q, {
+      limit,
+      categoryId: Number.isFinite(categoryId) ? categoryId : null,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/v1/products - list with pagination
 router.get('/', async (req, res) => {
   try {

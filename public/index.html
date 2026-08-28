@@ -6,14 +6,25 @@
   <title>3nityLab - Shop Deals & Save Big</title>
   <script src="/js/runtime-config.js"></script>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css?v=20260828-cart">
+  <link rel="stylesheet" href="/css/style.css?v=20260828-search">
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">3nityLab</a>
-      <div class="search-bar">
-        <input type="search" placeholder="Search products..." id="searchInput">
+      <div class="search-bar" id="searchBar">
+        <div class="search-bar__field">
+          <input
+            type="search"
+            placeholder="Search products..."
+            id="searchInput"
+            autocomplete="off"
+            aria-autocomplete="list"
+            aria-controls="searchSuggestions"
+            aria-expanded="false"
+          >
+          <div id="searchSuggestions" class="search-suggestions" role="listbox" hidden aria-label="Search suggestions"></div>
+        </div>
         <button type="button" class="btn-search">Search</button>
       </div>
       <nav class="nav">
@@ -118,6 +129,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=20260828-cart"></script>
+  <script src="/js/app.js?v=20260828-search"></script>
 </body>
 </html>

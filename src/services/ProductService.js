@@ -330,6 +330,55 @@ class ProductService {
     return { items: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  async suggest(search = '', options = {}) {
+    const term = search != null ? String(search).trim() : '';
+    if (!term) return { suggestions: [] };
+
+    const limit = Math.min(Math.max(parseInt(options.limit, 10) || 8, 1), 20);
+    const categoryId = parseInt(options.categoryId, 10);
+    const hasCategory = Number.isFinite(categoryId) && categoryId > 0;
+    const pattern = `%${term}%`;
+    const prefixPattern = `${term}%`;
+
+    const params = [pattern, prefixPattern];
+    let categorySql = '';
+    if (hasCategory) {
+      params.push(categoryId);
+      const catIdx = params.length;
+      categorySql = ` AND (
+        p.category_id = $${catIdx} OR EXISTS (
+          SELECT 1 FROM product_categories pc
+          WHERE pc.product_id = p.id AND pc.category_id = $${catIdx}
+        )
+      )`;
+    }
+    params.push(limit);
+    const limitIdx = params.length;
+
+    const result = await pool.query(
+      `SELECT p.id, p.title, p.price,
+              (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
+       FROM products p
+       WHERE p.status = 'active'
+         AND (p.title ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1 OR COALESCE(p.description, '') ILIKE $1)
+         ${categorySql}
+       ORDER BY
+         CASE WHEN p.title ILIKE $2 THEN 0 ELSE 1 END,
+         p.title ASC
+       LIMIT $${limitIdx}`,
+      params
+    );
+
+    return {
+      suggestions: result.rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        price: row.price,
+        image_url: row.image_url,
+      })),
+    };
+  }
+
   async getById(id) {
     const result = await pool.query(
       `SELECT p.*, c.name as category_name
