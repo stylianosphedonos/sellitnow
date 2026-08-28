@@ -982,20 +982,14 @@ function renderCompactCategoryIcon(c, variant) {
     </button>`;
 }
 
-function renderAllProductsCategoryButton(asCircle) {
+function renderAllProductsCategoryButton() {
   const cachedBrand = readCachedBrandSettings();
   if (cachedBrand?.allProductsShowOnWebsite === false) return '';
   const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
-  const mediaClass = asCircle
-    ? 'category-card__media category-card__media--tile'
-    : 'category-card__media';
   const media = allProductsImage
-    ? `<div class="${mediaClass} category-card__media--image"><img src="${escapeHtml(allProductsImage)}" alt="All products" loading="lazy" decoding="async"></div>`
-    : `<div class="${mediaClass} category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>`;
-  if (asCircle) {
-    return `<button type="button" class="category-icon category-icon--circle" id="loadAllProductsBtn" aria-label="Show all products">${media}<span class="category-icon__label">All products</span></button>`;
-  }
-  return `<button type="button" class="category-card" id="loadAllProductsBtn" aria-label="Show all products">${media}<span class="category-card__label">All products</span></button>`;
+    ? `<div class="category-card__media category-card__media--tile category-card__media--image"><img src="${escapeHtml(allProductsImage)}" alt="All products" loading="lazy" decoding="async"></div>`
+    : `<div class="category-card__media category-card__media--tile category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>`;
+  return `<button type="button" class="category-card category-card--tile" id="loadAllProductsBtn" aria-label="Show all products">${media}<span class="category-card__label">All products</span></button>`;
 }
 
 function renderCategoryForZone(c, zone) {
@@ -1011,6 +1005,46 @@ function hideMobileCategoryDock() {
   document.body.classList.remove('has-zone-mobile-dock');
 }
 
+function setupCategoryStripScroll() {
+  const strip = document.getElementById('categoryStrip');
+  const viewport = document.getElementById('categoryStripViewport');
+  const grid = document.getElementById('categoryGrid');
+  const prev = document.getElementById('categoryStripPrev');
+  const next = document.getElementById('categoryStripNext');
+  if (!strip || !viewport || !grid || !prev || !next) return;
+
+  const updateNav = () => {
+    const maxScroll = viewport.scrollWidth - viewport.clientWidth;
+    const canScroll = maxScroll > 4;
+    const atStart = viewport.scrollLeft <= 4;
+    const atEnd = viewport.scrollLeft >= maxScroll - 4;
+    prev.hidden = !canScroll || atStart;
+    next.hidden = !canScroll || atEnd;
+    strip.classList.toggle('category-strip--scrollable', canScroll);
+  };
+
+  const scrollStrip = (direction) => {
+    const amount = Math.max(140, viewport.clientWidth * 0.75);
+    viewport.scrollBy({ left: direction * amount, behavior: 'smooth' });
+  };
+
+  if (!strip.dataset.stripBound) {
+    strip.dataset.stripBound = '1';
+    prev.addEventListener('click', () => scrollStrip(-1));
+    next.addEventListener('click', () => scrollStrip(1));
+    viewport.addEventListener('scroll', updateNav, { passive: true });
+    window.addEventListener('resize', updateNav);
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(updateNav);
+      observer.observe(viewport);
+      observer.observe(grid);
+    }
+  }
+
+  viewport.scrollLeft = 0;
+  requestAnimationFrame(updateNav);
+}
+
 function paintStorefrontCategories(byZone) {
   const grid = document.getElementById('categoryGrid');
   const bannersEl = document.getElementById('categoryBanners');
@@ -1021,33 +1055,23 @@ function paintStorefrontCategories(byZone) {
   hideAllZoneContainers();
   hideMobileCategoryDock();
 
-  const all = flattenCategoriesByZone(byZone);
   const homeMain = byZone.get('home-main') || [];
   const showAllProducts = readCachedBrandSettings()?.allProductsShowOnWebsite !== false;
   const mobile = isMobileSiteDock();
 
-  if (mobile) {
-    const banners = all.filter(isBannerLayout);
-    const circles = all.filter((c) => !isBannerLayout(c));
-    if (bannersEl) {
-      bannersEl.innerHTML = banners.map((c) => renderStorefrontCategoryCard(c)).join('');
-      bannersEl.hidden = banners.length === 0;
-    }
-    grid.classList.add('category-grid--circles');
-    grid.innerHTML = renderAllProductsCategoryButton(true) + circles.map((c) => renderCompactCategoryIcon(c, 'circle')).join('');
-    if (heading) heading.hidden = circles.length === 0 && !showAllProducts;
-    if (categoriesSection) {
-      categoriesSection.hidden = banners.length === 0 && circles.length === 0 && !showAllProducts;
-    }
-  } else {
-    if (bannersEl) {
-      bannersEl.innerHTML = '';
-      bannersEl.hidden = true;
-    }
-    grid.classList.remove('category-grid--circles');
-    grid.innerHTML = renderAllProductsCategoryButton(false) + homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
-    if (heading) heading.hidden = false;
+  if (bannersEl) {
+    bannersEl.innerHTML = '';
+    bannersEl.hidden = true;
+  }
 
+  grid.classList.remove('category-grid--circles');
+  grid.innerHTML =
+    renderAllProductsCategoryButton() +
+    homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
+
+  if (heading) heading.hidden = homeMain.length === 0 && !showAllProducts;
+
+  if (!mobile) {
     for (const [zone, containerId] of Object.entries(WEBSITE_ZONE_CONTAINER_IDS)) {
       if (zone === 'home-main') continue;
       const el = document.getElementById(containerId);
@@ -1061,13 +1085,15 @@ function paintStorefrontCategories(byZone) {
       el.innerHTML = list.map((c) => renderCategoryForZone(c, zone)).join('');
       el.hidden = false;
     }
+  }
 
-    if (categoriesSection) {
-      categoriesSection.hidden = homeMain.length === 0 && !showAllProducts;
-    }
+  if (categoriesSection) {
+    categoriesSection.hidden = homeMain.length === 0 && !showAllProducts;
   }
 
   bindLoadAllProductsFromCategorySection();
+  setupCategoryStripScroll();
+
   const browsingCategoryId = getCurrentCategoryFromUrl();
   if (categoriesSection && browsingCategoryId != null) {
     categoriesSection.hidden = true;

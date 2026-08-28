@@ -6,7 +6,7 @@
   <title>3nityLab - 3D Printed Products Made in Cyprus</title>
   <script src="/js/runtime-config.js"></script>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css?v=20260828-search">
+  <link rel="stylesheet" href="/css/style.css?v=20260828-categories">
 </head>
 <body>
   <header class="header">
@@ -64,7 +64,17 @@
           <div class="category-banners" id="categoryBanners" hidden></div>
           <h2>Shop Products</h2>
           <p class="categories__lead">Browse our range of ready-made prints, or request something made just for you.</p>
-          <div class="category-grid" id="categoryGrid"></div>
+          <div class="category-strip" id="categoryStrip">
+            <button type="button" class="category-strip__nav category-strip__nav--prev" id="categoryStripPrev" aria-label="Previous categories" hidden>
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 15L7.5 10L12.5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="category-strip__viewport" id="categoryStripViewport">
+              <div class="category-grid" id="categoryGrid"></div>
+            </div>
+            <button type="button" class="category-strip__nav category-strip__nav--next" id="categoryStripNext" aria-label="Next categories" hidden>
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5L12.5 10L7.5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </section>
 
         <section class="products" id="products">
@@ -130,6 +140,6 @@
     </div>
   </div>
 
-  <script src="/js/app.js?v=20260828-search"></script>
+  <script src="/js/app.js?v=20260828-categories"></script>
 </body>
 </html>
