@@ -906,18 +906,22 @@ function sortCategoriesForZone(list) {
   });
 }
 
+/** Scroll an element to sit just below the sticky site header. */
+function scrollElementBelowHeader(el, behavior = 'smooth') {
+  if (!el) return;
+  const header = document.querySelector('.header');
+  const headerOffset = (header ? header.getBoundingClientRect().height : 0) + 8;
+  const top = el.getBoundingClientRect().top + window.scrollY - headerOffset;
+  window.scrollTo({ top: Math.max(0, top), behavior });
+}
+
 /** Scroll so the products toolbar (or title) sits below the sticky header. */
 function scrollProductsBrowseIntoView() {
   const browseBar = document.getElementById('productsBrowseBar');
   const heading = document.getElementById('productsSectionHeading');
   const target =
     browseBar && !browseBar.hidden ? browseBar : heading || document.querySelector('.products');
-  if (!target) return;
-
-  const header = document.querySelector('.header');
-  const headerOffset = (header ? header.getBoundingClientRect().height : 0) + 8;
-  const top = target.getBoundingClientRect().top + window.scrollY - headerOffset;
-  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  scrollElementBelowHeader(target);
 }
 
 function applyProductsBrowseMode(categoryId, categoryLabel) {
@@ -1250,7 +1254,11 @@ function bindBackToCategories() {
     history.replaceState({}, '', url.pathname + url.search);
     applyProductsBrowseMode(null);
     loadProducts(1, null);
-    document.getElementById('categories')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollElementBelowHeader(document.getElementById('categories'), 'smooth');
+      });
+    });
   });
 }
 
