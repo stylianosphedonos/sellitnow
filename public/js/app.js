@@ -712,15 +712,6 @@ const FLOATING_WEBSITE_ZONES = new Set([
   'bottom-right',
 ]);
 
-const MOBILE_DOCK_ZONES = new Set([
-  'top-left',
-  'top-right',
-  'bottom-left',
-  'bottom-right',
-  'left',
-  'right',
-]);
-
 function isMobileSiteDock() {
   return window.matchMedia('(max-width: 640px)').matches;
 }
@@ -778,42 +769,130 @@ function getCategoryWebsiteZone(c) {
   return 'home-main';
 }
 
-function renderCompactCategoryIcon(c, inDock) {
-  const media = renderCategoryCardMedia(c, 'tile');
+function isBannerLayout(c) {
+  const layout = getCategoryWebsiteLayout(c);
+  return layout === 'banner-left' || layout === 'banner-right';
+}
+
+function flattenCategoriesByZone(byZone) {
+  const items = [];
+  for (const list of byZone.values()) items.push(...list);
+  return sortCategoriesForZone(items);
+}
+
+function hideAllZoneContainers() {
+  Object.entries(WEBSITE_ZONE_CONTAINER_IDS).forEach(([zone, containerId]) => {
+    if (zone === 'home-main') return;
+    const el = document.getElementById(containerId);
+    if (el) {
+      el.innerHTML = '';
+      el.hidden = true;
+    }
+  });
+}
+
+function renderCompactCategoryIcon(c, variant) {
+  const compact = variant === 'circle' || variant === 'dock';
+  const media = renderCategoryCardMedia(c, 'tile', { compact });
   const typeClass = isIconCategory(c) ? ' category-icon--request' : '';
-  const dockClass = inDock ? ' category-icon--dock' : '';
+  const variantClass = variant === 'dock' ? ' category-icon--dock' : variant === 'circle' ? ' category-icon--circle' : '';
   return `
-    <button type="button" class="category-icon${typeClass}${dockClass}" data-category-id="${c.id}" aria-label="${escapeHtml(c.name)}">
+    <button type="button" class="category-icon${typeClass}${variantClass}" data-category-id="${c.id}" aria-label="${escapeHtml(c.name)}">
       ${media}
       <span class="category-icon__label">${escapeHtml(c.name)}</span>
     </button>`;
 }
 
-function renderCategoryForZone(c, zone) {
-  if (zone === 'home-main') return renderStorefrontCategoryCard(c);
-  return renderCompactCategoryIcon(c, false);
+function renderAllProductsCategoryButton(asCircle) {
+  const cachedBrand = readCachedBrandSettings();
+  if (cachedBrand?.allProductsShowOnWebsite === false) return '';
+  const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
+  const mediaClass = asCircle
+    ? 'category-card__media category-card__media--tile'
+    : 'category-card__media';
+  const media = allProductsImage
+    ? `<div class="${mediaClass} category-card__media--image"><img src="${escapeHtml(allProductsImage)}" alt="All products" loading="lazy" decoding="async"></div>`
+    : `<div class="${mediaClass} category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>`;
+  if (asCircle) {
+    return `<button type="button" class="category-icon category-icon--circle" id="loadAllProductsBtn" aria-label="Show all products">${media}<span class="category-icon__label">All products</span></button>`;
+  }
+  return `<button type="button" class="category-card" id="loadAllProductsBtn" aria-label="Show all products">${media}<span class="category-card__label">All products</span></button>`;
 }
 
-function renderMobileCategoryDock(byZone) {
+function renderCategoryForZone(c, zone) {
+  if (zone === 'home-main') return renderStorefrontCategoryCard(c);
+  return renderCompactCategoryIcon(c);
+}
+
+function hideMobileCategoryDock() {
   const dock = document.getElementById('zone-mobile-dock');
   if (!dock) return;
+  dock.hidden = true;
+  dock.innerHTML = '';
+  document.body.classList.remove('has-zone-mobile-dock');
+}
 
-  const items = [];
-  for (const zone of MOBILE_DOCK_ZONES) {
-    items.push(...(byZone.get(zone) || []));
+function paintStorefrontCategories(byZone) {
+  const grid = document.getElementById('categoryGrid');
+  const bannersEl = document.getElementById('categoryBanners');
+  const heading = document.querySelector('#categories > h2');
+  const categoriesSection = document.getElementById('categories');
+  if (!grid) return;
+
+  hideAllZoneContainers();
+  hideMobileCategoryDock();
+
+  const all = flattenCategoriesByZone(byZone);
+  const homeMain = byZone.get('home-main') || [];
+  const showAllProducts = readCachedBrandSettings()?.allProductsShowOnWebsite !== false;
+  const mobile = isMobileSiteDock();
+
+  if (mobile) {
+    const banners = all.filter(isBannerLayout);
+    const circles = all.filter((c) => !isBannerLayout(c));
+    if (bannersEl) {
+      bannersEl.innerHTML = banners.map((c) => renderStorefrontCategoryCard(c)).join('');
+      bannersEl.hidden = banners.length === 0;
+    }
+    grid.classList.add('category-grid--circles');
+    grid.innerHTML = renderAllProductsCategoryButton(true) + circles.map((c) => renderCompactCategoryIcon(c, 'circle')).join('');
+    if (heading) heading.hidden = circles.length === 0 && !showAllProducts;
+    if (categoriesSection) {
+      categoriesSection.hidden = banners.length === 0 && circles.length === 0 && !showAllProducts;
+    }
+  } else {
+    if (bannersEl) {
+      bannersEl.innerHTML = '';
+      bannersEl.hidden = true;
+    }
+    grid.classList.remove('category-grid--circles');
+    grid.innerHTML = renderAllProductsCategoryButton(false) + homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
+    if (heading) heading.hidden = false;
+
+    for (const [zone, containerId] of Object.entries(WEBSITE_ZONE_CONTAINER_IDS)) {
+      if (zone === 'home-main') continue;
+      const el = document.getElementById(containerId);
+      const list = byZone.get(zone) || [];
+      if (!el || !list.length) continue;
+      const isBar = zone === 'top' || zone === 'bottom';
+      const isSide = zone === 'left' || zone === 'right';
+      el.classList.toggle('site-zone--bar-row', isBar);
+      el.classList.toggle('site-zone--side-stack', isSide);
+      el.classList.toggle('site-zone--float-stack', FLOATING_WEBSITE_ZONES.has(zone));
+      el.innerHTML = list.map((c) => renderCategoryForZone(c, zone)).join('');
+      el.hidden = false;
+    }
+
+    if (categoriesSection) {
+      categoriesSection.hidden = homeMain.length === 0 && !showAllProducts;
+    }
   }
-  const sorted = sortCategoriesForZone(items);
 
-  if (!isMobileSiteDock() || !sorted.length) {
-    dock.hidden = true;
-    dock.innerHTML = '';
-    document.body.classList.remove('has-zone-mobile-dock');
-    return;
+  bindLoadAllProductsFromCategorySection();
+  const browsingCategoryId = getCurrentCategoryFromUrl();
+  if (categoriesSection && browsingCategoryId != null) {
+    categoriesSection.hidden = true;
   }
-
-  dock.innerHTML = sorted.map((c) => renderCompactCategoryIcon(c, true)).join('');
-  dock.hidden = false;
-  document.body.classList.add('has-zone-mobile-dock');
 }
 
 function initMobileCategoryDockReload(byZoneRef) {
@@ -823,7 +902,7 @@ function initMobileCategoryDockReload(byZoneRef) {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (byZoneRef.current) renderMobileCategoryDock(byZoneRef.current);
+      if (byZoneRef.current) paintStorefrontCategories(byZoneRef.current);
     }, 150);
   });
 }
@@ -1044,7 +1123,8 @@ function getCategoryWebsiteLayout(c) {
   return 'tile';
 }
 
-function renderCategoryCardMedia(c, layout) {
+function renderCategoryCardMedia(c, layout, opts) {
+  const compact = Boolean(opts && opts.compact);
   const cachedBrand = readCachedBrandSettings();
   const brandIconImage =
     isIconCategory(c) && cachedBrand?.requestIconImage
@@ -1052,8 +1132,10 @@ function renderCategoryCardMedia(c, layout) {
       : '';
   const imageSource = brandIconImage || c.image_url;
   const hasImage = Boolean(imageSource);
-  const mediaClass = getCategoryIconMediaClasses(c, layout, hasImage);
-  const mediaStyle = getCategoryIconMediaStyle(c, layout, hasImage);
+  const mediaClass = compact
+    ? 'category-card__media category-card__media--tile'
+    : getCategoryIconMediaClasses(c, layout, hasImage);
+  const mediaStyle = compact ? '' : getCategoryIconMediaStyle(c, layout, hasImage);
   const styleAttr = mediaStyle ? ` style="${mediaStyle}"` : '';
   const imgUrl = hasImage ? mediaUrl(imageSource) : '';
   if (imgUrl) {
@@ -1100,28 +1182,6 @@ async function loadCategories() {
   const grid = document.getElementById('categoryGrid');
   if (!grid) return;
 
-  Object.entries(WEBSITE_ZONE_CONTAINER_IDS).forEach(([zone, containerId]) => {
-    if (zone === 'home-main') return;
-    const el = document.getElementById(containerId);
-    if (el) {
-      el.innerHTML = '';
-      el.hidden = true;
-    }
-  });
-
-  const cachedBrand = readCachedBrandSettings();
-  const showAllProductsTile = cachedBrand?.allProductsShowOnWebsite !== false;
-  const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
-  const allProductsTile = showAllProductsTile ? `
-      <button type="button" class="category-card" id="loadAllProductsBtn" aria-label="Show all products">
-        ${
-          allProductsImage
-            ? `<div class="category-card__media"><img src="${escapeHtml(allProductsImage)}" alt="All products" loading="lazy" decoding="async"></div>`
-            : '<div class="category-card__media category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>'
-        }
-        <span class="category-card__label">All products</span>
-      </button>` : '';
-
   try {
     const { categories } = await callApi('/categories');
     sellitnowCategoryLabels.clear();
@@ -1155,36 +1215,15 @@ async function loadCategories() {
     }
     window.__sellitnowMobileDockByZoneRef.current = byZone;
 
-    const homeMain = byZone.get('home-main') || [];
-    grid.innerHTML = allProductsTile + homeMain.map((c) => renderStorefrontCategoryCard(c)).join('');
-
-    const categoriesSection = document.getElementById('categories');
-    if (categoriesSection) {
-      categoriesSection.hidden = homeMain.length === 0 && !showAllProductsTile;
-    }
-
-    for (const [zone, containerId] of Object.entries(WEBSITE_ZONE_CONTAINER_IDS)) {
-      if (zone === 'home-main') continue;
-      const el = document.getElementById(containerId);
-      const list = byZone.get(zone) || [];
-      if (!el || !list.length) continue;
-      const isBar = zone === 'top' || zone === 'bottom';
-      const isSide = zone === 'left' || zone === 'right';
-      el.classList.toggle('site-zone--bar-row', isBar);
-      el.classList.toggle('site-zone--side-stack', isSide);
-      el.classList.toggle('site-zone--float-stack', FLOATING_WEBSITE_ZONES.has(zone));
-      el.innerHTML = list.map((c) => renderCategoryForZone(c, zone)).join('');
-      el.hidden = false;
-    }
-
-    renderMobileCategoryDock(byZone);
+    paintStorefrontCategories(byZone);
   } catch (err) {
     sellitnowCategoryLabels.clear();
     sellitnowCategoriesById.clear();
-    renderMobileCategoryDock(new Map());
-    grid.innerHTML = allProductsTile + '<p>No categories</p>';
+    paintStorefrontCategories(new Map());
+    if (!grid.querySelector('[data-category-id], #loadAllProductsBtn')) {
+      grid.innerHTML += '<p>No categories</p>';
+    }
   }
-  bindLoadAllProductsFromCategorySection();
   bindCategoryGridNavigation();
   bindBackToCategories();
 }

@@ -342,6 +342,10 @@ section h2 {
 }
 
 /* Categories */
+.category-banners {
+  display: none;
+}
+
 .category-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -3846,6 +3850,12 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     gap: 10px;
   }
 
+  .category-icon--circle {
+    flex-basis: 25%;
+    max-width: 25%;
+    width: 25%;
+  }
+
   .pagination button {
     flex: 1 1 calc(50% - 6px);
     max-width: none;
@@ -4083,6 +4093,93 @@ body.request-modal-open {
     display: block;
     padding: 0;
     max-width: none;
+  }
+
+  .category-banners:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .category-banners .category-card--banner {
+    width: 100%;
+  }
+
+  .category-grid--circles {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 12px 0;
+  }
+
+  .category-icon--circle {
+    flex: 0 0 20%;
+    max-width: 20%;
+    width: 20%;
+    background: transparent;
+    box-shadow: none;
+    padding: 0 4px;
+    border-radius: 0;
+    gap: 6px;
+  }
+
+  .category-icon--circle:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .category-icon--circle:active .category-card__media {
+    transform: scale(0.94);
+  }
+
+  .category-icon--circle .category-card__media {
+    width: 58px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    max-width: 58px !important;
+    aspect-ratio: 1 !important;
+    border-radius: 50% !important;
+    margin: 0 auto;
+    overflow: hidden;
+    background: var(--bg);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.12);
+  }
+
+  .category-icon--circle .category-card__media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    border-radius: 50%;
+  }
+
+  .category-icon--circle .category-card__media--placeholder .icon {
+    font-size: 22px;
+  }
+
+  .category-icon--circle .category-icon__label {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: normal;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    max-width: 100%;
+    margin-top: 0;
+    text-align: center;
+  }
+
+  .category-icon--circle.category-icon--request::after {
+    top: -2px;
+    right: calc(50% - 33px);
+    width: 16px;
+    height: 16px;
+    font-size: 9px;
+    line-height: 16px;
   }
 
   .site-zone--bar {
