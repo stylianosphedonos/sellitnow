@@ -16,6 +16,7 @@ const {
   uploadRequestIconImage,
 } = require('../middleware/upload');
 const { publicUrlForUploadedFile, deleteStoredMediaUrl } = require('../lib/mediaPublicUrl');
+const { syncAllBilingualContent } = require('../lib/bilingualSync');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
 const EmailService = require('../services/EmailService');
 const OrderEmailLogService = require('../services/OrderEmailLogService');
@@ -929,6 +930,20 @@ router.post('/database/restore', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/sync-bilingual', async (req, res) => {
+  try {
+    const stats = await syncAllBilingualContent(pool);
+    res.json({
+      success: true,
+      message: `Updated ${stats.products} product(s), ${stats.categories} categor(ies), and ${stats.hero} hero block(s).`,
+      ...stats,
+    });
+  } catch (err) {
+    console.error('[admin] POST /sync-bilingual:', err);
+    res.status(500).json({ error: err.message || 'Language sync failed' });
   }
 });
 
