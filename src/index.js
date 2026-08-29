@@ -375,6 +375,23 @@ function runSchemaMigrations(db) {
   if (!categoryCols.some((c) => c.name === 'request_prompt')) {
     db.exec('ALTER TABLE categories ADD COLUMN request_prompt TEXT');
   }
+  if (!categoryCols.some((c) => c.name === 'name_el')) {
+    db.exec('ALTER TABLE categories ADD COLUMN name_el TEXT');
+  }
+  if (!categoryCols.some((c) => c.name === 'description_el')) {
+    db.exec('ALTER TABLE categories ADD COLUMN description_el TEXT');
+  }
+  if (!categoryCols.some((c) => c.name === 'request_prompt_el')) {
+    db.exec('ALTER TABLE categories ADD COLUMN request_prompt_el TEXT');
+  }
+
+  const productI18nCols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+  if (productI18nCols.length && !productI18nCols.includes('title_el')) {
+    db.exec('ALTER TABLE products ADD COLUMN title_el TEXT');
+  }
+  if (productI18nCols.length && !productI18nCols.includes('description_el')) {
+    db.exec('ALTER TABLE products ADD COLUMN description_el TEXT');
+  }
 
   const orderCols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!orderCols.includes('stock_warning')) {
@@ -509,6 +526,10 @@ async function ensureDb() {
     const schema = fs.readFileSync(path.join(__dirname, 'database', 'schema.sql'), 'utf8');
     db.exec(schema);
     runSchemaMigrations(db);
+    const { seedDefaultGreekCopy } = require('./database/storefrontDefaults');
+    const { copyGreekContentToElColumns } = require('./lib/localizedText');
+    await seedDefaultGreekCopy(dbMod.pool);
+    await copyGreekContentToElColumns(dbMod.pool);
     console.log('Database ready (SQLite)');
   } catch (err) {
     console.error('Database init failed:', err.message);
@@ -520,7 +541,9 @@ async function ensureSeed() {
   try {
     const slugify = require('slugify');
     const { pool } = require('./database/db');
+    const { seedDefaultGreekCopy } = require('./database/storefrontDefaults');
     await migrateLegacyHeroCopy(pool);
+    await seedDefaultGreekCopy(pool);
 
     const r = await pool.query('SELECT COUNT(*) as count FROM products');
     if (r.rows[0]?.count > 0) return;
@@ -533,14 +556,16 @@ async function ensureSeed() {
     for (const product of SAMPLE_PRODUCTS) {
       const categoryId = catBySlug.get(product.categorySlug);
       await pool.query(
-        `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+        `INSERT INTO products (sku, title, title_el, slug, description, description_el, price, stock_quantity, category_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
          ON CONFLICT (sku) DO NOTHING`,
         [
           product.sku,
           product.title,
+          product.title_el || null,
           slugify(product.title, { lower: true }),
           product.description,
+          product.description_el || null,
           product.price,
           product.stock,
           categoryId,

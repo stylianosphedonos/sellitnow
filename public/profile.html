@@ -3,31 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Account - 3nityLab</title>
+  <title data-i18n="page.account">Account - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js?v=20260829-i18n"></script>
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">3nityLab</a>
       <nav class="nav">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/admin/" class="nav-link" id="adminLink" style="display:none">Manage</a>
-        <button class="nav-link" id="logoutBtn">Logout</button>
+        <a href="/" class="nav-link" data-i18n="nav.home">Home</a>
+        <a href="/admin/" class="nav-link" id="adminLink" style="display:none" data-i18n="nav.manage">Manage</a>
+        <button class="nav-link" id="logoutBtn" data-i18n="nav.logout">Logout</button>
       </nav>
     </div>
   </header>
 
   <main class="main">
-    <h1>My Account</h1>
+    <h1 data-i18n="account.title">My Account</h1>
     <div id="profile"></div>
-    <h2 style="margin-top:32px">Order History</h2>
+    <h2 style="margin-top:32px" data-i18n="account.orders">Order History</h2>
     <div id="orders"></div>
   </main>
 
   <script src="/js/runtime-config.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=20260829-i18n"></script>
   <script>
     initLogout();
 
@@ -44,18 +45,22 @@
       await loadOrders();
     }
 
+    function tr(key, vars) {
+      return typeof t === 'function' ? t(key, vars) : key;
+    }
+
     async function loadProfile() {
       try {
         const { user: profile } = await callApi('/auth/me');
         document.getElementById('profile').innerHTML = `
           <div style="background:white;padding:24px;border-radius:12px;max-width:500px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-            <p><strong>Name:</strong> ${profile.first_name} ${profile.last_name}</p>
-            <p><strong>Email:</strong> ${profile.email}</p>
-            ${profile.phone ? '<p><strong>Phone:</strong> ' + profile.phone + '</p>' : ''}
+            <p><strong>${tr('account.name')}</strong> ${profile.first_name} ${profile.last_name}</p>
+            <p><strong>${tr('account.email')}</strong> ${profile.email}</p>
+            ${profile.phone ? '<p><strong>' + tr('account.phone') + '</strong> ' + profile.phone + '</p>' : ''}
           </div>
         `;
       } catch (err) {
-        document.getElementById('profile').innerHTML = '<p>Failed to load profile.</p>';
+        document.getElementById('profile').innerHTML = '<p>' + tr('account.loadFailed') + '</p>';
       }
     }
 
@@ -64,29 +69,36 @@
         const data = await callApi('/orders');
         const items = data.items || [];
         if (items.length === 0) {
-          document.getElementById('orders').innerHTML = '<p>No orders yet.</p>';
+          document.getElementById('orders').innerHTML = '<p>' + tr('account.noOrders') + '</p>';
           return;
         }
+        const dateLocale = typeof getStoreLang === 'function' && getStoreLang() === 'el' ? 'el-CY' : undefined;
         document.getElementById('orders').innerHTML = `
           <div class="table">
             <table style="width:100%;border-collapse:collapse">
-              <tr><th>Order #</th><th>Status</th><th>Payment</th><th>Total</th><th>Date</th></tr>
+              <tr><th>${tr('account.orderCol')}</th><th>${tr('account.statusCol')}</th><th>${tr('account.paymentCol')}</th><th>${tr('account.totalCol')}</th><th>${tr('account.dateCol')}</th></tr>
               ${items.map(o => `
                 <tr>
                   <td>${o.order_number}</td>
                   <td>${o.status}</td>
-                  <td>${o.payment_method === 'pay_on_delivery' ? 'On delivery (' + o.payment_status + ')' : o.payment_status}</td>
+                  <td>${o.payment_method === 'pay_on_delivery' ? tr('account.onDelivery', { status: o.payment_status }) : o.payment_status}</td>
                   <td>${formatStoreMoney(o.total_amount)}</td>
-                  <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                  <td>${new Date(o.created_at).toLocaleDateString(dateLocale)}</td>
                 </tr>
               `).join('')}
             </table>
           </div>
         `;
       } catch (err) {
-        document.getElementById('orders').innerHTML = '<p>Failed to load orders.</p>';
+        document.getElementById('orders').innerHTML = '<p>' + tr('account.ordersFailed') + '</p>';
       }
     }
+
+    window.addEventListener('storelangchange', () => {
+      if (typeof applyStaticTranslations === 'function') applyStaticTranslations();
+      loadProfile();
+      loadOrders();
+    });
 
     document.addEventListener('DOMContentLoaded', initProfilePage);
 

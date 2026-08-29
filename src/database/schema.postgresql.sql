@@ -31,8 +31,10 @@ CREATE TABLE IF NOT EXISTS addresses (
 CREATE TABLE IF NOT EXISTS categories (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
+  name_el TEXT,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
+  description_el TEXT,
   image_url TEXT,
   display_order INTEGER,
   icon_size_px INTEGER,
@@ -42,6 +44,7 @@ CREATE TABLE IF NOT EXISTS categories (
   category_type TEXT DEFAULT 'browse',
   website_zone TEXT DEFAULT 'home-main',
   request_prompt TEXT,
+  request_prompt_el TEXT,
   show_on_website INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -50,8 +53,10 @@ CREATE TABLE IF NOT EXISTS products (
   id SERIAL PRIMARY KEY,
   sku TEXT UNIQUE,
   title TEXT NOT NULL,
+  title_el TEXT,
   slug TEXT UNIQUE NOT NULL,
   description TEXT,
+  description_el TEXT,
   price DOUBLE PRECISION NOT NULL,
   stock_quantity INTEGER DEFAULT 0,
   category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,

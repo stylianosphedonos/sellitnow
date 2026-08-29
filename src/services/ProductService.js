@@ -3,6 +3,7 @@ const config = require('../config');
 const { pool } = require('../database/db');
 const { parseOptionsJson, stringifyOptionsJson } = require('../lib/productOptions');
 const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
+const { trimToNull } = require('../lib/localizedText');
 const {
   normalizeBundleItemsInput,
   computeStockFromBundleRows,
@@ -23,7 +24,7 @@ class ProductService {
   async getBundleItems(bundleProductId) {
     const result = await pool.query(
       `SELECT bi.id, bi.bundle_product_id, bi.component_product_id, bi.quantity, bi.display_order,
-              p.title AS component_title, p.slug AS component_slug, p.price AS component_price,
+              p.title AS component_title, p.title_el AS component_title_el, p.slug AS component_slug, p.price AS component_price,
               p.stock_quantity AS component_stock_quantity, p.status AS component_status, p.product_type AS component_product_type,
               (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) AS component_image_url
        FROM bundle_items bi
@@ -38,6 +39,7 @@ class ProductService {
       quantity: row.quantity,
       display_order: row.display_order,
       title: row.component_title,
+      title_el: row.component_title_el || null,
       slug: row.component_slug,
       price: Number(row.component_price),
       stock_quantity: row.component_stock_quantity,
@@ -52,7 +54,7 @@ class ProductService {
     const placeholders = bundleIds.map((_, i) => `$${i + 1}`).join(', ');
     const result = await pool.query(
       `SELECT bi.bundle_product_id, bi.component_product_id, bi.quantity, bi.display_order,
-              p.title AS component_title, p.price AS component_price,
+              p.title AS component_title, p.title_el AS component_title_el, p.price AS component_price,
               p.stock_quantity AS component_stock_quantity, p.status AS component_status,
               (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) AS component_image_url
        FROM bundle_items bi
@@ -69,6 +71,7 @@ class ProductService {
         quantity: row.quantity,
         display_order: row.display_order,
         title: row.component_title,
+        title_el: row.component_title_el || null,
         price: Number(row.component_price),
         stock_quantity: row.component_stock_quantity,
         status: row.component_status,
@@ -214,15 +217,18 @@ class ProductService {
     const pattern = term ? `%${term}%` : null;
 
     const countResult = pattern
-      ? await pool.query('SELECT COUNT(*)::int FROM products p WHERE p.title ILIKE $1', [pattern])
+      ? await pool.query(
+          'SELECT COUNT(*)::int FROM products p WHERE p.title ILIKE $1 OR COALESCE(p.title_el, \'\') ILIKE $1',
+          [pattern]
+        )
       : await pool.query('SELECT COUNT(*)::int FROM products');
     const total = countResult.rows[0].count;
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order, p.product_type
+          `SELECT p.id, p.sku, p.title, p.title_el, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order, p.product_type
            FROM products p
-           WHERE p.title ILIKE $1
+           WHERE p.title ILIKE $1 OR COALESCE(p.title_el, '') ILIKE $1
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
              p.display_order ASC,
@@ -231,7 +237,7 @@ class ProductService {
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.sku, p.title, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order, p.product_type
+          `SELECT p.id, p.sku, p.title, p.title_el, p.slug, p.price, p.stock_quantity, p.status, p.category_id, p.options_json, p.delivery_cost, p.display_order, p.product_type
            FROM products p
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
@@ -267,11 +273,13 @@ class ProductService {
           ? ` AND COALESCE(p.product_type, 'simple') = 'simple'`
           : '';
 
+    const searchSql = `(p.title ILIKE $1 OR COALESCE(p.title_el, '') ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.description_el, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)`;
+
     const countResult = pattern
       ? await pool.query(
           `SELECT COUNT(*)::int FROM products p
            WHERE p.status = 'active'
-             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)${typeSql}`,
+             AND ${searchSql}${typeSql}`,
           [pattern]
         )
       : await pool.query(
@@ -283,11 +291,11 @@ class ProductService {
     // Card payload only — omit description and other unused fields for faster storefront loads
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
+          `SELECT p.id, p.title, p.title_el, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'
-             AND (p.title ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1)${typeSql}
+             AND ${searchSql}${typeSql}
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
              p.display_order ASC,
@@ -296,7 +304,7 @@ class ProductService {
           [pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
+          `SELECT p.id, p.title, p.title_el, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = 'active'${typeSql}
@@ -315,6 +323,7 @@ class ProductService {
       return {
         id: row.id,
         title: row.title,
+        title_el: row.title_el || null,
         price: row.price,
         image_url: row.image_url,
         product_type: row.product_type || 'simple',
@@ -356,14 +365,14 @@ class ProductService {
     const limitIdx = params.length;
 
     const result = await pool.query(
-      `SELECT p.id, p.title, p.price,
+      `SELECT p.id, p.title, p.title_el, p.price,
               (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
        FROM products p
        WHERE p.status = 'active'
-         AND (p.title ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1 OR COALESCE(p.description, '') ILIKE $1)
+         AND (p.title ILIKE $1 OR COALESCE(p.title_el, '') ILIKE $1 OR COALESCE(p.sku, '') ILIKE $1 OR COALESCE(p.description, '') ILIKE $1 OR COALESCE(p.description_el, '') ILIKE $1)
          ${categorySql}
        ORDER BY
-         CASE WHEN p.title ILIKE $2 THEN 0 ELSE 1 END,
+         CASE WHEN p.title ILIKE $2 OR COALESCE(p.title_el, '') ILIKE $2 THEN 0 ELSE 1 END,
          p.title ASC
        LIMIT $${limitIdx}`,
       params
@@ -373,6 +382,7 @@ class ProductService {
       suggestions: result.rows.map((row) => ({
         id: row.id,
         title: row.title,
+        title_el: row.title_el || null,
         price: row.price,
         image_url: row.image_url,
       })),
@@ -468,14 +478,16 @@ class ProductService {
     const stockQuantity = productType === 'bundle' ? 0 : (data.stock_quantity ?? 0);
 
     const result = await pool.query(
-      `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status, product_type, options_json, delivery_cost, display_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO products (sku, title, title_el, slug, description, description_el, price, stock_quantity, category_id, status, product_type, options_json, delivery_cost, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         normalizedSku,
         data.title,
+        trimToNull(data.title_el) || null,
         slug,
         data.description || null,
+        trimToNull(data.description_el) ?? null,
         data.price,
         stockQuantity,
         primaryCategoryId,
@@ -513,9 +525,13 @@ class ProductService {
     const slug = data.title ? slugify(data.title, { lower: true }) : product.slug;
 
     const title = data.title !== undefined && data.title !== null ? data.title : product.title;
+    const title_el =
+      data.title_el !== undefined ? trimToNull(data.title_el) : product.title_el;
     const rawSku = data.sku !== undefined ? data.sku : product.sku;
     const sku = this.normalizeSku(rawSku) || this.generateFallbackSku(title);
     const description = data.description !== undefined ? data.description : product.description;
+    const description_el =
+      data.description_el !== undefined ? trimToNull(data.description_el) : product.description_el;
     const price = data.price !== undefined && data.price !== null ? data.price : product.price;
     const productType =
       data.product_type !== undefined && data.product_type !== null
@@ -564,19 +580,21 @@ class ProductService {
       `UPDATE products SET
         sku = $2,
         title = $3,
-        slug = $4,
-        description = $5,
-        price = $6,
-        stock_quantity = $7,
-        category_id = $8,
-        status = $9,
-        product_type = $10,
-        options_json = $11,
-        delivery_cost = $12,
-        display_order = $13,
+        title_el = $4,
+        slug = $5,
+        description = $6,
+        description_el = $7,
+        price = $8,
+        stock_quantity = $9,
+        category_id = $10,
+        status = $11,
+        product_type = $12,
+        options_json = $13,
+        delivery_cost = $14,
+        display_order = $15,
         updated_at = NOW()
        WHERE id = $1`,
-      [id, sku, title, slug, description, price, stock_quantity, category_id, status, productType, optionsJson, delivery_cost, display_order]
+      [id, sku, title, title_el, slug, description, description_el, price, stock_quantity, category_id, status, productType, optionsJson, delivery_cost, display_order]
     );
     await this.assignProductCategories(id, normalizedCategoryIds);
 

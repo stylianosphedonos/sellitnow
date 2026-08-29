@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Categories - Admin - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <div class="admin-layout">
@@ -33,17 +33,29 @@
       <div id="categoryForm" class="admin-panel">
         <h3>New Category</h3>
         <form id="addCategory">
-          <div class="form-group">
-            <label>Name *</label>
-            <input type="text" name="name" required>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label>Name (English) *</label>
+              <input type="text" name="name" required>
+            </div>
+            <div class="form-group">
+              <label>Name (Greek)</label>
+              <input type="text" name="name_el" placeholder="Όνομα στα ελληνικά">
+            </div>
           </div>
           <div class="form-group">
             <label>Slug</label>
             <input type="text" name="slug" placeholder="Optional; auto-generated from name if empty">
           </div>
-          <div class="form-group">
-            <label>Description</label>
-            <textarea name="description" rows="3"></textarea>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label>Description (English)</label>
+              <textarea name="description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Description (Greek)</label>
+              <textarea name="description_el" rows="3" placeholder="Περιγραφή στα ελληνικά"></textarea>
+            </div>
           </div>
           <div class="form-group">
             <label>Category type</label>
@@ -53,8 +65,16 @@
             </select>
           </div>
           <div class="form-group" id="addRequestPromptGroup" style="display:none">
-            <label>Request form message</label>
-            <textarea name="request_prompt" rows="3" placeholder="Tell us what product you need and we will reply by email."></textarea>
+            <div class="i18n-field-pair">
+              <div>
+                <label>Request form message (English)</label>
+                <textarea name="request_prompt" rows="3" placeholder="Tell us what product you need and we will reply by email."></textarea>
+              </div>
+              <div>
+                <label>Request form message (Greek)</label>
+                <textarea name="request_prompt_el" rows="3" placeholder="Πείτε μας τι χρειάζεστε..."></textarea>
+              </div>
+            </div>
           </div>
           <div class="form-group">
             <label>Position on website (sort order)</label>
@@ -168,7 +188,7 @@
                 <td>${escapeAttr(formatCategoryZone(c.website_zone))}</td>
                 <td>${c.show_on_website ? 'Yes' : 'No'}</td>
                 <td>${formatCategoryIconSize(c)}</td>
-                <td><strong>${escapeAttr(c.name)}</strong></td>
+                <td><strong>${escapeAttr(c.name)}</strong>${c.name_el ? `<div style="color:#666;font-size:13px;margin-top:2px">${escapeAttr(c.name_el)}</div>` : ''}</td>
                 <td class="col-actions">
                   <button class="btn btn-sm" type="button" onclick="editCategory(${c.id})">Edit</button>
                 </td>
@@ -196,13 +216,16 @@
       const descTrim = form.description.value.trim();
       const payload = {
         name,
+        name_el: form.name_el.value.trim() === '' ? null : form.name_el.value.trim(),
         description: descTrim === '' ? null : form.description.value,
+        description_el: form.description_el.value.trim() === '' ? null : form.description_el.value,
         display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
         show_on_website: form.show_on_website.checked,
         website_layout: form.website_layout.value,
         category_type: form.category_type.value,
         website_zone: form.website_zone.value,
-        request_prompt: form.request_prompt.value.trim() === '' ? null : form.request_prompt.value.trim()
+        request_prompt: form.request_prompt.value.trim() === '' ? null : form.request_prompt.value.trim(),
+        request_prompt_el: form.request_prompt_el.value.trim() === '' ? null : form.request_prompt_el.value.trim(),
       };
       if (form.icon_width_px.value !== '') {
         payload.icon_width_px = parseInt(form.icon_width_px.value, 10);

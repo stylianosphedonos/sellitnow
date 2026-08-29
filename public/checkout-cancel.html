@@ -3,26 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Checkout cancelled - 3nityLab</title>
+  <title data-i18n="page.checkoutCancel">Checkout cancelled - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js?v=20260829-i18n"></script>
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">3nityLab</a>
       <nav class="nav">
-        <a href="/cart.html" class="nav-link">Cart</a>
+        <a href="/cart.html" class="nav-link" data-i18n="nav.cart">Cart</a>
       </nav>
     </div>
   </header>
 
   <main class="main">
     <div style="max-width:500px;margin:60px auto;background:white;padding:40px;border-radius:12px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
-      <h1 style="margin-bottom:16px">Checkout cancelled</h1>
-      <p style="color:#666;margin-bottom:24px">Your payment was not completed. Your cart is unchanged and no charge was made.</p>
-      <a href="/cart.html" class="btn" style="display:inline-block;text-decoration:none;margin-right:12px">Back to cart</a>
-      <a href="/" class="btn btn-secondary" style="display:inline-block;text-decoration:none">Continue shopping</a>
+      <h1 style="margin-bottom:16px" data-i18n="cancel.title">Checkout cancelled</h1>
+      <p style="color:#666;margin-bottom:24px" data-i18n="cancel.text">Your payment was not completed. Your cart is unchanged and no charge was made.</p>
+      <a href="/cart.html" class="btn" style="display:inline-block;text-decoration:none;margin-right:12px" data-i18n="order.backCart">Back to cart</a>
+      <a href="/" class="btn btn-secondary" style="display:inline-block;text-decoration:none" data-i18n="cancel.continue">Continue shopping</a>
     </div>
   </main>
 </body>

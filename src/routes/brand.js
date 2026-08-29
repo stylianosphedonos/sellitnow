@@ -19,6 +19,8 @@ const DEFAULTS = {
   currency: 'usd',
   heroTitle: STOREFRONT_HERO.heroTitle,
   heroSubtitle: STOREFRONT_HERO.heroSubtitle,
+  heroTitleEl: STOREFRONT_HERO.heroTitleEl,
+  heroSubtitleEl: STOREFRONT_HERO.heroSubtitleEl,
   /** Black overlay on hero photo (0 = brightest, ~0.35 = previous default) */
   heroBannerOverlay: 0.35,
 };
@@ -169,6 +171,14 @@ async function getBrandSettings() {
     stored.heroSubtitle !== undefined && stored.heroSubtitle !== null
       ? String(stored.heroSubtitle)
       : DEFAULTS.heroSubtitle;
+  const heroTitleEl =
+    stored.heroTitleEl !== undefined && stored.heroTitleEl !== null
+      ? String(stored.heroTitleEl)
+      : DEFAULTS.heroTitleEl;
+  const heroSubtitleEl =
+    stored.heroSubtitleEl !== undefined && stored.heroSubtitleEl !== null
+      ? String(stored.heroSubtitleEl)
+      : DEFAULTS.heroSubtitleEl;
 
   let heroBannerOverlay = DEFAULTS.heroBannerOverlay;
   if (stored.heroBannerOverlay != null && String(stored.heroBannerOverlay).trim() !== '') {
@@ -210,6 +220,8 @@ async function getBrandSettings() {
     taxRatePercent,
     heroTitle,
     heroSubtitle,
+    heroTitleEl,
+    heroSubtitleEl,
     heroBannerOverlay,
     emailFrom,
     defaultDeliveryCost,

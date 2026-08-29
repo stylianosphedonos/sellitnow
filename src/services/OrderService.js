@@ -139,6 +139,7 @@ class OrderService {
           id: product.id,
           sku: product.sku,
           title: product.title,
+          title_el: product.title_el || null,
           slug: product.slug,
           product_type: product.product_type || 'simple',
           color: item.color || '',
@@ -151,6 +152,7 @@ class OrderService {
             ? product.bundle_items.map((b) => ({
                 product_id: b.component_product_id,
                 title: b.title,
+                title_el: b.title_el || null,
                 quantity: b.quantity,
                 price: b.price,
               }))
@@ -304,6 +306,7 @@ class OrderService {
         id: product.id,
         sku: product.sku,
         title: product.title,
+        title_el: product.title_el || null,
         slug: product.slug,
         product_type: product.product_type || 'simple',
         color: item.color || '',
@@ -316,6 +319,7 @@ class OrderService {
           ? product.bundle_items.map((b) => ({
               product_id: b.component_product_id,
               title: b.title,
+              title_el: b.title_el || null,
               quantity: b.quantity,
               price: b.price,
             }))

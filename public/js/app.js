@@ -8,6 +8,15 @@ function mediaUrl(u) {
   return u;
 }
 
+function tr(key, vars) {
+  return typeof t === 'function' ? t(key, vars) : key;
+}
+
+function loc(obj, field) {
+  if (typeof localizedField === 'function') return localizedField(obj, field);
+  return (obj && obj[field]) || '';
+}
+
 function readCachedBrandSettings() {
   try {
     const raw =
@@ -34,6 +43,8 @@ function persistBrandSettings(data) {
       requestIconImage: data.requestIconImage || '',
       heroTitle: data.heroTitle,
       heroSubtitle: data.heroSubtitle,
+      heroTitleEl: data.heroTitleEl,
+      heroSubtitleEl: data.heroSubtitleEl,
       heroBannerOverlay: data.heroBannerOverlay,
     }));
   } catch (_) {}
@@ -60,12 +71,28 @@ function syncHeroEmptyState() {
   hero.hidden = !hasImage && !hasCopy;
 }
 
+function pickLocalizedHero(data) {
+  if (!data || typeof data !== 'object') return { heroTitle: undefined, heroSubtitle: undefined };
+  const lang = typeof getStoreLang === 'function' ? getStoreLang() : 'en';
+  const pick = (en, el) => {
+    const a = en != null ? String(en) : '';
+    const b = el != null ? String(el) : '';
+    if (lang === 'el') return b.trim() !== '' ? b : a;
+    return a.trim() !== '' ? a : b;
+  };
+  return {
+    heroTitle: pick(data.heroTitle, data.heroTitleEl),
+    heroSubtitle: pick(data.heroSubtitle, data.heroSubtitleEl),
+  };
+}
+
 function applyHeroCopy(data) {
   if (!data || typeof data !== 'object') return;
+  const picked = pickLocalizedHero(data);
   const h1 = document.getElementById('heroTitle');
   const sub = document.getElementById('heroSubtitle');
-  if (h1 && data.heroTitle !== undefined) h1.textContent = data.heroTitle;
-  if (sub && data.heroSubtitle !== undefined) sub.textContent = data.heroSubtitle;
+  if (h1 && picked.heroTitle !== undefined) h1.textContent = picked.heroTitle;
+  if (sub && picked.heroSubtitle !== undefined) sub.textContent = picked.heroSubtitle;
   syncHeroHasCopyClass();
 }
 
@@ -79,7 +106,17 @@ function parseHeroBannerOverlay(data) {
   return Math.min(0.85, Math.max(0, n));
 }
 
-/** Hero section on index: centered image (+ optional headline overlay). */
+function heroHasCopy(data) {
+  const h1 = document.getElementById('heroTitle');
+  const sub = document.getElementById('heroSubtitle');
+  const picked = pickLocalizedHero(data);
+  return (
+    Boolean(h1 && String(h1.textContent || '').trim()) ||
+    Boolean(sub && String(sub.textContent || '').trim()) ||
+    Boolean(String(picked.heroTitle || '').trim()) ||
+    Boolean(String(picked.heroSubtitle || '').trim())
+  );
+}
 function applyHeroBannerBackground(data) {
   const hero = document.querySelector('.hero');
   const root = document.documentElement;
@@ -105,13 +142,7 @@ function applyHeroBannerBackground(data) {
     }
     // Dim layer only when headline text sits on top of the image
     if (bannerEl) {
-      const h1 = document.getElementById('heroTitle');
-      const sub = document.getElementById('heroSubtitle');
-      const hasCopy =
-        Boolean(h1 && String(h1.textContent || '').trim()) ||
-        Boolean(sub && String(sub.textContent || '').trim()) ||
-        Boolean(String(data.heroTitle || '').trim()) ||
-        Boolean(String(data.heroSubtitle || '').trim());
+      const hasCopy = heroHasCopy(data);
       if (hasCopy && overlay > 0) {
         bannerEl.style.backgroundImage = `linear-gradient(rgba(0,0,0,${overlay}), rgba(0,0,0,${overlay}))`;
       } else {
@@ -129,13 +160,7 @@ function applyHeroBannerBackground(data) {
       centerImg.setAttribute('hidden', '');
     }
     if (bannerEl) bannerEl.style.backgroundImage = '';
-    const h1 = document.getElementById('heroTitle');
-    const sub = document.getElementById('heroSubtitle');
-    const hasCopy =
-      Boolean(h1 && String(h1.textContent || '').trim()) ||
-      Boolean(sub && String(sub.textContent || '').trim()) ||
-      Boolean(String(data.heroTitle || '').trim()) ||
-      Boolean(String(data.heroSubtitle || '').trim());
+    const hasCopy = heroHasCopy(data);
     if (hasCopy) root.classList.add('hero-use-gradient');
     else root.classList.remove('hero-use-gradient');
   }
@@ -231,7 +256,7 @@ async function handleSessionExpired(options = {}) {
   updateNav();
 
   if (!options.silent && typeof showToast === 'function' && !isLoginPage()) {
-    showToast('Your session has expired. Please log in again.', { type: 'error' });
+    showToast(tr('session.expired'), { type: 'error' });
   }
 
   if (isProtectedPage() && !isLoginPage()) {
@@ -412,7 +437,8 @@ function formatStoreMoney(amount, currencyCode) {
   const n = Number(amount);
   if (!Number.isFinite(n)) return '—';
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(n);
+    const locale = typeof getStoreLang === 'function' && getStoreLang() === 'el' ? 'el-CY' : undefined;
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: code }).format(n);
   } catch {
     return `${code} ${n.toFixed(2)}`;
   }
@@ -583,7 +609,7 @@ function flashAddButton(btn) {
   if (!btn || btn.disabled) return;
   const original = btn.textContent;
   btn.classList.add('product-card__cta--added');
-  btn.textContent = 'Added ✓';
+  btn.textContent = tr('product.added');
   btn.disabled = true;
   window.setTimeout(() => {
     btn.classList.remove('product-card__cta--added');
@@ -597,15 +623,15 @@ function showCartAddedToast(productTitle, quantity) {
   const name = productTitle && String(productTitle).trim();
   const message = name
     ? qty > 1
-      ? `${name} · ${qty} added to cart`
-      : `${name} added to cart`
+      ? tr('cart.addedMany', { name, qty })
+      : tr('cart.addedOne', { name })
     : qty > 1
-      ? `${qty} items added to cart`
-      : 'Added to cart';
+      ? tr('cart.addedItems', { qty })
+      : tr('cart.addedGeneric');
 
   const type = 'success';
   const duration = 4200;
-  const action = { label: 'View cart', href: '/cart.html' };
+  const action = { label: tr('cart.viewCart'), href: '/cart.html' };
 
   let host = document.getElementById('3nitylab-toast-host');
   if (!host) {
@@ -826,9 +852,7 @@ function bindProductCardControls(container) {
   });
   container.querySelectorAll('[data-quick-add]').forEach((btn) => {
     btn.disabled = false;
-    if (btn.textContent.trim().toLowerCase() === 'out of stock') {
-      btn.textContent = 'Add to cart';
-    }
+    btn.textContent = tr('product.addToCart');
     btn.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -847,7 +871,8 @@ function productCardNeedsOptions(p) {
 function renderProductCardMarkup(p, opts = {}) {
   const isBundle = p.product_type === 'bundle';
   const needOptions = !isBundle && productCardNeedsOptions(p) ? '1' : '0';
-  const offerBadge = isBundle ? '<span class="product-card__offer-badge">Offer</span>' : '';
+  const title = loc(p, 'title');
+  const offerBadge = isBundle ? `<span class="product-card__offer-badge">${escapeHtml(tr('product.offer'))}</span>` : '';
   const comparePrice =
     isBundle && p.compare_at_price > p.price
       ? `<div class="product-price-compare">${formatStoreMoney(p.compare_at_price)}</div>`
@@ -858,16 +883,16 @@ function renderProductCardMarkup(p, opts = {}) {
       <a href="/product.html?id=${p.id}" class="product-card__link">
         <div class="product-image">
           ${offerBadge}
-          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(p.title)}"${eager} decoding="async">` : '📦'}
+          ${p.image_url ? `<img src="${escapeHtml(mediaUrl(p.image_url))}" alt="${escapeHtml(title)}"${eager} decoding="async">` : '📦'}
         </div>
         <div class="product-info">
-          <div class="product-title">${escapeHtml(p.title)}</div>
+          <div class="product-title">${escapeHtml(title)}</div>
           ${comparePrice}
           <div class="product-price">${formatStoreMoney(p.price)}</div>
         </div>
       </a>
       <div class="product-card__footer">
-        <button type="button" class="btn product-card__cta" data-quick-add="${p.id}" data-need-options="${needOptions}">Add to cart</button>
+        <button type="button" class="btn product-card__cta" data-quick-add="${p.id}" data-need-options="${needOptions}">${escapeHtml(tr('product.addToCart'))}</button>
       </div>
     </article>
   `;
@@ -942,9 +967,9 @@ function applyProductsBrowseMode(categoryId, categoryLabel) {
   if (heading) {
     if (inCategory) {
       const label = categoryLabel != null && String(categoryLabel).trim() !== '' ? String(categoryLabel).trim() : '';
-      heading.textContent = label || 'Products';
+      heading.textContent = label || tr('home.products');
     } else {
-      heading.textContent = 'All Products';
+      heading.textContent = tr('home.allProducts');
     }
   }
 }
@@ -987,9 +1012,9 @@ function renderCompactCategoryIcon(c, variant) {
   const typeClass = isIconCategory(c) ? ' category-icon--request' : '';
   const variantClass = variant === 'dock' ? ' category-icon--dock' : variant === 'circle' ? ' category-icon--circle' : '';
   return `
-    <button type="button" class="category-icon${typeClass}${variantClass}" data-category-id="${c.id}" aria-label="${escapeHtml(c.name)}">
+    <button type="button" class="category-icon${typeClass}${variantClass}" data-category-id="${c.id}" aria-label="${escapeHtml(loc(c, 'name'))}">
       ${media}
-      <span class="category-icon__label">${escapeHtml(c.name)}</span>
+      <span class="category-icon__label">${escapeHtml(loc(c, 'name'))}</span>
     </button>`;
 }
 
@@ -998,9 +1023,9 @@ function renderAllProductsCategoryButton() {
   if (cachedBrand?.allProductsShowOnWebsite === false) return '';
   const allProductsImage = cachedBrand?.allProductsImage ? mediaUrl(cachedBrand.allProductsImage) : '';
   const media = allProductsImage
-    ? `<div class="category-card__media category-card__media--tile category-card__media--image"><img src="${escapeHtml(allProductsImage)}" alt="All products" loading="lazy" decoding="async"></div>`
+    ? `<div class="category-card__media category-card__media--tile category-card__media--image"><img src="${escapeHtml(allProductsImage)}" alt="${escapeHtml(tr('home.allProductsLabel'))}" loading="lazy" decoding="async"></div>`
     : `<div class="category-card__media category-card__media--tile category-card__media--placeholder"><span class="icon" aria-hidden="true">🏪</span></div>`;
-  return `<button type="button" class="category-card category-card--tile" id="loadAllProductsBtn" aria-label="Show all products">${media}<span class="category-card__label">All products</span></button>`;
+  return `<button type="button" class="category-card category-card--tile" id="loadAllProductsBtn" aria-label="${escapeHtml(tr('home.allProductsLabel'))}">${media}<span class="category-card__label">${escapeHtml(tr('home.allProductsLabel'))}</span></button>`;
 }
 
 function renderCategoryForZone(c, zone) {
@@ -1145,9 +1170,9 @@ function openCategoryRequestModal(category) {
   }
   if (successEl) successEl.hidden = true;
   if (errEl) errEl.style.display = 'none';
-  if (titleEl) titleEl.textContent = category.name || 'Request a product';
+  if (titleEl) titleEl.textContent = loc(category, 'name') || tr('request.product');
   if (promptEl) {
-    const prompt = category.request_prompt || category.description || 'Tell us what you need and we will email you back.';
+    const prompt = loc(category, 'request_prompt') || loc(category, 'description') || tr('request.defaultPrompt');
     promptEl.textContent = prompt;
     promptEl.style.display = prompt ? '' : 'none';
   }
@@ -1191,7 +1216,7 @@ function initCategoryRequestModal() {
     const formData = new FormData(form);
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Sending…';
+      submitBtn.textContent = tr('request.sending');
     }
 
     try {
@@ -1205,13 +1230,13 @@ function initCategoryRequestModal() {
       if (successEl) successEl.hidden = false;
     } catch (err) {
       if (errEl) {
-        errEl.textContent = err.message || 'Could not send request';
+        errEl.textContent = err.message || tr('request.sendFailed');
         errEl.style.display = 'block';
       }
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Send request';
+        submitBtn.textContent = tr('request.send');
       }
     }
   });
@@ -1378,7 +1403,7 @@ function renderStorefrontCategoryCard(c) {
   const layout = getCategoryWebsiteLayout(c);
   const hasImage = Boolean(c.image_url);
   const media = renderCategoryCardMedia(c, layout);
-  const label = `<span class="category-card__label">${escapeHtml(c.name)}</span>`;
+  const label = `<span class="category-card__label">${escapeHtml(loc(c, 'name'))}</span>`;
   const tileStyle = layout === 'tile' ? getCategoryCardTileStyle(c, hasImage) : '';
   const tileStyleAttr = tileStyle ? ` style="${tileStyle}"` : '';
   const tileWidthClass =
@@ -1420,7 +1445,7 @@ async function loadCategories() {
     const byZone = new Map();
     for (const c of categories || []) {
       if (!c || c.id == null) continue;
-      sellitnowCategoryLabels.set(c.id, c.name);
+      sellitnowCategoryLabels.set(c.id, loc(c, 'name'));
       sellitnowCategoriesById.set(c.id, c);
       const zone = getCategoryWebsiteZone(c);
       if (!byZone.has(zone)) byZone.set(zone, []);
@@ -1451,7 +1476,7 @@ async function loadCategories() {
     sellitnowCategoriesById.clear();
     paintStorefrontCategories(new Map());
     if (!grid.querySelector('[data-category-id], #loadAllProductsBtn')) {
-      grid.innerHTML += '<p>No categories</p>';
+      grid.innerHTML += `<p>${escapeHtml(tr('home.noCategories'))}</p>`;
     }
   }
   bindCategoryGridNavigation();
@@ -1617,24 +1642,24 @@ function renderProductsPagination(paginationEl, data, categoryId) {
     return btn;
   };
 
-  addBtn('First', 1, page <= 1);
-  addBtn('Prev', page - 1, page <= 1);
+  addBtn(tr('pagination.first'), 1, page <= 1);
+  addBtn(tr('pagination.prev'), page - 1, page <= 1);
 
   const status = document.createElement('span');
   status.className = 'pagination__status';
-  status.textContent = `Page ${page} of ${totalPages}`;
+  status.textContent = tr('pagination.pageOf', { page, total: totalPages });
   paginationEl.appendChild(status);
 
-  addBtn('Next', page + 1, page >= totalPages);
-  addBtn('Last', totalPages, page >= totalPages);
+  addBtn(tr('pagination.next'), page + 1, page >= totalPages);
+  addBtn(tr('pagination.last'), totalPages, page >= totalPages);
 
   const gotoWrap = document.createElement('form');
   gotoWrap.className = 'pagination__goto';
-  gotoWrap.setAttribute('aria-label', 'Go to page');
+  gotoWrap.setAttribute('aria-label', tr('pagination.goToPage'));
 
   const label = document.createElement('label');
   label.htmlFor = 'paginationPageInput';
-  label.textContent = 'Go to';
+  label.textContent = tr('pagination.goTo');
 
   const input = document.createElement('input');
   input.type = 'number';
@@ -1646,7 +1671,7 @@ function renderProductsPagination(paginationEl, data, categoryId) {
 
   const goBtn = document.createElement('button');
   goBtn.type = 'submit';
-  goBtn.textContent = 'Go';
+  goBtn.textContent = tr('pagination.go');
 
   gotoWrap.appendChild(label);
   gotoWrap.appendChild(input);
@@ -1681,7 +1706,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
     const items = data.items || [];
     grid.innerHTML = items.length
       ? items.map((p, i) => renderProductCardMarkup(p, { priority: i < 4 })).join('')
-      : '<p>No products match your search.</p>';
+      : `<p>${escapeHtml(tr('home.noProducts'))}</p>`;
     bindProductCardControls(grid);
 
     renderProductsPagination(pagination, data, categoryId);
@@ -1695,7 +1720,7 @@ async function loadProducts(page = 1, categoryId = null, searchQuery, scrollToTo
       scrollProductsBrowseIntoView();
     }
   } catch (err) {
-    grid.innerHTML = '<p>Failed to load products. Make sure the server is running.</p>';
+    grid.innerHTML = `<p>${escapeHtml(tr('home.loadFailed'))}</p>`;
   }
 }
 
@@ -1745,7 +1770,7 @@ function initHomeSearch() {
     }
     currentSuggestions = items;
     if (!items.length) {
-      suggestionsEl.innerHTML = `<div class="search-suggestions__empty">No matches for “${escapeHtml(query)}”</div>`;
+      suggestionsEl.innerHTML = `<div class="search-suggestions__empty">${escapeHtml(tr('search.noMatches', { query }))}</div>`;
       suggestionsEl.hidden = false;
       input.setAttribute('aria-expanded', 'true');
       return;
@@ -1766,7 +1791,7 @@ function initHomeSearch() {
             aria-selected="${index === activeSuggestionIndex ? 'true' : 'false'}"
           >
             ${thumb}
-            <span class="search-suggestions__text">${highlightSearchMatch(item.title, query)}</span>
+            <span class="search-suggestions__text">${highlightSearchMatch(loc(item, 'title'), query)}</span>
             <span class="search-suggestions__price">${formatStoreMoney(item.price)}</span>
           </button>`;
       })
@@ -1945,10 +1970,29 @@ async function initHomePage() {
   restoreHomeScroll(restoreScroll);
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initHomePage);
+window.addEventListener('storelangchange', () => {
+  applyCachedBrandSettings();
+  if (typeof applyStaticTranslations === 'function') applyStaticTranslations();
+  if (document.getElementById('categoryGrid')) {
+    loadCategories();
+    const categoryId = getCurrentCategoryFromUrl();
+    const q = new URLSearchParams(location.search).get('q') || '';
+    const page = sellitnowProductsBrowseState.page || 1;
+    loadProducts(page, categoryId, q);
+  }
+});
+
+if (document.getElementById('productGrid') || document.getElementById('categoryGrid')) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHomePage);
+  } else {
+    initHomePage();
+  }
 } else {
-  initHomePage();
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof updateNav === 'function') updateNav();
+    if (typeof initLogout === 'function') initLogout();
+  });
 }
 
 window.addEventListener('pageshow', (e) => {

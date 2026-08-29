@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const showLogin = document.getElementById('showLogin');
 
   if (new URLSearchParams(location.search).get('reason') === 'session_expired' && loginError) {
-    loginError.textContent = 'Your session has expired. Please log in again.';
+    loginError.textContent = typeof t === 'function' ? t('session.expired') : 'Your session has expired. Please log in again.';
     loginError.style.display = 'block';
   }
 

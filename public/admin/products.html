@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Products - Admin - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <div class="admin-layout">
@@ -43,13 +43,25 @@
       <div id="productForm" class="admin-panel">
         <h3>New Product</h3>
         <form id="addProduct">
-          <div class="form-group">
-            <label>Title *</label>
-            <input type="text" name="title" required>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label>Title (English) *</label>
+              <input type="text" name="title" required>
+            </div>
+            <div class="form-group">
+              <label>Title (Greek)</label>
+              <input type="text" name="title_el" placeholder="Τίτλος στα ελληνικά">
+            </div>
           </div>
-          <div class="form-group">
-            <label>Description</label>
-            <textarea name="description" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px"></textarea>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label>Description (English)</label>
+              <textarea name="description" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Description (Greek)</label>
+              <textarea name="description_el" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px" placeholder="Περιγραφή στα ελληνικά"></textarea>
+            </div>
           </div>
           <div class="form-group">
             <label>Order number (optional)</label>
@@ -196,7 +208,7 @@
               <tr>
                 <td>${p.id}</td>
                 <td>${p.display_order ?? '-'}</td>
-                <td><strong>${escapeAttr(p.title)}</strong></td>
+                <td><strong>${escapeAttr(p.title)}</strong>${p.title_el ? `<div style="color:#666;font-size:13px;margin-top:2px">${escapeAttr(p.title_el)}</div>` : ''}</td>
                 <td>${p.product_type === 'bundle' ? 'Offer' : 'Product'}</td>
                 <td>${formatStoreMoney(p.price)}</td>
                 <td>${p.stock_quantity}</td>

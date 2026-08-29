@@ -29,14 +29,16 @@ async function seed() {
     for (const product of SAMPLE_PRODUCTS) {
       const categoryId = catBySlug.get(product.categorySlug);
       await pool.query(
-        `INSERT INTO products (sku, title, slug, description, price, stock_quantity, category_id, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+        `INSERT INTO products (sku, title, title_el, slug, description, description_el, price, stock_quantity, category_id, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
          ON CONFLICT (sku) DO NOTHING`,
         [
           product.sku,
           product.title,
+          product.title_el || null,
           slugify(product.title, { lower: true }),
           product.description,
+          product.description_el || null,
           product.price,
           product.stock,
           categoryId,

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Brand - Admin - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <div class="admin-layout">
@@ -97,13 +97,25 @@
         <section style="background:white;padding:24px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
           <h2 style="font-size:18px;margin-bottom:8px">Home center image</h2>
           <p style="color:var(--text-muted);margin:0 0 20px;line-height:1.45">Upload any image to show <strong>centered</strong> under the header (the space where the old full-width hero sat). Optional headline text can sit on top.</p>
-          <div class="form-group">
-            <label for="heroTitleInput">Headline (optional)</label>
-            <input type="text" id="heroTitleInput" maxlength="200" placeholder="Leave blank to show only the image" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label for="heroTitleInput">Headline (English, optional)</label>
+              <input type="text" id="heroTitleInput" maxlength="200" placeholder="Leave blank to show only the image" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+            </div>
+            <div class="form-group">
+              <label for="heroTitleElInput">Headline (Greek, optional)</label>
+              <input type="text" id="heroTitleElInput" maxlength="200" placeholder="Πρωτοσέλιδο στα ελληνικά" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px">
+            </div>
           </div>
-          <div class="form-group">
-            <label for="heroSubtitleInput">Subheading (optional)</label>
-            <textarea id="heroSubtitleInput" rows="2" maxlength="400" placeholder="Supporting line under the headline" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label for="heroSubtitleInput">Subheading (English, optional)</label>
+              <textarea id="heroSubtitleInput" rows="2" maxlength="400" placeholder="Supporting line under the headline" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="heroSubtitleElInput">Subheading (Greek, optional)</label>
+              <textarea id="heroSubtitleElInput" rows="2" maxlength="400" placeholder="Υπότιτλος στα ελληνικά" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
+            </div>
           </div>
           <div class="form-group" style="margin-bottom:16px">
             <label for="heroBannerOverlayRange" id="heroBannerOverlayLabel">Image dimming (only when headline is set)</label>
@@ -220,8 +232,10 @@
       const pctEl = document.getElementById('heroBannerOverlayPct');
       const dimPrev = document.getElementById('bannerDimPreview');
       const bannerImg = document.getElementById('bannerImg');
-      const title = (document.getElementById('heroTitleInput')?.value || '').trim();
-      const subtitle = (document.getElementById('heroSubtitleInput')?.value || '').trim();
+      const title = (document.getElementById('heroTitleInput')?.value || '').trim()
+        || (document.getElementById('heroTitleElInput')?.value || '').trim();
+      const subtitle = (document.getElementById('heroSubtitleInput')?.value || '').trim()
+        || (document.getElementById('heroSubtitleElInput')?.value || '').trim();
       const v = Number(rangeEl.value);
       const safe = Number.isFinite(v) ? Math.min(85, Math.max(0, v)) : 35;
       pctEl.textContent = `${safe}%`;
@@ -237,6 +251,8 @@
     document.getElementById('heroBannerOverlayRange').addEventListener('input', syncBannerDimUi);
     document.getElementById('heroTitleInput').addEventListener('input', syncBannerDimUi);
     document.getElementById('heroSubtitleInput').addEventListener('input', syncBannerDimUi);
+    document.getElementById('heroTitleElInput').addEventListener('input', syncBannerDimUi);
+    document.getElementById('heroSubtitleElInput').addEventListener('input', syncBannerDimUi);
 
     async function loadBrand() {
       try {
@@ -257,6 +273,10 @@
           data.heroTitle != null ? data.heroTitle : '';
         document.getElementById('heroSubtitleInput').value =
           data.heroSubtitle != null ? data.heroSubtitle : '';
+        document.getElementById('heroTitleElInput').value =
+          data.heroTitleEl != null ? data.heroTitleEl : '';
+        document.getElementById('heroSubtitleElInput').value =
+          data.heroSubtitleEl != null ? data.heroSubtitleEl : '';
 
         const overlayRaw = data.heroBannerOverlay;
         let overlayPct = 35;
@@ -336,6 +356,8 @@
           body: JSON.stringify({
             heroTitle: document.getElementById('heroTitleInput').value,
             heroSubtitle: document.getElementById('heroSubtitleInput').value,
+            heroTitleEl: document.getElementById('heroTitleElInput').value,
+            heroSubtitleEl: document.getElementById('heroSubtitleElInput').value,
             heroBannerOverlay: overlay,
           }),
         });

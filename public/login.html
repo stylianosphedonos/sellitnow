@@ -3,71 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - 3nityLab</title>
+  <title data-i18n="page.login">Login - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js?v=20260829-i18n"></script>
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">3nityLab</a>
       <nav class="nav">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/login.html" class="nav-link">Login</a>
+        <a href="/" class="nav-link" data-i18n="nav.home">Home</a>
+        <a href="/login.html" class="nav-link" data-i18n="nav.login">Login</a>
       </nav>
     </div>
   </header>
 
   <main>
     <div id="loginForm" class="form-container">
-      <h1>Login</h1>
+      <h1 data-i18n="login.title">Login</h1>
       <div id="loginError" class="alert alert-error" style="display:none"></div>
       <form id="login">
         <div class="form-group">
-          <label>Email</label>
+          <label data-i18n="login.email">Email</label>
           <input type="email" name="email" required>
         </div>
         <div class="form-group">
-          <label>Password</label>
+          <label data-i18n="login.password">Password</label>
           <input type="password" name="password" required>
         </div>
-        <button type="submit" class="btn">Login</button>
+        <button type="submit" class="btn" data-i18n="login.submit">Login</button>
       </form>
-      <p class="form-footer">Don't have an account? <a href="#" id="showRegister">Register</a></p>
+      <p class="form-footer"><span data-i18n="login.noAccount">Don't have an account?</span> <a href="#" id="showRegister" data-i18n="login.registerLink">Register</a></p>
     </div>
 
     <div id="registerForm" class="form-container" style="display:none">
-      <h1>Register</h1>
+      <h1 data-i18n="register.title">Register</h1>
       <div id="registerError" class="alert alert-error" style="display:none"></div>
       <form id="register">
         <div class="form-group">
-          <label>First Name</label>
+          <label data-i18n="register.firstName">First Name</label>
           <input type="text" name="first_name" required>
         </div>
         <div class="form-group">
-          <label>Last Name</label>
+          <label data-i18n="register.lastName">Last Name</label>
           <input type="text" name="last_name" required>
         </div>
         <div class="form-group">
-          <label>Email</label>
+          <label data-i18n="login.email">Email</label>
           <input type="email" name="email" required>
         </div>
         <div class="form-group">
-          <label>Password (min 8 characters)</label>
+          <label data-i18n="register.password">Password (min 8 characters)</label>
           <input type="password" name="password" required minlength="8">
         </div>
         <div class="form-group">
-          <label>Phone (optional)</label>
+          <label data-i18n="register.phone">Phone (optional)</label>
           <input type="tel" name="phone">
         </div>
-        <button type="submit" class="btn">Register</button>
+        <button type="submit" class="btn" data-i18n="register.submit">Register</button>
       </form>
-      <p class="form-footer">Already have an account? <a href="#" id="showLogin">Login</a></p>
+      <p class="form-footer"><span data-i18n="register.hasAccount">Already have an account?</span> <a href="#" id="showLogin" data-i18n="register.loginLink">Login</a></p>
     </div>
   </main>
 
   <script src="/js/runtime-config.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/app.js?v=20260829-i18n"></script>
   <script src="/js/login.js"></script>
 </body>
 </html>

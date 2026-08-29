@@ -3,46 +3,47 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Product - 3nityLab</title>
+  <title data-i18n="page.product">Product - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css?v=20260828-cart">
+  <script src="/js/i18n.js?v=20260829-i18n"></script>
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">3nityLab</a>
       <nav class="nav">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/cart.html" class="nav-link cart-link">Cart <span class="cart-count" id="cartCount">0</span></a>
-        <a href="/login.html" class="nav-link" id="loginBtn">Login</a>
+        <a href="/" class="nav-link" data-i18n="nav.home">Home</a>
+        <a href="/cart.html" class="nav-link cart-link"><span data-i18n="nav.cart">Cart</span> <span class="cart-count" id="cartCount">0</span></a>
+        <a href="/login.html" class="nav-link" id="loginBtn" data-i18n="nav.login">Login</a>
       </nav>
     </div>
   </header>
 
   <main class="main">
     <div class="product-page__toolbar">
-      <button type="button" class="btn btn-secondary product-page__back" id="productBack">← Back</button>
+      <button type="button" class="btn btn-secondary product-page__back" id="productBack" data-i18n="product.back">← Back</button>
     </div>
     <div id="product" style="display:flex;gap:32px;max-width:900px;margin:0 auto;background:white;padding:32px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
       <div class="product-image" style="width:400px;aspect-ratio:1;background:#f5f5f5;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:120px;color:#999" id="productImage">📦</div>
       <div style="flex:1">
         <h1 id="productTitle" style="font-size:24px;margin-bottom:12px"></h1>
         <p id="productPrice" style="font-size:28px;font-weight:700;color:var(--primary);margin-bottom:16px"></p>
-        <p id="productOfferBadge" style="display:none;margin-bottom:8px"><span style="display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px">Special offer</span></p>
+        <p id="productOfferBadge" style="display:none;margin-bottom:8px"><span style="display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px" data-i18n="product.specialOffer">Special offer</span></p>
         <p id="productPriceCompare" style="display:none;font-size:16px;color:#888;text-decoration:line-through;margin:-8px 0 12px"></p>
         <p id="productDesc" style="margin-bottom:24px;line-height:1.6;color:#555"></p>
         <div id="bundleIncludes" class="bundle-includes" style="display:none">
-          <h3 class="bundle-includes__heading">This offer includes</h3>
+          <h3 class="bundle-includes__heading" data-i18n="product.bundleIncludes">This offer includes</h3>
           <div id="bundleIncludesList" class="bundle-includes__grid"></div>
         </div>
         <div id="variantSection" style="display:none;margin-bottom:20px"></div>
         <div class="form-group" style="max-width:120px;margin-bottom:16px">
-          <label>Quantity</label>
+          <label data-i18n="product.quantity">Quantity</label>
           <input type="number" id="qty" value="1" min="1" style="width:100%">
         </div>
         <div class="product-page__actions">
-          <button class="btn" id="addToCart">Add to Cart</button>
-          <button type="button" class="btn btn-secondary" id="shareProduct" aria-label="Share product link">Share</button>
+          <button class="btn" id="addToCart" data-i18n="product.addToCartBtn">Add to Cart</button>
+          <button type="button" class="btn btn-secondary" id="shareProduct" data-i18n="product.share" data-i18n-aria="product.shareAria" aria-label="Share product link">Share</button>
         </div>
       </div>
     </div>
@@ -50,12 +51,12 @@
 
   <div id="productImageLightbox" class="product-lightbox" hidden aria-hidden="true">
     <div class="product-lightbox__backdrop" data-close-lightbox></div>
-    <button type="button" class="product-lightbox__close" data-close-lightbox aria-label="Close">&times;</button>
+    <button type="button" class="product-lightbox__close" data-close-lightbox data-i18n-aria="close" aria-label="Close">&times;</button>
     <img id="productImageLightboxImg" class="product-lightbox__img" alt="">
   </div>
 
   <script src="/js/runtime-config.js"></script>
-  <script src="/js/app.js?v=20260828-cart"></script>
+  <script src="/js/app.js?v=20260829-i18n"></script>
   <script>
     const params = new URLSearchParams(location.search);
     const id = params.get('id');
@@ -86,8 +87,17 @@
         : url;
     }
 
+    function loc(obj, field) {
+      if (typeof localizedField === 'function') return localizedField(obj, field);
+      return (obj && obj[field]) || '';
+    }
+
+    function tr(key, vars) {
+      return typeof t === 'function' ? t(key, vars) : key;
+    }
+
     function renderBundleIncludeItem(item) {
-      const label = escapeHtml(item.title || 'Product');
+      const label = escapeHtml(loc(item, 'title') || tr('product.fallbackTitle'));
       const qtyLabel = item.quantity > 1 ? ` × ${item.quantity}` : '';
       const imgUrl = resolveProductMediaUrl(item.image_url);
       const photoInner = imgUrl
@@ -148,20 +158,30 @@
       const sizeOpts = sizes.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
       let html = '';
       if (colors.length) {
-        html += `<div class="form-group" style="max-width:280px"><label>Color</label><select id="selColor" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${colorOpts}</select></div>`;
+        html += `<div class="form-group" style="max-width:280px"><label>${escapeHtml(tr('product.color'))}</label><select id="selColor" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">${escapeHtml(tr('product.select'))}</option>${colorOpts}</select></div>`;
       }
       if (sizes.length) {
-        html += `<div class="form-group" style="max-width:280px"><label>Size</label><select id="selSize" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">Select…</option>${sizeOpts}</select></div>`;
+        html += `<div class="form-group" style="max-width:280px"><label>${escapeHtml(tr('product.size'))}</label><select id="selSize" style="width:100%;padding:10px;border:1px solid #eee;border-radius:8px"><option value="">${escapeHtml(tr('product.select'))}</option>${sizeOpts}</select></div>`;
       }
       wrap.innerHTML = html;
     }
 
+    function applyProductCopy() {
+      if (!product) return;
+      const title = loc(product, 'title');
+      document.getElementById('productTitle').textContent = title;
+      document.getElementById('productDesc').textContent = loc(product, 'description') || tr('product.noDescription');
+      const imgWrap = document.getElementById('productImage');
+      const img = imgWrap && imgWrap.querySelector('img');
+      if (img) img.alt = title || 'Product image';
+    }
+
     async function loadProduct() {
-      if (!id) { document.getElementById('product').innerHTML = '<p>Product not found</p>'; return; }
+      if (!id) { document.getElementById('product').innerHTML = `<p>${escapeHtml(tr('product.notFound'))}</p>`; return; }
       try {
         const data = await callApi(`/products/${id}`);
         product = data.product;
-        document.getElementById('productTitle').textContent = product.title;
+        applyProductCopy();
         document.getElementById('productPrice').textContent = formatStoreMoney(product.price);
         const isBundle = product.product_type === 'bundle';
         document.getElementById('productOfferBadge').style.display = isBundle ? 'block' : 'none';
@@ -172,7 +192,7 @@
         } else {
           compareEl.style.display = 'none';
         }
-        document.getElementById('productDesc').textContent = product.description || 'No description.';
+        document.getElementById('productDesc').textContent = loc(product, 'description') || tr('product.noDescription');
         const bundleWrap = document.getElementById('bundleIncludes');
         const bundleList = document.getElementById('bundleIncludesList');
         if (isBundle && Array.isArray(product.bundle_items) && product.bundle_items.length) {
@@ -191,17 +211,17 @@
           imgWrap.innerHTML = '';
           const el = document.createElement('img');
           el.src = resolvedUrl;
-          el.alt = product.title || 'Product image';
+          el.alt = loc(product, 'title') || 'Product image';
           el.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:12px';
           imgWrap.classList.add('product-image--clickable');
           imgWrap.setAttribute('role', 'button');
           imgWrap.setAttribute('tabindex', '0');
-          imgWrap.setAttribute('aria-label', 'View full size image');
-          imgWrap.onclick = () => openProductImageLightbox(resolvedUrl, product.title);
+          imgWrap.setAttribute('aria-label', tr('product.viewFullImage'));
+          imgWrap.onclick = () => openProductImageLightbox(resolvedUrl, loc(product, 'title'));
           imgWrap.onkeydown = (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              openProductImageLightbox(resolvedUrl, product.title);
+              openProductImageLightbox(resolvedUrl, loc(product, 'title'));
             }
           };
           imgWrap.appendChild(el);
@@ -215,7 +235,7 @@
         }
         document.getElementById('qty').removeAttribute('max');
       } catch (err) {
-        document.getElementById('product').innerHTML = '<p>Failed to load product.</p>';
+        document.getElementById('product').innerHTML = `<p>${escapeHtml(tr('product.loadFailed'))}</p>`;
       }
     }
 
@@ -232,7 +252,7 @@
         });
         const imageUrl = product.image_url || document.querySelector('.product-image img')?.getAttribute('src') || '';
         celebrateCartAdd(document.getElementById('addToCart'), {
-          title: product.title,
+          title: loc(product, 'title'),
           imageUrl: imageUrl || null,
           quantity: qty,
         });
@@ -264,11 +284,11 @@
 
     document.getElementById('shareProduct')?.addEventListener('click', async () => {
       if (!product && !id) {
-        showToast('Product not loaded yet', { type: 'error' });
+        showToast(tr('product.notLoaded'), { type: 'error' });
         return;
       }
       const url = getProductShareUrl();
-      const title = product?.title || document.title;
+      const title = loc(product, 'title') || document.title;
       if (navigator.share) {
         try {
           await navigator.share({ title, text: title, url });
@@ -279,9 +299,9 @@
       }
       try {
         await copyProductLink(url);
-        showToast('Link copied', { type: 'success' });
+        showToast(tr('product.linkCopied'), { type: 'success' });
       } catch (_) {
-        showToast('Could not share link', { type: 'error' });
+        showToast(tr('product.shareFailed'), { type: 'error' });
       }
     });
 
@@ -292,6 +312,18 @@
       await loadProduct();
       loadCartCount();
     })();
+
+    window.addEventListener('storelangchange', () => {
+      if (typeof applyStaticTranslations === 'function') applyStaticTranslations();
+      if (product) {
+        applyProductCopy();
+        renderVariantSection(product.product_type === 'bundle' ? { colors: [], sizes: [] } : (product.options || { colors: [], sizes: [] }));
+        const bundleList = document.getElementById('bundleIncludesList');
+        if (product.product_type === 'bundle' && Array.isArray(product.bundle_items) && product.bundle_items.length && bundleList) {
+          bundleList.innerHTML = product.bundle_items.map(renderBundleIncludeItem).join('');
+        }
+      }
+    });
 
     window.addEventListener('pageshow', (e) => {
       if (!e.persisted || typeof loadBrandSettings !== 'function') return;

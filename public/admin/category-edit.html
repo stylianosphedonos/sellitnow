@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edit Category - Admin - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
 </head>
 <body>
   <div class="admin-layout">
@@ -58,9 +58,15 @@
       const websiteZone = category.website_zone || 'home-main';
       document.getElementById('formContainer').innerHTML = `
         <form id="editForm" style="max-width:600px;background:white;padding:24px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-          <div class="form-group">
-            <label>Name *</label>
-            <input type="text" name="name" value="${escapeHtml(category.name || '')}" required>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label>Name (English) *</label>
+              <input type="text" name="name" value="${escapeHtml(category.name || '')}" required>
+            </div>
+            <div class="form-group">
+              <label>Name (Greek)</label>
+              <input type="text" name="name_el" value="${escapeHtml(category.name_el || '')}" placeholder="Όνομα στα ελληνικά">
+            </div>
           </div>
           <div class="form-group">
             <label>Slug</label>
@@ -75,13 +81,27 @@
             <small>Browse opens products. Request icon opens a form so customers can email support with an optional photo.</small>
           </div>
           <div class="form-group" id="requestPromptGroup" style="${categoryType === 'icon' ? '' : 'display:none'}">
-            <label>Request form message</label>
-            <textarea name="request_prompt" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px" placeholder="Tell us what product you need and we will reply by email.">${escapeHtml(category.request_prompt || '')}</textarea>
+            <div class="i18n-field-pair">
+              <div>
+                <label>Request form message (English)</label>
+                <textarea name="request_prompt" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px" placeholder="Tell us what product you need and we will reply by email.">${escapeHtml(category.request_prompt || '')}</textarea>
+              </div>
+              <div>
+                <label>Request form message (Greek)</label>
+                <textarea name="request_prompt_el" rows="3" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px" placeholder="Πείτε μας τι χρειάζεστε...">${escapeHtml(category.request_prompt_el || '')}</textarea>
+              </div>
+            </div>
             <small>Shown above the request form when customers click this icon.</small>
           </div>
-          <div class="form-group">
-            <label>Description</label>
-            <textarea name="description" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(category.description || '')}</textarea>
+          <div class="i18n-field-pair">
+            <div class="form-group">
+              <label>Description (English)</label>
+              <textarea name="description" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(category.description || '')}</textarea>
+            </div>
+            <div class="form-group">
+              <label>Description (Greek)</label>
+              <textarea name="description_el" rows="4" style="width:100%;padding:12px;border:1px solid #eee;border-radius:8px">${escapeHtml(category.description_el || '')}</textarea>
+            </div>
           </div>
           <div class="form-group">
             <label>Position on website (sort order)</label>
@@ -258,13 +278,16 @@
       const slugTrim = form.slug.value.trim();
       const payload = {
         name: form.name.value.trim(),
+        name_el: form.name_el.value.trim() === '' ? null : form.name_el.value.trim(),
         description: form.description.value.trim() === '' ? null : form.description.value,
+        description_el: form.description_el.value.trim() === '' ? null : form.description_el.value,
         display_order: form.display_order.value === '' ? null : parseInt(form.display_order.value, 10),
         show_on_website: form.show_on_website.checked,
         website_layout: form.website_layout.value,
         category_type: form.category_type.value,
         website_zone: form.website_zone.value,
-        request_prompt: form.request_prompt.value.trim() === '' ? null : form.request_prompt.value.trim()
+        request_prompt: form.request_prompt.value.trim() === '' ? null : form.request_prompt.value.trim(),
+        request_prompt_el: form.request_prompt_el.value.trim() === '' ? null : form.request_prompt_el.value.trim()
       };
       payload.icon_width_px = form.icon_width_px.value === '' ? null : parseInt(form.icon_width_px.value, 10);
       payload.icon_height_px = form.icon_height_px.value === '' ? null : parseInt(form.icon_height_px.value, 10);

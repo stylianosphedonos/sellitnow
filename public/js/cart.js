@@ -9,24 +9,36 @@ function imgSrc(u) {
   return typeof sellitnowResolveMediaUrl === 'function' ? sellitnowResolveMediaUrl(u) : u;
 }
 
+function tr(key, vars) {
+  return typeof t === 'function' ? t(key, vars) : key;
+}
+
+function loc(obj, field) {
+  if (typeof localizedField === 'function') return localizedField(obj, field);
+  return (obj && obj[field]) || '';
+}
+
 function formatVariantsHtml(color, size) {
   const hasColor = color && String(color).trim();
   const hasSize = size && String(size).trim();
   if (!hasColor && !hasSize) return '';
+  const localizeVal = (v) =>
+    String(v).trim() === 'Not Specified' ? tr('product.notSpecified') : String(v).trim();
   let html = '<dl class="line-item__variants">';
   if (hasColor) {
-    html += `<div class="line-item__variant-row"><dt>Color</dt><dd>${escapeHtml(String(color).trim())}</dd></div>`;
+    html += `<div class="line-item__variant-row"><dt>${escapeHtml(tr('product.color'))}</dt><dd>${escapeHtml(localizeVal(color))}</dd></div>`;
   }
   if (hasSize) {
-    html += `<div class="line-item__variant-row"><dt>Size</dt><dd>${escapeHtml(String(size).trim())}</dd></div>`;
+    html += `<div class="line-item__variant-row"><dt>${escapeHtml(tr('product.size'))}</dt><dd>${escapeHtml(localizeVal(size))}</dd></div>`;
   }
   html += '</dl>';
   return html;
 }
 
 function renderCartLine(item) {
+  const title = loc(item, 'title');
   const thumb = item.image_url
-    ? `<img class="line-item__img" src="${escapeHtml(imgSrc(item.image_url))}" alt="${escapeHtml(item.title)}" loading="lazy" decoding="async">`
+    ? `<img class="line-item__img" src="${escapeHtml(imgSrc(item.image_url))}" alt="${escapeHtml(title)}" loading="lazy" decoding="async">`
     : '<div class="line-item__img line-item__img--placeholder" aria-hidden="true">📦</div>';
   const unit = parseFloat(item.price);
   const lineTotal = parseFloat(item.line_total);
@@ -38,26 +50,26 @@ function renderCartLine(item) {
     <article class="cart-line line-item" data-cart-item-id="${item.id}">
       <div class="line-item__thumb">${thumb}</div>
       <div class="line-item__info">
-        <a class="line-item__title" href="/product.html?id=${item.product_id}">${escapeHtml(item.title)}</a>
+        <a class="line-item__title" href="/product.html?id=${item.product_id}">${escapeHtml(title)}</a>
         ${skuRow}
         ${formatVariantsHtml(item.color, item.size)}
       </div>
       <div class="cart-line__pricing">
         <div class="cart-line__unit-wrap">
-          <span class="cart-line__label">Unit price</span>
+          <span class="cart-line__label">${escapeHtml(tr('cart.unitPrice'))}</span>
           <span class="cart-line__unit">${formatStoreMoney(unit)}</span>
         </div>
         <div class="cart-line__qty-wrap">
-          <label class="cart-line__label" for="qty-${item.id}">Quantity</label>
-          <input type="number" class="cart-line__qty-input" id="qty-${item.id}" value="${item.quantity}" min="1" data-item-id="${item.id}" aria-label="Quantity for ${escapeHtml(item.title)}">
+          <label class="cart-line__label" for="qty-${item.id}">${escapeHtml(tr('product.quantity'))}</label>
+          <input type="number" class="cart-line__qty-input" id="qty-${item.id}" value="${item.quantity}" min="1" data-item-id="${item.id}" aria-label="${escapeHtml(tr('cart.qtyFor', { title }))}">
         </div>
         <div class="cart-line__line-wrap">
-          <span class="cart-line__label">Line total</span>
+          <span class="cart-line__label">${escapeHtml(tr('cart.lineTotal'))}</span>
           <span class="cart-line__line-total">${formatStoreMoney(lineTotal)}</span>
         </div>
       </div>
       <div class="cart-line__actions">
-        <button type="button" class="cart-line__remove" data-remove-id="${item.id}">Remove</button>
+        <button type="button" class="cart-line__remove" data-remove-id="${item.id}">${escapeHtml(tr('cart.remove'))}</button>
       </div>
     </article>
   `;
@@ -78,9 +90,9 @@ async function loadCart() {
       container.innerHTML = `
         <div class="cart-empty">
           <div class="cart-empty__icon" aria-hidden="true">🛒</div>
-          <h1 class="cart-empty__title">Your cart is empty</h1>
-          <p class="cart-empty__text">Add items from the store to see them here. When you’re ready, you can review color, size, and totals before checkout.</p>
-          <a href="/" class="btn cart-empty__cta">Browse products</a>
+          <h1 class="cart-empty__title">${escapeHtml(tr('cart.emptyTitle'))}</h1>
+          <p class="cart-empty__text">${escapeHtml(tr('cart.emptyText'))}</p>
+          <a href="/" class="btn cart-empty__cta">${escapeHtml(tr('cart.browse'))}</a>
         </div>
       `;
       return;
@@ -88,31 +100,32 @@ async function loadCart() {
 
     const itemCount = cart.item_count || cart.items.reduce((s, i) => s + i.quantity, 0);
     const linesHtml = cart.items.map((item) => renderCartLine(item)).join('');
+    const itemsWord = itemCount === 1 ? tr('cart.item') : tr('cart.items');
 
     container.innerHTML = `
       <header class="cart-page__head">
         <div>
-          <h1 class="cart-page__title">Shopping cart</h1>
-          <p class="cart-page__subtitle">${itemCount} ${itemCount === 1 ? 'item' : 'items'} · Review options and quantities below</p>
+          <h1 class="cart-page__title">${escapeHtml(tr('cart.title'))}</h1>
+          <p class="cart-page__subtitle">${escapeHtml(tr('cart.subtitle', { count: itemCount, items: itemsWord }))}</p>
         </div>
-        <a href="/" class="cart-page__continue">← Continue shopping</a>
+        <a href="/" class="cart-page__continue">${escapeHtml(tr('cart.continue'))}</a>
       </header>
       <div class="cart-layout">
-        <section class="cart-lines" aria-label="Cart items">
+        <section class="cart-lines" aria-label="${escapeHtml(tr('cart.itemsAria'))}">
           ${linesHtml}
         </section>
-        <aside class="cart-summary" aria-label="Order summary">
-          <h2 class="cart-summary__title">Order summary</h2>
+        <aside class="cart-summary" aria-label="${escapeHtml(tr('cart.summary'))}">
+          <h2 class="cart-summary__title">${escapeHtml(tr('cart.summary'))}</h2>
           <div class="cart-summary__body">
-            ${renderSummaryRow('Subtotal', formatStoreMoney(cart.subtotal))}
-            ${renderSummaryRow('Estimated tax (VAT)', formatStoreMoney(cart.tax_amount), { muted: true })}
-            ${renderSummaryRow('Shipping estimate', formatStoreMoney(cart.shipping_estimate), { muted: true })}
+            ${renderSummaryRow(tr('cart.subtotal'), formatStoreMoney(cart.subtotal))}
+            ${renderSummaryRow(tr('cart.tax'), formatStoreMoney(cart.tax_amount), { muted: true })}
+            ${renderSummaryRow(tr('cart.shipping'), formatStoreMoney(cart.shipping_estimate), { muted: true })}
             <div class="cart-summary__divider"></div>
-            ${renderSummaryRow('Total', formatStoreMoney(cart.total), { strong: true })}
+            ${renderSummaryRow(tr('cart.total'), formatStoreMoney(cart.total), { strong: true })}
           </div>
-          <p class="cart-summary__note">Tax and shipping are estimates until checkout. Each line shows SKU and selected color/size for your order.</p>
-          <a href="/checkout.html" class="btn cart-summary__checkout">Proceed to checkout</a>
-          <p class="cart-summary__secure">🔒 Secure checkout</p>
+          <p class="cart-summary__note">${escapeHtml(tr('cart.note'))}</p>
+          <a href="/checkout.html" class="btn cart-summary__checkout">${escapeHtml(tr('cart.checkout'))}</a>
+          <p class="cart-summary__secure">${escapeHtml(tr('cart.secure'))}</p>
         </aside>
       </div>
     `;
@@ -136,7 +149,7 @@ async function loadCart() {
       btn.addEventListener('click', () => removeItem(parseInt(btn.getAttribute('data-remove-id'), 10)));
     });
   } catch (err) {
-    container.innerHTML = `<div class="cart-error"><p>Could not load your cart.</p><a href="/">Return home</a></div>`;
+    container.innerHTML = `<div class="cart-error"><p>${escapeHtml(tr('cart.loadFailed'))}</p><a href="/">${escapeHtml(tr('cart.returnHome'))}</a></div>`;
   }
 }
 
@@ -154,4 +167,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof loadBrandSettings === 'function') await loadBrandSettings();
   loadCart();
   loadCartCount();
+});
+
+window.addEventListener('storelangchange', () => {
+  if (document.getElementById('cartContent')) loadCart();
 });

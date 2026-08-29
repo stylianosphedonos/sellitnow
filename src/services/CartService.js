@@ -51,7 +51,7 @@ class CartService {
   async getCart(userId = null, sessionId = null) {
     const cart = await this.getOrCreateCart(userId, sessionId);
     const itemsResult = await pool.query(
-      `SELECT ci.id, ci.product_id, ci.quantity, ci.color, ci.size, p.title, p.price, p.stock_quantity, p.sku, p.delivery_cost,
+      `SELECT ci.id, ci.product_id, ci.quantity, ci.color, ci.size, p.title, p.title_el, p.price, p.stock_quantity, p.sku, p.delivery_cost,
               (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
@@ -71,6 +71,7 @@ class CartService {
         color: r.color || '',
         size: r.size || '',
         title: r.title,
+        title_el: r.title_el || null,
         price: parseFloat(r.price),
         stock_quantity: r.stock_quantity,
         image_url: r.image_url,

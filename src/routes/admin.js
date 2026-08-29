@@ -638,6 +638,8 @@ router.put('/brand', async (req, res) => {
       taxRatePercent,
       heroTitle,
       heroSubtitle,
+      heroTitleEl,
+      heroSubtitleEl,
       heroBannerOverlay,
       emailFrom,
       defaultDeliveryCost,
@@ -658,6 +660,8 @@ router.put('/brand', async (req, res) => {
       requestIconImage !== undefined && { key: 'requestIconImage', value: String(requestIconImage || '') },
       heroTitle !== undefined && { key: 'heroTitle', value: String(heroTitle) },
       heroSubtitle !== undefined && { key: 'heroSubtitle', value: String(heroSubtitle) },
+      heroTitleEl !== undefined && { key: 'heroTitleEl', value: String(heroTitleEl) },
+      heroSubtitleEl !== undefined && { key: 'heroSubtitleEl', value: String(heroSubtitleEl) },
     ].filter(Boolean);
 
     if (heroBannerOverlay !== undefined && heroBannerOverlay !== null && String(heroBannerOverlay).trim() !== '') {

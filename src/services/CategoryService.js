@@ -1,6 +1,7 @@
 const slugify = require('slugify');
 const { pool } = require('../database/db');
 const { parseOptionsJson } = require('../lib/productOptions');
+const { trimToNull } = require('../lib/localizedText');
 
 const DEFAULT_ICON_HEIGHT_PX = 140;
 const MIN_ICON_DIMENSION_PX = 48;
@@ -20,7 +21,7 @@ const WEBSITE_ZONES = [
   'right',
 ];
 const CATEGORY_FIELDS =
-  'id, name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, category_type, website_zone, request_prompt, show_on_website';
+  'id, name, name_el, slug, description, description_el, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, category_type, website_zone, request_prompt, request_prompt_el, show_on_website';
 
 function parseNullableInteger(value, fieldName) {
   if (value === undefined || value === null || value === '') return null;
@@ -157,7 +158,7 @@ class CategoryService {
                  WHERE pc.product_id = p.id AND pc.category_id = $1
                )
              )
-             AND (p.title ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)`,
+             AND (p.title ILIKE $3 OR COALESCE(p.title_el, '') ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.description_el, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)`,
           [categoryId, 'active', pattern]
         )
       : await pool.query(
@@ -176,7 +177,7 @@ class CategoryService {
 
     const result = pattern
       ? await pool.query(
-          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
+          `SELECT p.id, p.title, p.title_el, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -186,7 +187,7 @@ class CategoryService {
                  WHERE pc.product_id = p.id AND pc.category_id = $1
                )
              )
-             AND (p.title ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)
+             AND (p.title ILIKE $3 OR COALESCE(p.title_el, '') ILIKE $3 OR COALESCE(p.description, '') ILIKE $3 OR COALESCE(p.description_el, '') ILIKE $3 OR COALESCE(p.sku, '') ILIKE $3)
            ORDER BY
              CASE WHEN p.display_order IS NULL THEN 1 ELSE 0 END,
              p.display_order ASC,
@@ -195,7 +196,7 @@ class CategoryService {
           [categoryId, 'active', pattern, limit, offset]
         )
       : await pool.query(
-          `SELECT p.id, p.title, p.price, p.options_json, p.product_type,
+          `SELECT p.id, p.title, p.title_el, p.price, p.options_json, p.product_type,
                   (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order LIMIT 1) as image_url
            FROM products p
            WHERE p.status = $2
@@ -220,6 +221,7 @@ class CategoryService {
       return {
         id: row.id,
         title: row.title,
+        title_el: row.title_el || null,
         price: row.price,
         image_url: row.image_url,
         product_type: row.product_type || 'simple',
@@ -251,14 +253,17 @@ class CategoryService {
     const categoryType = parseCategoryType(data.category_type);
     const websiteZone = parseWebsiteZone(data.website_zone);
     const requestPrompt = parseRequestPrompt(data.request_prompt);
+    const requestPromptEl = parseRequestPrompt(data.request_prompt_el);
     const result = await pool.query(
-      `INSERT INTO categories (name, slug, description, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, category_type, website_zone, request_prompt, show_on_website)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO categories (name, name_el, slug, description, description_el, image_url, display_order, icon_size_px, icon_width_px, icon_height_px, website_layout, category_type, website_zone, request_prompt, request_prompt_el, show_on_website)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING ${CATEGORY_FIELDS}`,
       [
         name,
+        trimToNull(data.name_el) || null,
         slug,
         data.description != null ? data.description : null,
+        trimToNull(data.description_el) ?? null,
         data.image_url || null,
         displayOrder,
         iconHeightPx,
@@ -268,6 +273,7 @@ class CategoryService {
         categoryType,
         websiteZone,
         requestPrompt,
+        requestPromptEl,
         showOnWebsite,
       ]
     );
@@ -287,9 +293,17 @@ class CategoryService {
         values.push(slugify(data.name, { lower: true }));
       }
     }
+    if (data.name_el !== undefined) {
+      updates.push(`name_el = $${i++}`);
+      values.push(trimToNull(data.name_el));
+    }
     if (data.description !== undefined) {
       updates.push(`description = $${i++}`);
       values.push(data.description);
+    }
+    if (data.description_el !== undefined) {
+      updates.push(`description_el = $${i++}`);
+      values.push(trimToNull(data.description_el));
     }
     if (data.image_url !== undefined) {
       updates.push(`image_url = $${i++}`);
@@ -339,6 +353,10 @@ class CategoryService {
     if (data.request_prompt !== undefined) {
       updates.push(`request_prompt = $${i++}`);
       values.push(parseRequestPrompt(data.request_prompt));
+    }
+    if (data.request_prompt_el !== undefined) {
+      updates.push(`request_prompt_el = $${i++}`);
+      values.push(parseRequestPrompt(data.request_prompt_el));
     }
 
     if (updates.length === 0) throw new Error('No fields to update');

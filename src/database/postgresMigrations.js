@@ -2,7 +2,8 @@
  * Incremental PostgreSQL migrations for existing databases.
  * Must run before schema.postgresql.sql (which creates indexes on new columns).
  */
-const { migrateLegacyHeroCopy } = require('./storefrontDefaults');
+const { migrateLegacyHeroCopy, seedDefaultGreekCopy } = require('./storefrontDefaults');
+const { copyGreekContentToElColumns } = require('../lib/localizedText');
 
 async function runPostgresMigrations(pool) {
   await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_warning TEXT');
@@ -139,7 +140,15 @@ async function runPostgresMigrations(pool) {
     'CREATE INDEX IF NOT EXISTS idx_pickup_stores_provider ON pickup_stores(provider)'
   );
 
+  await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS title_el TEXT');
+  await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS description_el TEXT');
+  await pool.query('ALTER TABLE categories ADD COLUMN IF NOT EXISTS name_el TEXT');
+  await pool.query('ALTER TABLE categories ADD COLUMN IF NOT EXISTS description_el TEXT');
+  await pool.query('ALTER TABLE categories ADD COLUMN IF NOT EXISTS request_prompt_el TEXT');
+
   await migrateLegacyHeroCopy(pool);
+  await seedDefaultGreekCopy(pool);
+  await copyGreekContentToElColumns(pool);
 }
 
 module.exports = { runPostgresMigrations };

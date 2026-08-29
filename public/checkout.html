@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Checkout - 3nityLab</title>
+  <title data-i18n="page.checkout">Checkout - 3nityLab</title>
   <script src="/js/brand-boot.js"></script>
-  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js?v=20260829-i18n"></script>
+  <link rel="stylesheet" href="/css/style.css?v=20260829-i18n">
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
@@ -13,10 +14,10 @@
     <div class="header-inner">
       <a href="/" class="logo">3nityLab</a>
       <nav class="nav">
-        <a href="/cart.html" class="nav-link cart-link">Cart <span class="cart-count" id="cartCount">0</span></a>
-        <a href="/login.html" class="nav-link" id="loginBtn">Login</a>
-        <a href="/profile.html" class="nav-link" id="profileBtn" style="display:none">Account</a>
-        <button class="nav-link" id="logoutBtn" style="display:none">Logout</button>
+        <a href="/cart.html" class="nav-link cart-link"><span data-i18n="nav.cart">Cart</span> <span class="cart-count" id="cartCount">0</span></a>
+        <a href="/login.html" class="nav-link" id="loginBtn" data-i18n="nav.login">Login</a>
+        <a href="/profile.html" class="nav-link" id="profileBtn" style="display:none" data-i18n="nav.account">Account</a>
+        <button class="nav-link" id="logoutBtn" style="display:none" data-i18n="nav.logout">Logout</button>
       </nav>
     </div>
   </header>
@@ -24,23 +25,23 @@
   <main class="main">
     <div class="checkout-layout">
       <div class="checkout-main">
-        <h1 style="font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em">Checkout</h1>
-        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px">Cyprus pickup only — choose an ACS, Akis Express, or Box Now location, then pay securely by card. Your order is created only after payment succeeds.</p>
+        <h1 style="font-size:26px;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em" data-i18n="checkout.title">Checkout</h1>
+        <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px" data-i18n="checkout.intro">Cyprus pickup only — choose an ACS, Akis Express, or Box Now location, then pay securely by card. Your order is created only after payment succeeds.</p>
         <div id="checkoutError" class="alert alert-error" style="display:none"></div>
 
         <div id="stepShipping" class="checkout-card" style="max-width:640px">
-          <h2 style="margin:0 0 20px;font-size:18px">Pickup &amp; payment</h2>
+          <h2 style="margin:0 0 20px;font-size:18px" data-i18n="checkout.pickupPayment">Pickup &amp; payment</h2>
           <form id="checkoutForm">
             <div class="form-group">
-              <label>Email *</label>
+              <label data-i18n="checkout.email">Email *</label>
               <input type="email" name="guest_email" id="guestEmail" required autocomplete="email">
             </div>
 
             <div id="pickupStoreFields">
-              <h3 style="margin:24px 0 12px;font-size:15px">Pickup in Cyprus</h3>
+              <h3 style="margin:24px 0 12px;font-size:15px" data-i18n="checkout.pickupCyprus">Pickup in Cyprus</h3>
 
               <div class="form-group">
-                <label for="pickupCity">City *</label>
+                <label for="pickupCity" data-i18n="checkout.city">City *</label>
                 <select id="pickupCity" required class="checkout-city-select">
                   <option value="">Select a city</option>
                 </select>
@@ -49,50 +50,50 @@
 
               <div id="pickupAfterCity" style="display:none">
                 <div class="checkout-pickup-filters">
-                  <div class="checkout-pickup-providers" role="tablist" aria-label="Courier">
-                    <button type="button" class="checkout-pickup-provider is-active" data-provider="all">All</button>
+                  <div class="checkout-pickup-providers" role="tablist" data-i18n-aria="checkout.courier" aria-label="Courier">
+                    <button type="button" class="checkout-pickup-provider is-active" data-provider="all" data-i18n="checkout.providerAll">All</button>
                     <button type="button" class="checkout-pickup-provider" data-provider="acs">ACS</button>
                     <button type="button" class="checkout-pickup-provider" data-provider="akis">Akis Express</button>
                     <button type="button" class="checkout-pickup-provider" data-provider="boxnow">Box Now</button>
                   </div>
                   <div class="form-group" style="margin:0">
-                    <label for="pickupSearch">Search within city</label>
-                    <input type="search" id="pickupSearch" placeholder="Store name or address" autocomplete="off">
+                    <label for="pickupSearch" data-i18n="checkout.searchCity">Search within city</label>
+                    <input type="search" id="pickupSearch" data-i18n-placeholder="checkout.searchPlaceholder" placeholder="Store name or address" autocomplete="off">
                   </div>
                 </div>
                 <p id="pickupStoresMeta" style="margin:8px 0 12px;font-size:13px;color:var(--text-muted)"></p>
                 <p id="pickupStoresEmpty" class="alert alert-error" style="display:none"></p>
-                <div id="pickupStoreList" class="checkout-pickup-list" role="radiogroup" aria-label="Pickup stores"></div>
+                <div id="pickupStoreList" class="checkout-pickup-list" role="radiogroup" data-i18n-aria="checkout.storesAria" aria-label="Pickup stores"></div>
               </div>
 
-              <p id="pickupChooseCityHint" style="margin:8px 0 0;font-size:14px;color:var(--text-muted)">Select your city to see available ACS, Akis Express, and Box Now pickup points.</p>
-              <p id="pickupLoadingHint" style="display:none;margin:8px 0 0;font-size:14px;color:var(--text-muted)">Loading pickup locations…</p>
+              <p id="pickupChooseCityHint" style="margin:8px 0 0;font-size:14px;color:var(--text-muted)" data-i18n="checkout.chooseCity">Select your city to see available ACS, Akis Express, and Box Now pickup points.</p>
+              <p id="pickupLoadingHint" style="display:none;margin:8px 0 0;font-size:14px;color:var(--text-muted)" data-i18n="checkout.loadingPickup">Loading pickup locations…</p>
             </div>
 
             <div class="form-group">
-              <label>Country</label>
+              <label data-i18n="checkout.country">Country</label>
               <input type="text" name="country" id="checkoutCountry" value="Cyprus (CY)" readonly>
             </div>
             <div id="checkoutPhoneWrap" class="form-group checkout-phone-field--highlight">
-              <label id="checkoutPhoneLabel" for="checkoutPhone">Phone <span id="checkoutPhoneOptional" style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+              <label id="checkoutPhoneLabel" for="checkoutPhone"><span data-i18n="checkout.phone">Phone</span> <span id="checkoutPhoneOptional" style="color:var(--text-muted);font-weight:400" data-i18n="checkout.phoneOptional">(optional)</span></label>
               <input type="tel" name="phone" id="checkoutPhone" autocomplete="tel" inputmode="tel" placeholder="">
-              <p id="checkoutPhoneHint" class="checkout-phone-hint" style="display:none;margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--text-muted)">We’ll use this number if we need to reach you about your pickup.</p>
+              <p id="checkoutPhoneHint" class="checkout-phone-hint" style="display:none;margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--text-muted)" data-i18n="checkout.phoneHint">We’ll use this number if we need to reach you about your pickup.</p>
             </div>
-            <button type="submit" class="btn" id="placeOrderBtn" style="margin-top:24px;max-width:240px">Continue to payment</button>
+            <button type="submit" class="btn" id="placeOrderBtn" style="margin-top:24px;max-width:240px" data-i18n="checkout.continuePay">Continue to payment</button>
           </form>
         </div>
 
         <div id="stepPayment" class="checkout-card" style="display:none;max-width:640px">
-          <h2 style="margin-top:0;font-size:18px">Payment</h2>
+          <h2 style="margin-top:0;font-size:18px" data-i18n="checkout.payment">Payment</h2>
           <div id="paymentOrderBanner"></div>
-          <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px">Enter your card below. Your order will be placed when payment succeeds.</p>
+          <p id="paymentStepIntro" style="color:var(--text-muted);font-size:14px;margin-bottom:20px" data-i18n="checkout.paymentIntro">Enter your card below. Your order will be placed when payment succeeds.</p>
           <div id="payment-message" class="alert alert-error" style="display:none;margin-top:12px"></div>
           <form id="paymentForm">
             <div id="payment-element"></div>
-            <button type="submit" class="btn" id="payBtn" style="margin-top:24px;max-width:200px">Pay now</button>
+            <button type="submit" class="btn" id="payBtn" style="margin-top:24px;max-width:200px" data-i18n="checkout.payNow">Pay now</button>
           </form>
           <p style="margin-top:20px;font-size:14px">
-            <a href="/checkout-cancel.html" id="cancelPaymentLink">Cancel and return to cart</a>
+            <a href="/checkout-cancel.html" id="cancelPaymentLink" data-i18n="checkout.cancelReturn">Cancel and return to cart</a>
           </p>
         </div>
       </div>
@@ -104,8 +105,8 @@
   </main>
 
   <script src="/js/runtime-config.js"></script>
-  <script src="/js/app.js"></script>
-  <script src="/js/order-review.js"></script>
+  <script src="/js/app.js?v=20260829-i18n"></script>
+  <script src="/js/order-review.js?v=20260829-i18n"></script>
   <script>
     const user = getUser();
     if (user?.email) {
@@ -125,6 +126,14 @@
     let selectedProvider = 'all';
     let searchTimer = null;
     let catalogReady = false;
+
+    function tr(key, vars) {
+      return typeof t === 'function' ? t(key, vars) : key;
+    }
+
+    function locCity(name) {
+      return typeof localizedCity === 'function' ? localizedCity(name) : name;
+    }
 
     function escapeHtml(str) {
       if (str == null) return '';
@@ -207,17 +216,15 @@
         if (empty) {
           empty.style.display = 'block';
           empty.textContent = pickupActiveTotal
-            ? `No pickup points found in ${city} for this filter. Try another courier or clear search.`
-            : 'Pickup locations could not be loaded. Please refresh the page or try again in a moment.';
+            ? tr('checkout.noStores')
+            : tr('checkout.citiesLoadFailed');
         }
         return;
       }
 
       if (empty) empty.style.display = 'none';
       if (meta) {
-        meta.textContent = `${pickupStores.length} pickup point${
-          pickupStores.length === 1 ? '' : 's'
-        } in ${city}${parts.length ? ` · Network total: ${parts.join(', ')}` : ''}`;
+        meta.textContent = `${tr(pickupStores.length === 1 ? 'checkout.points' : 'checkout.pointsPlural', { count: pickupStores.length })} · ${locCity(city)}${parts.length ? ` · ${parts.join(', ')}` : ''}`;
       }
 
       const preferred =
@@ -256,8 +263,8 @@
       const placeholder = document.createElement('option');
       placeholder.value = '';
       placeholder.textContent = pickupCities.length
-        ? 'Select a city'
-        : 'No cities available';
+        ? tr('checkout.selectCity')
+        : tr('checkout.noCities');
       select.appendChild(placeholder);
 
       const preferred = ['Nicosia', 'Limassol', 'Larnaca', 'Paphos', 'Ammochostos', 'Polis'];
@@ -273,7 +280,7 @@
       for (const city of sorted) {
         const opt = document.createElement('option');
         opt.value = city;
-        opt.textContent = city;
+        opt.textContent = locCity(city);
         select.appendChild(opt);
       }
       if (current && pickupCities.includes(current)) select.value = current;
@@ -301,7 +308,7 @@
           if (cityError) {
             cityError.style.display = 'block';
             cityError.textContent =
-              'No Cyprus pickup cities are available yet. Please refresh in a moment.';
+              tr('checkout.noCitiesAvailable');
           }
         }
       } catch (err) {
@@ -313,7 +320,7 @@
         if (cityError) {
           cityError.style.display = 'block';
           cityError.textContent =
-            err.message || 'Could not load pickup cities. Please refresh the page.';
+            err.message || tr('checkout.citiesLoadFailed');
         }
       } finally {
         if (loading) loading.style.display = 'none';
@@ -384,7 +391,7 @@
       btn.disabled = true;
 
       if (!selectedCity()) {
-        errEl.textContent = 'Please select a city first.';
+        errEl.textContent = tr('checkout.selectCityFirst');
         errEl.style.display = 'block';
         btn.disabled = false;
         return;
@@ -393,7 +400,7 @@
       const phoneTrim = (form.phone?.value || '').trim();
       const selected = form.querySelector('input[name="pickup_store_id"]:checked');
       if (!selected || !pickupStores.length) {
-        errEl.textContent = 'Please select a pickup store in your city.';
+        errEl.textContent = tr('checkout.selectStore');
         errEl.style.display = 'block';
         btn.disabled = false;
         return;
@@ -410,7 +417,7 @@
       try {
         const cartForReview = await callApi('/cart');
         if (!cartForReview.items || cartForReview.items.length === 0) {
-          errEl.textContent = 'Your cart is empty. Add items before checkout.';
+          errEl.textContent = tr('checkout.emptyCart');
           errEl.style.display = 'block';
           btn.disabled = false;
           await loadCheckoutReview();
@@ -435,7 +442,7 @@
         );
         initStripePayment();
       } catch (err) {
-        errEl.textContent = err.message || 'Could not continue to payment';
+        errEl.textContent = err.message || tr('checkout.continueFailed');
         errEl.style.display = 'block';
         btn.disabled = false;
       }
@@ -481,7 +488,7 @@
 
         const { error: submitError } = await elements.submit();
         if (submitError) {
-          messageEl.textContent = submitError.message || 'Please check your payment details';
+          messageEl.textContent = submitError.message || tr('checkout.checkDetails');
           messageEl.style.display = 'block';
           payBtn.disabled = false;
           return;
@@ -494,7 +501,7 @@
         });
 
         if (error) {
-          messageEl.textContent = error.message || 'Payment failed';
+          messageEl.textContent = error.message || tr('checkout.paymentFailed');
           messageEl.style.display = 'block';
           payBtn.disabled = false;
           return;
@@ -557,10 +564,10 @@
         });
         paymentElement.mount('#payment-element');
       } catch (err) {
-        messageEl.textContent = err.message || 'Payment could not be loaded';
+        messageEl.textContent = err.message || tr('checkout.paymentLoadFailed');
         messageEl.style.display = 'block';
         paymentElHost.innerHTML =
-          '<p>Unable to load payment form. <a href="/cart.html">Return to cart</a>.</p>';
+          `<p>${escapeHtml(tr('checkout.paymentLoadFailed'))} <a href="/cart.html">${escapeHtml(tr('review.returnCart'))}</a>.</p>`;
         payBtn.style.display = 'none';
       }
     }
@@ -582,6 +589,19 @@
       loadCartCount();
       updateNav();
       initLogout();
+    });
+
+    window.addEventListener('storelangchange', () => {
+      if (typeof applyStaticTranslations === 'function') applyStaticTranslations();
+      const country = document.getElementById('checkoutCountry');
+      if (country) country.value = tr('checkout.countryValue');
+      fillCityOptions();
+      renderPickupStores();
+      if (lastCartReview) renderCheckoutReview(lastCartReview);
+      const banner = document.getElementById('paymentOrderBanner');
+      if (banner && checkoutDraft) {
+        banner.innerHTML = buildPaymentStepOrderBanner(null, checkoutDraft.total_amount);
+      }
     });
 
     window.addEventListener('pageshow', (e) => {
