@@ -24,6 +24,12 @@ class MediaBlobService {
     const row = r.rows[0];
     return { contentType: row.content_type, data: row.data };
   }
+
+  static async deleteById(id) {
+    this.assertPostgres();
+    if (!id) return;
+    await pool.query('DELETE FROM media_blobs WHERE id = $1', [id]);
+  }
 }
 
 module.exports = MediaBlobService;

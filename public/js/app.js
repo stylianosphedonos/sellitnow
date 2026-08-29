@@ -50,6 +50,12 @@ function persistBrandSettings(data) {
   } catch (_) {}
 }
 
+function clearHeroBannerPreload() {
+  try {
+    document.querySelector('link[data-hero-preload="1"]')?.remove();
+  } catch (_) {}
+}
+
 function syncHeroHasCopyClass() {
   const hero = document.querySelector('.hero');
   if (!hero) return;
@@ -154,6 +160,7 @@ function applyHeroBannerBackground(data) {
     root.classList.remove('has-hero-banner');
     root.style.removeProperty('--hero-banner-image');
     root.style.removeProperty('--hero-banner-overlay');
+    clearHeroBannerPreload();
     if (centerImg) {
       centerImg.removeAttribute('src');
       centerImg.hidden = true;

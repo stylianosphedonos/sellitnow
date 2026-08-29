@@ -32,6 +32,12 @@
     } catch (_) {}
   }
 
+  function cachedHeroHasCopy(data) {
+    if (!data || typeof data !== 'object') return false;
+    const fields = [data.heroTitle, data.heroSubtitle, data.heroTitleEl, data.heroSubtitleEl];
+    return fields.some((v) => v != null && String(v).trim() !== '');
+  }
+
   function applyThemeVars(data) {
     if (!data || typeof document === 'undefined') return;
     const root = document.documentElement;
@@ -59,7 +65,8 @@
       preloadHeroBanner(resolved);
     } else {
       root.classList.remove('has-hero-banner');
-      root.classList.add('hero-use-gradient');
+      if (cachedHeroHasCopy(data)) root.classList.add('hero-use-gradient');
+      else root.classList.remove('hero-use-gradient');
       root.style.removeProperty('--hero-banner-image');
       root.style.removeProperty('--hero-banner-overlay');
     }

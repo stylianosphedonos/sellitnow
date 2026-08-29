@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const MediaBlobService = require('../services/MediaBlobService');
@@ -39,4 +40,37 @@ async function publicUrlForUploadedFile(file, options = {}) {
   return `${prefix}/${filename}`.replace(/\/{2,}/g, '/');
 }
 
-module.exports = { publicUrlForUploadedFile, uploadPrefix };
+/**
+ * Best-effort delete of a previously stored public media URL (local disk or Postgres blob).
+ * @param {string} url
+ */
+async function deleteStoredMediaUrl(url) {
+  const raw = url != null ? String(url).trim() : '';
+  if (!raw) return;
+
+  const prefix = uploadPrefix();
+  const normalized = raw.replace(/\/{2,}/g, '/');
+  const blobPrefix = `${prefix}/blob/`;
+  if (normalized.startsWith(blobPrefix)) {
+    const id = normalized.slice(blobPrefix.length).split(/[/?#]/)[0];
+    if (id && isPostgres) {
+      await MediaBlobService.deleteById(id).catch(() => {});
+    }
+    return;
+  }
+
+  const filename = path.basename(normalized);
+  if (!filename || filename === '.' || filename === '..') return;
+
+  const uploadDir = config.app.uploadDir;
+  if (!uploadDir) return;
+
+  const filePath = path.join(uploadDir, filename);
+  const resolved = path.resolve(filePath);
+  const resolvedDir = path.resolve(uploadDir);
+  if (!resolved.startsWith(resolvedDir + path.sep) && resolved !== resolvedDir) return;
+
+  await fs.promises.unlink(resolved).catch(() => {});
+}
+
+module.exports = { publicUrlForUploadedFile, uploadPrefix, deleteStoredMediaUrl };

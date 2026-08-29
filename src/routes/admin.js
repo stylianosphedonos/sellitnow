@@ -15,7 +15,7 @@ const {
   uploadAllProductsTileImage,
   uploadRequestIconImage,
 } = require('../middleware/upload');
-const { publicUrlForUploadedFile } = require('../lib/mediaPublicUrl');
+const { publicUrlForUploadedFile, deleteStoredMediaUrl } = require('../lib/mediaPublicUrl');
 const { getBrandSettings, normalizeCurrency, normalizeEmailFromInput } = require('./brand');
 const EmailService = require('../services/EmailService');
 const OrderEmailLogService = require('../services/OrderEmailLogService');
@@ -650,7 +650,6 @@ router.put('/brand', async (req, res) => {
       secondary != null && { key: 'secondary', value: String(secondary) },
       accent != null && { key: 'accent', value: String(accent) },
       headerShadow != null && { key: 'headerShadow', value: String(headerShadow) },
-      banner !== undefined && { key: 'banner', value: String(banner || '') },
       logo !== undefined && { key: 'logo', value: String(logo || '') },
       allProductsImage !== undefined && { key: 'allProductsImage', value: String(allProductsImage || '') },
       allProductsShowOnWebsite !== undefined && {
@@ -663,6 +662,21 @@ router.put('/brand', async (req, res) => {
       heroTitleEl !== undefined && { key: 'heroTitleEl', value: String(heroTitleEl) },
       heroSubtitleEl !== undefined && { key: 'heroSubtitleEl', value: String(heroSubtitleEl) },
     ].filter(Boolean);
+
+    if (banner !== undefined) {
+      const nextBanner = String(banner || '').trim();
+      const currentSettings = await getBrandSettings();
+      const previousBanner = currentSettings.banner && String(currentSettings.banner).trim();
+      if (nextBanner === '') {
+        if (previousBanner) await deleteStoredMediaUrl(previousBanner);
+        await pool.query(`DELETE FROM brand_settings WHERE key = 'banner'`);
+      } else {
+        if (previousBanner && previousBanner !== nextBanner) {
+          await deleteStoredMediaUrl(previousBanner);
+        }
+        updates.push({ key: 'banner', value: nextBanner });
+      }
+    }
 
     if (heroBannerOverlay !== undefined && heroBannerOverlay !== null && String(heroBannerOverlay).trim() !== '') {
       const o = parseFloat(heroBannerOverlay);
@@ -820,7 +834,12 @@ router.post('/brand/banner', uploadBanner, async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No image file uploaded' });
     }
+    const currentSettings = await getBrandSettings();
+    const previousBanner = currentSettings.banner && String(currentSettings.banner).trim();
     const url = await publicUrlForUploadedFile(req.file, { assetType: 'banner' });
+    if (previousBanner && previousBanner !== url) {
+      await deleteStoredMediaUrl(previousBanner);
+    }
     await pool.query(
       'INSERT INTO brand_settings (key, value) VALUES ($1, $2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       ['banner', url]

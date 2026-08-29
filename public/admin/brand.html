@@ -307,9 +307,11 @@
           placeholder.style.display = 'none';
         } else {
           bannerImg.src = '';
+          bannerImg.removeAttribute('src');
           bannerImg.style.display = 'none';
           placeholder.style.display = 'block';
         }
+        removeBannerBtn.disabled = !data.banner;
         syncBannerDimUi();
 
         const allProductsImg = document.getElementById('allProductsImg');
@@ -417,14 +419,17 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || 'Upload failed');
+        applyBrandTheme(data, true);
+        if (typeof applyHeroBannerBackground === 'function') applyHeroBannerBackground(data);
         document.getElementById('bannerImg').src =
           typeof mediaUrl === 'function' ? mediaUrl(data.banner) : data.banner;
         document.getElementById('bannerImg').style.display = 'block';
         document.getElementById('bannerPlaceholder').style.display = 'none';
+        removeBannerBtn.disabled = false;
         syncBannerDimUi();
         bannerFile.value = '';
         uploadBannerBtn.disabled = true;
-        showAlert('Home center image uploaded. Refresh the store to see it.');
+        showAlert('Home center image uploaded.');
       } catch (err) {
         showAlert(err.message || 'Failed to upload banner.', true);
       }
@@ -433,14 +438,24 @@
     });
 
     removeBannerBtn.addEventListener('click', async () => {
+      if (removeBannerBtn.disabled) return;
+      removeBannerBtn.disabled = true;
+      removeBannerBtn.textContent = 'Removing...';
       try {
-        await callApi('/admin/brand', {
+        const data = await callApi('/admin/brand', {
           method: 'PUT',
           body: JSON.stringify({ banner: '' })
         });
-      } catch (_) {}
-      await loadBrand();
-      showAlert('Home center image removed.');
+        applyBrandTheme(data, true);
+        if (typeof applyHeroBannerBackground === 'function') applyHeroBannerBackground(data);
+        if (typeof clearHeroBannerPreload === 'function') clearHeroBannerPreload();
+        await loadBrand();
+        showAlert('Home center image removed.');
+      } catch (err) {
+        showAlert(err.message || 'Failed to remove home center image.', true);
+        removeBannerBtn.disabled = false;
+      }
+      removeBannerBtn.textContent = 'Remove image';
     });
 
     logoFile.addEventListener('change', () => {
