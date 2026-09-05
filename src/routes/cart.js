@@ -85,7 +85,8 @@ router.post('/voucher', optionalAuth, async (req, res) => {
   try {
     const { userId, sessionId } = getCartContext(req);
     const code = req.body?.code;
-    const cart = await CartService.applyVoucher(userId, sessionId, code);
+    const guestEmail = req.body?.guest_email || null;
+    const cart = await CartService.applyVoucher(userId, sessionId, code, guestEmail);
     res.json(cart);
   } catch (err) {
     res.status(400).json({ error: err.message });

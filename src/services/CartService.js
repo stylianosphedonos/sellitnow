@@ -50,11 +50,11 @@ class CartService {
     return result.rows[0];
   }
 
-  async resolveAppliedVoucher(cartRow) {
+  async resolveAppliedVoucher(cartRow, userId = null) {
     const raw = cartRow?.voucher_code;
     if (!raw) return null;
     try {
-      return await VoucherService.validateApplicable(raw);
+      return await VoucherService.validateApplicable(raw, { userId });
     } catch {
       await pool.query('UPDATE cart SET voucher_code = NULL WHERE id = $1', [cartRow.id]);
       return null;
@@ -103,7 +103,7 @@ class CartService {
     const itemCount = items.reduce((s, i) => s + i.quantity, 0);
     const shippingCost = computeShippingTotal(defaultDelivery, items);
 
-    const voucher = items.length ? await this.resolveAppliedVoucher(cart) : null;
+    const voucher = items.length ? await this.resolveAppliedVoucher(cart, userId) : null;
     const discountPercent = voucher ? Number(voucher.discount_percent) || 0 : 0;
     const discountAmount = voucher ? roundMoney(subtotal * (discountPercent / 100)) : 0;
     const discountedSubtotal = Math.max(0, roundMoney(subtotal - discountAmount));
@@ -124,6 +124,7 @@ class CartService {
             discount_percent: voucher.discount_percent,
             expires_at: voucher.expires_at,
             label: voucher.label,
+            usage_type: voucher.usage_type,
           }
         : null,
       tax_amount: taxAmount,
@@ -136,8 +137,11 @@ class CartService {
     };
   }
 
-  async applyVoucher(userId, sessionId, code) {
-    const voucher = await VoucherService.validateApplicable(code);
+  async applyVoucher(userId, sessionId, code, guestEmail = null) {
+    const voucher = await VoucherService.validateApplicable(code, {
+      userId,
+      guestEmail,
+    });
     const cart = await this.getOrCreateCart(userId, sessionId);
     const count = await this.getItemCount(userId, sessionId);
     if (!count.item_count) throw new Error('Add items to your cart before applying a voucher.');

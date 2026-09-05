@@ -6,6 +6,7 @@ const config = require('../config');
 const EmailService = require('./EmailService');
 const OrderEmailLogService = require('./OrderEmailLogService');
 const { createGuestOrderToken, verifyGuestOrderToken } = require('../lib/guestOrderToken');
+const VoucherService = require('./VoucherService');
 
 class OrderService {
   async releaseOrderItemsToStock(client, orderId) {
@@ -127,6 +128,23 @@ class OrderService {
         ]
       );
       const order = orderResult.rows[0];
+
+      if (voucherCode) {
+        await VoucherService.validateApplicable(voucherCode, {
+          userId,
+          guestEmail: email,
+          requireIdentity: true,
+        });
+        await VoucherService.recordRedemption(
+          {
+            voucherCode,
+            orderId: order.id,
+            userId,
+            guestEmail: email || userEmail,
+          },
+          client
+        );
+      }
 
       for (const item of cartData.items) {
         const product = await ProductService.getById(item.product_id);
@@ -291,6 +309,20 @@ class OrderService {
       ]
     );
     const order = orderResult.rows[0];
+
+    if (voucherCode) {
+      await VoucherService.validateApplicable(voucherCode, {
+        userId,
+        guestEmail: email,
+        requireIdentity: true,
+      });
+      await VoucherService.recordRedemption({
+        voucherCode,
+        orderId: order.id,
+        userId,
+        guestEmail: email || userEmail,
+      });
+    }
 
     for (const item of cartData.items) {
       const product = await ProductService.getById(item.product_id);

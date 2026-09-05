@@ -8,6 +8,7 @@ const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
 const { verifyGuestOrderToken, createGuestOrderToken } = require('../lib/guestOrderToken');
 const PickupStoreService = require('./PickupStoreService');
+const VoucherService = require('./VoucherService');
 const {
   resolveCheckoutAddress,
   toPaymentMetadataAddress,
@@ -155,6 +156,14 @@ class PaymentService {
     if (!cartData.items.length) throw new Error('Cart is empty');
 
     if (!userId && !guestEmail) throw new Error('Email required for guest checkout');
+
+    if (cartData.voucher_code) {
+      await VoucherService.validateApplicable(cartData.voucher_code, {
+        userId,
+        guestEmail,
+        requireIdentity: true,
+      });
+    }
 
     const resolvedAddress = await resolveCheckoutAddress(shippingAddress, PickupStoreService);
     const shippingCost = Number(cartData.shipping_estimate) || 0;

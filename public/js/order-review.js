@@ -173,7 +173,11 @@
           return;
         }
         try {
-          await global.callApi('/cart/voucher', { method: 'POST', body: JSON.stringify({ code }) });
+          const guestEmail = document.getElementById('guestEmail')?.value?.trim() || null;
+          await global.callApi('/cart/voucher', {
+            method: 'POST',
+            body: JSON.stringify({ code, guest_email: guestEmail }),
+          });
           if (typeof onChanged === 'function') onChanged();
         } catch (err) {
           if (errEl) {

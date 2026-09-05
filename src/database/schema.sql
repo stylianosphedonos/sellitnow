@@ -196,7 +196,17 @@ CREATE TABLE IF NOT EXISTS discount_vouchers (
   discount_percent REAL NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
   expires_at TEXT,
   label TEXT,
+  usage_type TEXT NOT NULL DEFAULT 'single' CHECK (usage_type IN ('single', 'multi')),
   is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS voucher_redemptions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  voucher_id INTEGER NOT NULL REFERENCES discount_vouchers(id) ON DELETE CASCADE,
+  order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  guest_email TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -230,3 +240,6 @@ CREATE INDEX IF NOT EXISTS idx_cart_session_id ON cart(session_id);
 CREATE INDEX IF NOT EXISTS idx_pickup_stores_active_order ON pickup_stores(active, display_order, city);
 CREATE INDEX IF NOT EXISTS idx_discount_vouchers_code ON discount_vouchers(code);
 CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active);
+CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_voucher ON voucher_redemptions(voucher_id);
+CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_user ON voucher_redemptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_email ON voucher_redemptions(guest_email);

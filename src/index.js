@@ -478,11 +478,27 @@ function runSchemaMigrations(db) {
     discount_percent REAL NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
     expires_at TEXT,
     label TEXT,
+    usage_type TEXT NOT NULL DEFAULT 'single' CHECK (usage_type IN ('single', 'multi')),
     is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  const voucherCols = db.prepare('PRAGMA table_info(discount_vouchers)').all().map((c) => c.name);
+  if (voucherCols.length && !voucherCols.includes('usage_type')) {
+    db.exec("ALTER TABLE discount_vouchers ADD COLUMN usage_type TEXT NOT NULL DEFAULT 'multi'");
+  }
+  db.exec(`CREATE TABLE IF NOT EXISTS voucher_redemptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    voucher_id INTEGER NOT NULL REFERENCES discount_vouchers(id) ON DELETE CASCADE,
+    order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    guest_email TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_code ON discount_vouchers(code)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_voucher ON voucher_redemptions(voucher_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_user ON voucher_redemptions(user_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_voucher_redemptions_email ON voucher_redemptions(guest_email)');
   const cartTableCols = db.prepare('PRAGMA table_info(cart)').all().map((c) => c.name);
   if (cartTableCols.length && !cartTableCols.includes('voucher_code')) {
     db.exec('ALTER TABLE cart ADD COLUMN voucher_code TEXT');
