@@ -101,6 +101,12 @@ async function loadCart() {
     const itemCount = cart.item_count || cart.items.reduce((s, i) => s + i.quantity, 0);
     const linesHtml = cart.items.map((item) => renderCartLine(item)).join('');
     const itemsWord = itemCount === 1 ? tr('cart.item') : tr('cart.items');
+    const shippingIsFree =
+      cart.shipping_is_free === true ||
+      itemCount >= (Number(cart.free_delivery_min_items) || 10);
+    const shippingLabel = shippingIsFree
+      ? tr('cart.shippingFree')
+      : formatStoreMoney(cart.shipping_estimate);
 
     container.innerHTML = `
       <header class="cart-page__head">
@@ -119,10 +125,11 @@ async function loadCart() {
           <div class="cart-summary__body">
             ${renderSummaryRow(tr('cart.subtotal'), formatStoreMoney(cart.subtotal))}
             ${renderSummaryRow(tr('cart.tax'), formatStoreMoney(cart.tax_amount), { muted: true })}
-            ${renderSummaryRow(tr('cart.shipping'), formatStoreMoney(cart.shipping_estimate), { muted: true })}
+            ${renderSummaryRow(tr('cart.shipping'), shippingLabel, { muted: true })}
             <div class="cart-summary__divider"></div>
             ${renderSummaryRow(tr('cart.total'), formatStoreMoney(cart.total), { strong: true })}
           </div>
+          <p class="cart-summary__note">${escapeHtml(tr('cart.freeDeliveryNote'))}</p>
           <p class="cart-summary__note">${escapeHtml(tr('cart.note'))}</p>
           <a href="/checkout.html" class="btn cart-summary__checkout">${escapeHtml(tr('cart.checkout'))}</a>
           <p class="cart-summary__secure">${escapeHtml(tr('cart.secure'))}</p>

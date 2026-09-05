@@ -4,7 +4,7 @@ const { pool } = require('../database/db');
 const { getBrandSettings } = require('../routes/brand');
 const ProductService = require('./ProductService');
 const { validateVariantForProduct } = require('../lib/productOptions');
-const { computeShippingTotal } = require('../lib/shipping');
+const { computeShippingTotal, FREE_DELIVERY_MIN_ITEMS } = require('../lib/shipping');
 
 class CartService {
   /**
@@ -85,10 +85,8 @@ class CartService {
     const taxRate = Number(brand.taxRatePercent) / 100;
     const taxAmount = subtotal * (Number.isFinite(taxRate) ? taxRate : 0);
     const defaultDelivery = brand.defaultDeliveryCost;
-    // Checkout is Cyprus pickup-only; cart totals match pickup (no home delivery fee).
-    const shippingCost = computeShippingTotal(defaultDelivery, items, {
-      fulfillmentMethod: 'pickup',
-    });
+    const itemCount = items.reduce((s, i) => s + i.quantity, 0);
+    const shippingCost = computeShippingTotal(defaultDelivery, items);
     const total = subtotal + taxAmount + shippingCost;
 
     return {
@@ -99,8 +97,10 @@ class CartService {
       tax_amount: taxAmount,
       default_delivery_cost: defaultDelivery,
       shipping_estimate: shippingCost,
+      free_delivery_min_items: FREE_DELIVERY_MIN_ITEMS,
+      shipping_is_free: itemCount >= FREE_DELIVERY_MIN_ITEMS,
       total,
-      item_count: items.reduce((s, i) => s + i.quantity, 0),
+      item_count: itemCount,
     };
   }
 

@@ -77,12 +77,22 @@
   }
 
   function footerHtml(cart) {
+    const itemCount =
+      cart.item_count ||
+      (cart.items || []).reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+    const shippingIsFree =
+      cart.shipping_is_free === true ||
+      itemCount >= (Number(cart.free_delivery_min_items) || 10);
+    const shippingValue = shippingIsFree
+      ? tr('cart.shippingFree')
+      : money(cart.shipping_estimate);
     return `
       <div class="order-review__footer">
         <div class="order-review__row"><span>${escapeHtml(tr('cart.subtotal'))}</span><span>${money(cart.subtotal)}</span></div>
         <div class="order-review__row"><span>${escapeHtml(tr('review.estTax'))}</span><span>${money(cart.tax_amount)}</span></div>
-        <div class="order-review__row"><span>${escapeHtml(tr('review.pickup'))}</span><span>${money(cart.shipping_estimate)}</span></div>
+        <div class="order-review__row"><span>${escapeHtml(tr('review.pickup'))}</span><span>${escapeHtml(shippingValue)}</span></div>
         <div class="order-review__row order-review__row--total"><span>${escapeHtml(tr('cart.total'))}</span><span>${money(cart.total)}</span></div>
+        <p class="order-review__shipping-note">${escapeHtml(tr('cart.freeDeliveryNote'))}</p>
       </div>
     `;
   }
