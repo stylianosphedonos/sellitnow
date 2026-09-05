@@ -69,4 +69,15 @@ router.delete('/items/:id', optionalAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/v1/cart — remove all items
+router.delete('/', optionalAuth, async (req, res) => {
+  try {
+    const { userId, sessionId } = getCartContext(req);
+    const cart = await CartService.clearAllItems(userId, sessionId);
+    res.json(cart);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

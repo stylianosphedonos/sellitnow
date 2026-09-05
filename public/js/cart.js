@@ -114,7 +114,10 @@ async function loadCart() {
           <h1 class="cart-page__title">${escapeHtml(tr('cart.title'))}</h1>
           <p class="cart-page__subtitle">${escapeHtml(tr('cart.subtitle', { count: itemCount, items: itemsWord }))}</p>
         </div>
-        <a href="/" class="cart-page__continue">${escapeHtml(tr('cart.continue'))}</a>
+        <div class="cart-page__head-actions">
+          <a href="/" class="cart-page__continue">${escapeHtml(tr('cart.continue'))}</a>
+          <button type="button" class="cart-page__clear" id="clearCartBtn">${escapeHtml(tr('cart.removeAll'))}</button>
+        </div>
       </header>
       <div class="cart-layout">
         <section class="cart-lines" aria-label="${escapeHtml(tr('cart.itemsAria'))}">
@@ -155,6 +158,11 @@ async function loadCart() {
     container.querySelectorAll('[data-remove-id]').forEach((btn) => {
       btn.addEventListener('click', () => removeItem(parseInt(btn.getAttribute('data-remove-id'), 10)));
     });
+
+    const clearBtn = document.getElementById('clearCartBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => clearAllItems());
+    }
   } catch (err) {
     container.innerHTML = `<div class="cart-error"><p>${escapeHtml(tr('cart.loadFailed'))}</p><a href="/">${escapeHtml(tr('cart.returnHome'))}</a></div>`;
   }
@@ -167,6 +175,26 @@ async function removeItem(itemId) {
     loadCartCount();
   } catch (err) {
     alert(err.message);
+  }
+}
+
+async function clearAllItems() {
+  if (!window.confirm(tr('cart.removeAllConfirm'))) return;
+  const btn = document.getElementById('clearCartBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = tr('cart.removingAll');
+  }
+  try {
+    await callApi('/cart', { method: 'DELETE' });
+    loadCart();
+    loadCartCount();
+  } catch (err) {
+    alert(err.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = tr('cart.removeAll');
+    }
   }
 }
 

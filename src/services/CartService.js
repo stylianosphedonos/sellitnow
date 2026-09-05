@@ -226,6 +226,15 @@ class CartService {
   async clearCart(cartId) {
     await pool.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
   }
+
+  /**
+   * Remove every line from the current user/guest cart.
+   */
+  async clearAllItems(userId = null, sessionId = null) {
+    const cart = await this.getOrCreateCart(userId, sessionId);
+    await this.clearCart(cart.id);
+    return this.getCart(userId, sessionId);
+  }
 }
 
 module.exports = new CartService();

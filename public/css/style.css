@@ -2696,6 +2696,39 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   text-decoration: underline;
 }
 
+.cart-page__head-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.cart-page__clear {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.cart-page__clear:hover:not(:disabled) {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #b91c1c;
+}
+
+.cart-page__clear:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .cart-layout {
   display: grid;
   grid-template-columns: 1fr min(360px, 100%);
@@ -4017,6 +4050,11 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 
   .cart-page__title {
     font-size: 24px;
+  }
+
+  .cart-page__head-actions {
+    align-items: flex-start;
+    width: 100%;
   }
 
   .cart-page__continue {
