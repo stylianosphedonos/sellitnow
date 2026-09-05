@@ -1,4 +1,4 @@
-const { containsGreek, isBlank } = require('./localizedText');
+const { containsGreek } = require('./localizedText');
 const { translateText } = require('./translateText');
 const { STOREFRONT_HERO } = require('../database/storefrontDefaults');
 
@@ -12,35 +12,58 @@ function looksGreek(value) {
 }
 
 /**
- * Fill missing side of a bilingual pair. May also move Greek out of an English column.
+ * Fill missing side of a bilingual pair and repair common bad states:
+ * - Greek text left in the English column
+ * - Identical EN/EL copies (not a real translation)
+ *
  * @returns {Promise<{ en: string, el: string, changed: boolean }>}
  */
 async function syncBilingualPair(enValue, elValue) {
   let en = trim(enValue);
   let el = trim(elValue);
-  let changed = false;
 
+  if (!en && !el) return { en: '', el: '', changed: false };
+
+  const originalEn = en;
+  const originalEl = el;
+  const enGreek = Boolean(en && looksGreek(en));
+  const elGreek = Boolean(el && looksGreek(el));
+
+  // English column still has Greek → move/keep Greek on EL, translate EN.
+  if (enGreek) {
+    if (!el || !elGreek) el = en;
+    en = await translateText(el, 'el', 'en');
+    return {
+      en,
+      el,
+      changed: en !== originalEn || el !== originalEl,
+    };
+  }
+
+  // Both sides identical non-Greek text → EL is not a real translation.
+  if (en && el && en === el) {
+    el = await translateText(en, 'en', 'el');
+    return { en, el, changed: el !== originalEl };
+  }
+
+  // Missing EL → translate from English.
   if (en && !el) {
-    if (looksGreek(en)) {
-      el = en;
-      en = await translateText(en, 'el', 'en');
-    } else {
-      el = await translateText(en, 'en', 'el');
-    }
-    changed = true;
-  } else if (el && !en) {
-    if (looksGreek(el)) {
+    el = await translateText(en, 'en', 'el');
+    return { en, el, changed: true };
+  }
+
+  // Missing EN → translate from Greek (or treat EL as English if it has no Greek).
+  if (el && !en) {
+    if (elGreek) {
       en = await translateText(el, 'el', 'en');
     } else {
       en = el;
       el = await translateText(en, 'en', 'el');
     }
-    changed = true;
-  } else if (en && el) {
-    return { en, el, changed: false };
+    return { en, el, changed: true };
   }
 
-  return { en, el, changed };
+  return { en, el, changed: false };
 }
 
 async function syncProducts(pool) {
