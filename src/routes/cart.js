@@ -80,4 +80,27 @@ router.delete('/', optionalAuth, async (req, res) => {
   }
 });
 
+// POST /api/v1/cart/voucher — apply discount code
+router.post('/voucher', optionalAuth, async (req, res) => {
+  try {
+    const { userId, sessionId } = getCartContext(req);
+    const code = req.body?.code;
+    const cart = await CartService.applyVoucher(userId, sessionId, code);
+    res.json(cart);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/v1/cart/voucher — remove discount code
+router.delete('/voucher', optionalAuth, async (req, res) => {
+  try {
+    const { userId, sessionId } = getCartContext(req);
+    const cart = await CartService.removeVoucher(userId, sessionId);
+    res.json(cart);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;

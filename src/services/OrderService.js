@@ -1,8 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../database/db');
 const CartService = require('./CartService');
-const { getBrandSettings } = require('../routes/brand');
-const { computeShippingTotal } = require('../lib/shipping');
 const ProductService = require('./ProductService');
 const config = require('../config');
 const EmailService = require('./EmailService');
@@ -104,20 +102,15 @@ class OrderService {
 
       const subtotal = cartData.subtotal;
       const taxAmount = cartData.tax_amount;
-      const brand = await getBrandSettings();
-      const fulfillmentMethod =
-        shippingAddress && shippingAddress.fulfillment_method
-          ? String(shippingAddress.fulfillment_method)
-          : 'delivery';
-      const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items, {
-        fulfillmentMethod,
-      });
-      const totalAmount = subtotal + taxAmount + shippingCost;
+      const discountAmount = Number(cartData.discount_amount) || 0;
+      const voucherCode = cartData.voucher_code || null;
+      const shippingCost = Number(cartData.shipping_estimate);
+      const totalAmount = Number(cartData.total);
       const orderNumber = this.generateOrderNumber();
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status, payment_method, stock_warning)
-         VALUES ($1, $2, $3, 'processing', $4, $5, $6, $7, $8, 'paid', 'card', $9)
+        `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, discount_amount, voucher_code, total_amount, shipping_address, payment_status, payment_method, stock_warning)
+         VALUES ($1, $2, $3, 'processing', $4, $5, $6, $7, $8, $9, $10, 'paid', 'card', $11)
          RETURNING *`,
         [
           orderNumber,
@@ -126,6 +119,8 @@ class OrderService {
           subtotal,
           taxAmount,
           shippingCost,
+          discountAmount,
+          voucherCode,
           totalAmount,
           JSON.stringify(shippingAddress),
           stockWarning,
@@ -269,21 +264,16 @@ class OrderService {
 
     const subtotal = cartData.subtotal;
     const taxAmount = cartData.tax_amount;
-    const brand = await getBrandSettings();
-    const fulfillmentMethod =
-      shippingAddress && shippingAddress.fulfillment_method
-        ? String(shippingAddress.fulfillment_method)
-        : 'delivery';
-    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items, {
-      fulfillmentMethod,
-    });
-    const totalAmount = subtotal + taxAmount + shippingCost;
+    const discountAmount = Number(cartData.discount_amount) || 0;
+    const voucherCode = cartData.voucher_code || null;
+    const shippingCost = Number(cartData.shipping_estimate);
+    const totalAmount = Number(cartData.total);
 
     const orderNumber = this.generateOrderNumber();
 
     const orderResult = await pool.query(
-      `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, total_amount, shipping_address, payment_status, payment_method, stock_warning)
-       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, 'pending', $9, $10)
+      `INSERT INTO orders (order_number, user_id, guest_email, status, subtotal, tax_amount, shipping_cost, discount_amount, voucher_code, total_amount, shipping_address, payment_status, payment_method, stock_warning)
+       VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12)
        RETURNING *`,
       [
         orderNumber,
@@ -292,6 +282,8 @@ class OrderService {
         subtotal,
         taxAmount,
         shippingCost,
+        discountAmount,
+        voucherCode,
         totalAmount,
         JSON.stringify(shippingAddress),
         pm,

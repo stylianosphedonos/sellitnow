@@ -86,12 +86,39 @@
     const shippingValue = shippingIsFree
       ? tr('cart.shippingFree')
       : money(cart.shipping_estimate);
+    const discountRow =
+      cart.voucher_code && Number(cart.discount_amount) > 0
+        ? `<div class="order-review__row"><span>${escapeHtml(
+            tr('cart.discount', { code: cart.voucher_code, percent: cart.discount_percent })
+          )}</span><span>−${money(cart.discount_amount)}</span></div>`
+        : '';
+    const voucherBlock = cart.voucher_code
+      ? `<div class="order-review__voucher order-review__voucher--applied">
+          <span>${escapeHtml(
+            tr('cart.voucherApplied', { code: cart.voucher_code, percent: cart.discount_percent })
+          )}</span>
+          <button type="button" class="order-review__voucher-remove" data-remove-voucher>${escapeHtml(
+            tr('cart.voucherRemove')
+          )}</button>
+        </div>`
+      : `<form class="order-review__voucher" data-apply-voucher>
+          <label for="checkoutVoucherCode">${escapeHtml(tr('cart.voucherLabel'))}</label>
+          <div class="order-review__voucher-row">
+            <input type="text" id="checkoutVoucherCode" name="voucher_code" maxlength="40" autocomplete="off" placeholder="${escapeHtml(
+              tr('cart.voucherPlaceholder')
+            )}">
+            <button type="submit" class="btn btn-sm">${escapeHtml(tr('cart.voucherApply'))}</button>
+          </div>
+          <p class="order-review__voucher-error" data-voucher-error hidden></p>
+        </form>`;
     return `
       <div class="order-review__footer">
         <div class="order-review__row"><span>${escapeHtml(tr('cart.subtotal'))}</span><span>${money(cart.subtotal)}</span></div>
+        ${discountRow}
         <div class="order-review__row"><span>${escapeHtml(tr('review.estTax'))}</span><span>${money(cart.tax_amount)}</span></div>
         <div class="order-review__row"><span>${escapeHtml(tr('review.pickup'))}</span><span>${escapeHtml(shippingValue)}</span></div>
         <div class="order-review__row order-review__row--total"><span>${escapeHtml(tr('cart.total'))}</span><span>${money(cart.total)}</span></div>
+        ${voucherBlock}
         <p class="order-review__shipping-note">${escapeHtml(tr('cart.freeDeliveryNote'))}</p>
       </div>
     `;
@@ -122,6 +149,52 @@
         ${footerHtml(cart)}
       </div>
     `;
+  };
+
+  global.bindOrderReviewVoucherControls = function bindOrderReviewVoucherControls(root, onChanged) {
+    const host = root || document;
+    const form = host.querySelector('[data-apply-voucher]');
+    if (form && form.dataset.bound !== '1') {
+      form.dataset.bound = '1';
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = form.querySelector('input');
+        const errEl = form.querySelector('[data-voucher-error]');
+        const code = (input?.value || '').trim();
+        if (errEl) {
+          errEl.hidden = true;
+          errEl.textContent = '';
+        }
+        if (!code) {
+          if (errEl) {
+            errEl.textContent = tr('cart.voucherRequired');
+            errEl.hidden = false;
+          }
+          return;
+        }
+        try {
+          await global.callApi('/cart/voucher', { method: 'POST', body: JSON.stringify({ code }) });
+          if (typeof onChanged === 'function') onChanged();
+        } catch (err) {
+          if (errEl) {
+            errEl.textContent = err.message || tr('cart.voucherInvalid');
+            errEl.hidden = false;
+          }
+        }
+      });
+    }
+    const removeBtn = host.querySelector('[data-remove-voucher]');
+    if (removeBtn && removeBtn.dataset.bound !== '1') {
+      removeBtn.dataset.bound = '1';
+      removeBtn.addEventListener('click', async () => {
+        try {
+          await global.callApi('/cart/voucher', { method: 'DELETE' });
+          if (typeof onChanged === 'function') onChanged();
+        } catch (err) {
+          alert(err.message);
+        }
+      });
+    }
   };
 
   global.buildPaymentStepOrderBanner = function (orderNumber, totalAmount) {

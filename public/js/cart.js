@@ -127,10 +127,36 @@ async function loadCart() {
           <h2 class="cart-summary__title">${escapeHtml(tr('cart.summary'))}</h2>
           <div class="cart-summary__body">
             ${renderSummaryRow(tr('cart.subtotal'), formatStoreMoney(cart.subtotal))}
+            ${
+              cart.voucher_code && Number(cart.discount_amount) > 0
+                ? renderSummaryRow(
+                    tr('cart.discount', { code: cart.voucher_code, percent: cart.discount_percent }),
+                    `−${formatStoreMoney(cart.discount_amount)}`,
+                    { muted: true }
+                  )
+                : ''
+            }
             ${renderSummaryRow(tr('cart.tax'), formatStoreMoney(cart.tax_amount), { muted: true })}
             ${renderSummaryRow(tr('cart.shipping'), shippingLabel, { muted: true })}
             <div class="cart-summary__divider"></div>
             ${renderSummaryRow(tr('cart.total'), formatStoreMoney(cart.total), { strong: true })}
+          </div>
+          <div class="cart-summary__voucher">
+            ${
+              cart.voucher_code
+                ? `<div class="cart-summary__voucher-applied">
+                    <span>${escapeHtml(tr('cart.voucherApplied', { code: cart.voucher_code, percent: cart.discount_percent }))}</span>
+                    <button type="button" class="cart-summary__voucher-remove" id="removeVoucherBtn">${escapeHtml(tr('cart.voucherRemove'))}</button>
+                  </div>`
+                : `<form class="cart-summary__voucher-form" id="applyVoucherForm">
+                    <label class="cart-summary__voucher-label" for="voucherCodeInput">${escapeHtml(tr('cart.voucherLabel'))}</label>
+                    <div class="cart-summary__voucher-row">
+                      <input type="text" id="voucherCodeInput" class="cart-summary__voucher-input" placeholder="${escapeHtml(tr('cart.voucherPlaceholder'))}" autocomplete="off" maxlength="40">
+                      <button type="submit" class="btn cart-summary__voucher-apply" id="applyVoucherBtn">${escapeHtml(tr('cart.voucherApply'))}</button>
+                    </div>
+                    <p class="cart-summary__voucher-error" id="voucherError" hidden></p>
+                  </form>`
+            }
           </div>
           <p class="cart-summary__note">${escapeHtml(tr('cart.freeDeliveryNote'))}</p>
           <p class="cart-summary__note">${escapeHtml(tr('cart.note'))}</p>
@@ -163,6 +189,54 @@ async function loadCart() {
     if (clearBtn) {
       clearBtn.addEventListener('click', () => clearAllItems());
     }
+
+    const voucherForm = document.getElementById('applyVoucherForm');
+    if (voucherForm) {
+      voucherForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('voucherCodeInput');
+        const errEl = document.getElementById('voucherError');
+        const btn = document.getElementById('applyVoucherBtn');
+        const code = (input?.value || '').trim();
+        if (errEl) {
+          errEl.hidden = true;
+          errEl.textContent = '';
+        }
+        if (!code) {
+          if (errEl) {
+            errEl.textContent = tr('cart.voucherRequired');
+            errEl.hidden = false;
+          }
+          return;
+        }
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = tr('cart.voucherApplying');
+        }
+        try {
+          await callApi('/cart/voucher', { method: 'POST', body: JSON.stringify({ code }) });
+          loadCart();
+        } catch (err) {
+          if (errEl) {
+            errEl.textContent = err.message || tr('cart.voucherInvalid');
+            errEl.hidden = false;
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = tr('cart.voucherApply');
+          }
+        }
+      });
+    }
+
+    document.getElementById('removeVoucherBtn')?.addEventListener('click', async () => {
+      try {
+        await callApi('/cart/voucher', { method: 'DELETE' });
+        loadCart();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
   } catch (err) {
     container.innerHTML = `<div class="cart-error"><p>${escapeHtml(tr('cart.loadFailed'))}</p><a href="/">${escapeHtml(tr('cart.returnHome'))}</a></div>`;
   }

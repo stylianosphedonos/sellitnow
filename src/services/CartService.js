@@ -5,6 +5,11 @@ const { getBrandSettings } = require('../routes/brand');
 const ProductService = require('./ProductService');
 const { validateVariantForProduct } = require('../lib/productOptions');
 const { computeShippingTotal, FREE_DELIVERY_MIN_ITEMS } = require('../lib/shipping');
+const VoucherService = require('./VoucherService');
+
+function roundMoney(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
 
 class CartService {
   /**
@@ -45,6 +50,17 @@ class CartService {
     return result.rows[0];
   }
 
+  async resolveAppliedVoucher(cartRow) {
+    const raw = cartRow?.voucher_code;
+    if (!raw) return null;
+    try {
+      return await VoucherService.validateApplicable(raw);
+    } catch {
+      await pool.query('UPDATE cart SET voucher_code = NULL WHERE id = $1', [cartRow.id]);
+      return null;
+    }
+  }
+
   /**
    * Get cart with items
    */
@@ -83,17 +99,33 @@ class CartService {
 
     const brand = await getBrandSettings();
     const taxRate = Number(brand.taxRatePercent) / 100;
-    const taxAmount = subtotal * (Number.isFinite(taxRate) ? taxRate : 0);
     const defaultDelivery = brand.defaultDeliveryCost;
     const itemCount = items.reduce((s, i) => s + i.quantity, 0);
     const shippingCost = computeShippingTotal(defaultDelivery, items);
-    const total = subtotal + taxAmount + shippingCost;
+
+    const voucher = items.length ? await this.resolveAppliedVoucher(cart) : null;
+    const discountPercent = voucher ? Number(voucher.discount_percent) || 0 : 0;
+    const discountAmount = voucher ? roundMoney(subtotal * (discountPercent / 100)) : 0;
+    const discountedSubtotal = Math.max(0, roundMoney(subtotal - discountAmount));
+    const taxAmount = roundMoney(discountedSubtotal * (Number.isFinite(taxRate) ? taxRate : 0));
+    const total = roundMoney(discountedSubtotal + taxAmount + shippingCost);
 
     return {
       cart_id: cart.id,
       session_id: cart.session_id,
       items,
-      subtotal,
+      subtotal: roundMoney(subtotal),
+      discount_amount: discountAmount,
+      discount_percent: discountPercent || null,
+      voucher_code: voucher ? voucher.code : null,
+      voucher: voucher
+        ? {
+            code: voucher.code,
+            discount_percent: voucher.discount_percent,
+            expires_at: voucher.expires_at,
+            label: voucher.label,
+          }
+        : null,
       tax_amount: taxAmount,
       default_delivery_cost: defaultDelivery,
       shipping_estimate: shippingCost,
@@ -102,6 +134,21 @@ class CartService {
       total,
       item_count: itemCount,
     };
+  }
+
+  async applyVoucher(userId, sessionId, code) {
+    const voucher = await VoucherService.validateApplicable(code);
+    const cart = await this.getOrCreateCart(userId, sessionId);
+    const count = await this.getItemCount(userId, sessionId);
+    if (!count.item_count) throw new Error('Add items to your cart before applying a voucher.');
+    await pool.query('UPDATE cart SET voucher_code = $1 WHERE id = $2', [voucher.code, cart.id]);
+    return this.getCart(userId, sessionId);
+  }
+
+  async removeVoucher(userId, sessionId) {
+    const cart = await this.getOrCreateCart(userId, sessionId);
+    await pool.query('UPDATE cart SET voucher_code = NULL WHERE id = $1', [cart.id]);
+    return this.getCart(userId, sessionId);
   }
 
   /** Lightweight badge count — skips line items, tax, and shipping. */
@@ -204,7 +251,6 @@ class CartService {
       return;
     }
 
-    // Merge guest items into user cart
     const guestItems = await pool.query(
       'SELECT product_id, quantity, color, size FROM cart_items WHERE cart_id = $1',
       [guestCart.rows[0].id]
@@ -217,6 +263,14 @@ class CartService {
       });
     }
 
+    // Prefer guest voucher if user cart has none
+    if (guestCart.rows[0].voucher_code && !userCart.rows[0].voucher_code) {
+      await pool.query('UPDATE cart SET voucher_code = $1 WHERE id = $2', [
+        guestCart.rows[0].voucher_code,
+        userCart.rows[0].id,
+      ]);
+    }
+
     await pool.query('DELETE FROM cart WHERE id = $1', [guestCart.rows[0].id]);
   }
 
@@ -225,6 +279,7 @@ class CartService {
    */
   async clearCart(cartId) {
     await pool.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
+    await pool.query('UPDATE cart SET voucher_code = NULL WHERE id = $1', [cartId]);
   }
 
   /**

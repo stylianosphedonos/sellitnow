@@ -155,6 +155,11 @@ async function runPostgresMigrations(pool) {
   await pool.query(
     'CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active)'
   );
+  await pool.query('ALTER TABLE cart ADD COLUMN IF NOT EXISTS voucher_code TEXT');
+  await pool.query(
+    'ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION DEFAULT 0'
+  );
+  await pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS voucher_code TEXT');
 
   await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS title_el TEXT');
   await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS description_el TEXT');

@@ -171,6 +171,24 @@ class VoucherService {
     return true;
   }
 
+  /**
+   * Validate a code for checkout use. Throws if invalid/expired/inactive.
+   */
+  async validateApplicable(codeInput) {
+    const code = normalizeCode(codeInput);
+    if (!code) throw new Error('Enter a voucher code.');
+    const result = await pool.query(
+      `SELECT id, code, discount_percent, expires_at, label, is_active, created_at
+       FROM discount_vouchers WHERE code = $1`,
+      [code]
+    );
+    if (!result.rows.length) throw new Error('Voucher code not found.');
+    const voucher = mapRow(result.rows[0]);
+    if (!voucher.is_active) throw new Error('This voucher is no longer active.');
+    if (voucher.expired) throw new Error('This voucher has expired.');
+    return voucher;
+  }
+
   formatExportText(vouchers) {
     const lines = (vouchers || []).map((v) => {
       const parts = [v.code, `${Number(v.discount_percent)}%`];

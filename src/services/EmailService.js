@@ -362,6 +362,11 @@ class EmailService {
 
           <table style="width:100%;max-width:320px;margin-left:auto;font-size:14px;border-collapse:collapse">
             <tr><td style="padding:6px 8px;color:#555">Subtotal</td><td style="padding:6px 8px;text-align:right">${fmt(order.subtotal)}</td></tr>
+            ${
+              Number(order.discount_amount) > 0
+                ? `<tr><td style="padding:6px 8px;color:#555">Discount${order.voucher_code ? ` (${order.voucher_code})` : ''}</td><td style="padding:6px 8px;text-align:right">−${fmt(order.discount_amount)}</td></tr>`
+                : ''
+            }
             <tr><td style="padding:6px 8px;color:#555">Tax (VAT)</td><td style="padding:6px 8px;text-align:right">${fmt(order.tax_amount)}</td></tr>
             <tr><td style="padding:6px 8px;color:#555">Shipping</td><td style="padding:6px 8px;text-align:right">${fmt(order.shipping_cost)}</td></tr>
             <tr><td style="padding:10px 8px 6px;font-weight:700;border-top:2px solid #111">${isPaid ? 'Total charged' : 'Order total'}</td><td style="padding:10px 8px 6px;text-align:right;font-weight:700;border-top:2px solid #111">${fmt(order.total_amount)}</td></tr>
@@ -396,6 +401,9 @@ class EmailService {
       plainAddr ? `Ship to: ${plainAddr}` : '',
       '',
       `Subtotal: ${fmt(order.subtotal)}`,
+      ...(Number(order.discount_amount) > 0
+        ? [`Discount${order.voucher_code ? ` (${order.voucher_code})` : ''}: -${fmt(order.discount_amount)}`]
+        : []),
       `Tax: ${fmt(order.tax_amount)}`,
       `Shipping: ${fmt(order.shipping_cost)}`,
       `Total: ${fmt(order.total_amount)}`,
@@ -849,6 +857,11 @@ class EmailService {
 
       <table style="margin-top:16px;font-size:14px;max-width:320px;margin-left:auto">
         <tr><td style="padding:4px 8px">Subtotal</td><td style="padding:4px 8px;text-align:right">${fmt(order.subtotal)}</td></tr>
+        ${
+          Number(order.discount_amount) > 0
+            ? `<tr><td style="padding:4px 8px">Discount${order.voucher_code ? ` (${escapeHtml(order.voucher_code)})` : ''}</td><td style="padding:4px 8px;text-align:right">−${fmt(order.discount_amount)}</td></tr>`
+            : ''
+        }
         <tr><td style="padding:4px 8px">Tax (VAT)</td><td style="padding:4px 8px;text-align:right">${fmt(order.tax_amount)}</td></tr>
         <tr><td style="padding:4px 8px">Shipping</td><td style="padding:4px 8px;text-align:right">${fmt(order.shipping_cost)}</td></tr>
         <tr><td style="padding:8px 8px 4px;font-weight:700;border-top:1px solid #ddd">Total</td><td style="padding:8px 8px 4px;text-align:right;font-weight:700;border-top:1px solid #ddd">${fmt(order.total_amount)}</td></tr>

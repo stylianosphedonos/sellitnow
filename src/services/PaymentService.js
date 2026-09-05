@@ -7,7 +7,6 @@ const CartService = require('./CartService');
 const ProductService = require('./ProductService');
 const EmailService = require('./EmailService');
 const { verifyGuestOrderToken, createGuestOrderToken } = require('../lib/guestOrderToken');
-const { computeShippingTotal } = require('../lib/shipping');
 const PickupStoreService = require('./PickupStoreService');
 const {
   resolveCheckoutAddress,
@@ -158,14 +157,12 @@ class PaymentService {
     if (!userId && !guestEmail) throw new Error('Email required for guest checkout');
 
     const resolvedAddress = await resolveCheckoutAddress(shippingAddress, PickupStoreService);
-    const brand = await getBrandSettings();
-    const shippingCost = computeShippingTotal(brand.defaultDeliveryCost, cartData.items, {
-      fulfillmentMethod: resolvedAddress.fulfillment_method,
-    });
-    const totalAmount = cartData.subtotal + cartData.tax_amount + shippingCost;
+    const shippingCost = Number(cartData.shipping_estimate) || 0;
+    const totalAmount = Number(cartData.total);
     const amountInCents = Math.round(parseFloat(totalAmount) * 100);
     if (amountInCents < 50) throw new Error('Amount too small');
 
+    const brand = await getBrandSettings();
     const { currency: storeCurrency } = brand;
     const stripeCurrency = (storeCurrency || 'usd').toLowerCase();
 
@@ -184,6 +181,8 @@ class PaymentService {
         session_id: sessionId ? String(sessionId) : '',
         guest_email: guestEmail ? String(guestEmail).trim().toLowerCase() : '',
         shipping_address: shippingJson,
+        voucher_code: cartData.voucher_code || '',
+        discount_amount: String(cartData.discount_amount || 0),
       },
     });
 
@@ -191,6 +190,8 @@ class PaymentService {
       client_secret: paymentIntent.client_secret,
       total_amount: totalAmount,
       shipping_cost: shippingCost,
+      discount_amount: cartData.discount_amount || 0,
+      voucher_code: cartData.voucher_code || null,
       fulfillment_method: resolvedAddress.fulfillment_method,
     };
   }

@@ -483,6 +483,17 @@ function runSchemaMigrations(db) {
   )`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_code ON discount_vouchers(code)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active)');
+  const cartTableCols = db.prepare('PRAGMA table_info(cart)').all().map((c) => c.name);
+  if (cartTableCols.length && !cartTableCols.includes('voucher_code')) {
+    db.exec('ALTER TABLE cart ADD COLUMN voucher_code TEXT');
+  }
+  const orderColsForDiscount = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
+  if (orderColsForDiscount.length && !orderColsForDiscount.includes('discount_amount')) {
+    db.exec('ALTER TABLE orders ADD COLUMN discount_amount REAL DEFAULT 0');
+  }
+  if (orderColsForDiscount.length && !orderColsForDiscount.includes('voucher_code')) {
+    db.exec('ALTER TABLE orders ADD COLUMN voucher_code TEXT');
+  }
   const pickupCols = db.prepare('PRAGMA table_info(pickup_stores)').all().map((c) => c.name);
   if (!pickupCols.includes('provider')) {
     db.exec("ALTER TABLE pickup_stores ADD COLUMN provider TEXT NOT NULL DEFAULT 'manual'");
