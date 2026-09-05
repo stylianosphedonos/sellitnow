@@ -116,7 +116,7 @@ async function loadCart() {
         </div>
         <div class="cart-page__head-actions">
           <a href="/" class="cart-page__continue">${escapeHtml(tr('cart.continue'))}</a>
-          <button type="button" class="cart-page__clear" id="clearCartBtn">${escapeHtml(tr('cart.removeAll'))}</button>
+          <button type="button" class="btn cart-page__clear" id="clearCartBtn">${escapeHtml(tr('cart.removeAll'))}</button>
         </div>
       </header>
       <div class="cart-layout">

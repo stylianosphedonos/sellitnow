@@ -2700,28 +2700,29 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
 }
 
 .cart-page__clear {
-  appearance: none;
-  background: none;
-  border: 1px solid var(--border);
+  width: auto;
+  min-width: 160px;
+  padding: 12px 18px;
+  background: #111;
+  color: var(--white);
+  border: none;
   border-radius: 8px;
-  color: var(--text-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: background 0.15s, transform 0.15s;
 }
 
 .cart-page__clear:hover:not(:disabled) {
-  background: #fff;
-  border-color: #d1d5db;
-  color: #b91c1c;
+  background: #000;
+  color: var(--white);
+  border-color: transparent;
+  text-decoration: none;
 }
 
 .cart-page__clear:disabled {
