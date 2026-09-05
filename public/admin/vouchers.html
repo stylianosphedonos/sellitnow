@@ -28,13 +28,16 @@
           <h1>Discount Vouchers</h1>
           <p class="admin-lead">Create percentage discount codes, set expiry dates, and export selected codes to a text file.</p>
         </div>
+        <div class="admin-page-head__actions">
+          <button type="button" class="btn" id="showCreateFormBtn">Create vouchers</button>
+        </div>
       </header>
 
       <div id="voucherMessage" class="admin-flash" role="status" style="display:none"></div>
 
-      <section class="admin-panel" style="margin-bottom:24px;padding:20px 22px">
+      <section class="admin-card is-open" id="createVoucherSection" style="margin-bottom:24px">
         <h2 style="margin:0 0 16px;font-size:18px">Create vouchers</h2>
-        <form id="createVoucherForm" class="admin-toolbar" style="align-items:flex-end;flex-wrap:wrap;gap:14px 16px">
+        <form id="createVoucherForm" class="admin-toolbar" style="align-items:flex-end;flex-wrap:wrap;gap:14px 16px;margin:0;padding:0;border:none;box-shadow:none;background:transparent">
           <div class="admin-toolbar__field" style="min-width:120px;max-width:140px">
             <label for="discountPercent">Discount %</label>
             <input type="number" id="discountPercent" name="discount_percent" min="1" max="100" step="0.01" required placeholder="e.g. 15">
@@ -55,7 +58,7 @@
             <label for="customCode">Custom code (single only)</label>
             <input type="text" id="customCode" name="code" maxlength="40" placeholder="Leave blank to auto-generate" autocomplete="off">
           </div>
-          <button type="submit" class="btn" id="createVoucherBtn" style="width:auto;max-width:none;padding:12px 18px">Create</button>
+          <button type="submit" class="btn" id="createVoucherBtn" style="width:auto;max-width:none;padding:12px 18px;min-width:140px">Create</button>
         </form>
         <p style="margin:12px 0 0;font-size:13px;color:var(--text-muted);line-height:1.45">
           Create one voucher or a batch with the same discount and expiry. Leave expiry empty for no expiry. Custom codes only work when quantity is 1.
@@ -267,6 +270,12 @@
 
     document.getElementById('statusFilter').addEventListener('change', loadVouchers);
     document.getElementById('refreshVouchersBtn').addEventListener('click', loadVouchers);
+
+    document.getElementById('showCreateFormBtn')?.addEventListener('click', () => {
+      const section = document.getElementById('createVoucherSection');
+      section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.getElementById('discountPercent')?.focus();
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
       loadVouchers();
