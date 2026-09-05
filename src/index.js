@@ -472,6 +472,17 @@ function runSchemaMigrations(db) {
     display_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS discount_vouchers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    discount_percent REAL NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
+    expires_at TEXT,
+    label TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_code ON discount_vouchers(code)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active)');
   const pickupCols = db.prepare('PRAGMA table_info(pickup_stores)').all().map((c) => c.name);
   if (!pickupCols.includes('provider')) {
     db.exec("ALTER TABLE pickup_stores ADD COLUMN provider TEXT NOT NULL DEFAULT 'manual'");

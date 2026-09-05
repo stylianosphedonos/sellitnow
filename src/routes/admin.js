@@ -25,6 +25,7 @@ const PDFDocument = require('pdfkit');
 const { createFullBackup, restoreFullBackup } = require('../services/DatabaseBackupService');
 const PickupStoreService = require('../services/PickupStoreService');
 const CourierPickupSyncService = require('../services/CourierPickupSyncService');
+const VoucherService = require('../services/VoucherService');
 
 const router = express.Router();
 
@@ -1137,6 +1138,63 @@ router.delete('/pickup-stores/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     const status = err.message === 'Pickup store not found' ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+// —— Discount vouchers ——
+router.get('/vouchers', async (req, res) => {
+  try {
+    const vouchers = await VoucherService.list({ status: req.query.status });
+    res.json({ vouchers });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/vouchers', async (req, res) => {
+  try {
+    const vouchers = await VoucherService.create(req.body || {});
+    res.status(201).json({ vouchers, count: vouchers.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/vouchers/export', async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const vouchers = await VoucherService.getByIds(ids);
+    if (!vouchers.length) {
+      return res.status(400).json({ error: 'Select at least one voucher to export.' });
+    }
+    const text = VoucherService.formatExportText(vouchers);
+    res.json({ text, count: vouchers.length, vouchers });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.patch('/vouchers/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (req.body && Object.prototype.hasOwnProperty.call(req.body, 'is_active')) {
+      const voucher = await VoucherService.setActive(id, Boolean(req.body.is_active));
+      return res.json({ voucher });
+    }
+    return res.status(400).json({ error: 'Nothing to update.' });
+  } catch (err) {
+    const status = err.message === 'Voucher not found' ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+});
+
+router.delete('/vouchers/:id', async (req, res) => {
+  try {
+    await VoucherService.remove(parseInt(req.params.id, 10));
+    res.json({ success: true });
+  } catch (err) {
+    const status = err.message === 'Voucher not found' ? 404 : 400;
     res.status(status).json({ error: err.message });
   }
 });

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discount Vouchers - Admin - 3nityLab</title>
+  <script src="/js/brand-boot.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <a href="/admin/">Dashboard</a>
+      <a href="/admin/products.html">Products</a>
+      <a href="/admin/categories.html">Categories</a>
+      <a href="/admin/orders.html">Orders</a>
+      <a href="/admin/pickup-stores.html">Pickup stores</a>
+      <a href="/admin/vouchers.html">Discount Vouchers</a>
+      <a href="/admin/customers.html">Customers</a>
+      <a href="/admin/brand.html">Brand</a>
+      <a href="/admin/settings.html">Settings</a>
+      <a href="/admin/user-management.html">User Management</a>
+      <a href="/">← Back to Store</a>
+    </aside>
+    <main class="admin-content">
+      <header class="admin-page-head">
+        <div class="admin-page-head__text">
+          <h1>Discount Vouchers</h1>
+          <p class="admin-lead">Create percentage discount codes, set expiry dates, and export selected codes to a text file.</p>
+        </div>
+      </header>
+
+      <div id="voucherMessage" class="admin-flash" role="status" style="display:none"></div>
+
+      <section class="admin-panel" style="margin-bottom:24px;padding:20px 22px">
+        <h2 style="margin:0 0 16px;font-size:18px">Create vouchers</h2>
+        <form id="createVoucherForm" class="admin-toolbar" style="align-items:flex-end;flex-wrap:wrap;gap:14px 16px">
+          <div class="admin-toolbar__field" style="min-width:120px;max-width:140px">
+            <label for="discountPercent">Discount %</label>
+            <input type="number" id="discountPercent" name="discount_percent" min="1" max="100" step="0.01" required placeholder="e.g. 15">
+          </div>
+          <div class="admin-toolbar__field" style="min-width:160px;max-width:180px">
+            <label for="expiresAt">Expiry date</label>
+            <input type="date" id="expiresAt" name="expires_at">
+          </div>
+          <div class="admin-toolbar__field" style="min-width:100px;max-width:120px">
+            <label for="quantity">Quantity</label>
+            <input type="number" id="quantity" name="quantity" min="1" max="500" value="1" required>
+          </div>
+          <div class="admin-toolbar__field" style="min-width:160px;max-width:220px">
+            <label for="voucherLabel">Label (optional)</label>
+            <input type="text" id="voucherLabel" name="label" maxlength="120" placeholder="e.g. Spring campaign">
+          </div>
+          <div class="admin-toolbar__field" style="min-width:160px;max-width:220px">
+            <label for="customCode">Custom code (single only)</label>
+            <input type="text" id="customCode" name="code" maxlength="40" placeholder="Leave blank to auto-generate" autocomplete="off">
+          </div>
+          <button type="submit" class="btn" id="createVoucherBtn" style="width:auto;max-width:none;padding:12px 18px">Create</button>
+        </form>
+        <p style="margin:12px 0 0;font-size:13px;color:var(--text-muted);line-height:1.45">
+          Create one voucher or a batch with the same discount and expiry. Leave expiry empty for no expiry. Custom codes only work when quantity is 1.
+        </p>
+      </section>
+
+      <div class="admin-toolbar" style="margin-bottom:12px">
+        <div class="admin-toolbar__field" style="min-width:160px;max-width:200px">
+          <label for="statusFilter">Status</label>
+          <select id="statusFilter">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <button type="button" class="btn" id="exportSelectedBtn" style="width:auto;max-width:none;padding:12px 18px;background:#111">Export selected to text</button>
+        <button type="button" class="btn btn-secondary" id="refreshVouchersBtn" style="width:auto;max-width:none;padding:12px 18px;margin-top:0">Refresh</button>
+      </div>
+
+      <div id="vouchersList"></div>
+    </main>
+  </div>
+  <script src="/js/runtime-config.js"></script>
+  <script src="/js/app.js"></script>
+  <script src="/js/admin-layout.js"></script>
+  <script>
+    let lastVouchers = [];
+
+    function showMessage(message, isError = false) {
+      const el = document.getElementById('voucherMessage');
+      el.textContent = message;
+      el.className = 'admin-flash' + (isError ? ' admin-flash--error' : '');
+      el.style.display = message ? 'block' : 'none';
+    }
+
+    function esc(s) {
+      return escapeHtml(String(s == null ? '' : s));
+    }
+
+    function selectedIds() {
+      return Array.from(document.querySelectorAll('.voucher-select:checked'))
+        .map((el) => parseInt(el.value, 10))
+        .filter((n) => Number.isInteger(n));
+    }
+
+    function statusBadge(v) {
+      const label = v.status === 'active' ? 'Active' : v.status === 'expired' ? 'Expired' : 'Inactive';
+      const color =
+        v.status === 'active' ? '#166534' : v.status === 'expired' ? '#92400e' : '#64748b';
+      const bg =
+        v.status === 'active' ? '#dcfce7' : v.status === 'expired' ? '#fef3c7' : '#e2e8f0';
+      return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:${color};background:${bg}">${label}</span>`;
+    }
+
+    function renderVouchers(vouchers) {
+      const host = document.getElementById('vouchersList');
+      lastVouchers = vouchers || [];
+      if (!lastVouchers.length) {
+        host.innerHTML = '<p style="color:var(--text-muted)">No vouchers yet. Create your first batch above.</p>';
+        return;
+      }
+      host.innerHTML = `
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th style="width:40px"><input type="checkbox" id="selectAllVouchers" aria-label="Select all"></th>
+                <th>Code</th>
+                <th>Discount</th>
+                <th>Expires</th>
+                <th>Label</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lastVouchers
+                .map(
+                  (v) => `
+                <tr data-id="${v.id}">
+                  <td><input type="checkbox" class="voucher-select" value="${v.id}" aria-label="Select ${esc(v.code)}"></td>
+                  <td><code style="font-weight:700;letter-spacing:0.04em">${esc(v.code)}</code></td>
+                  <td>${esc(v.discount_percent)}%</td>
+                  <td>${v.expires_at ? esc(v.expires_at) : '—'}</td>
+                  <td>${v.label ? esc(v.label) : '—'}</td>
+                  <td>${statusBadge(v)}</td>
+                  <td style="white-space:nowrap;font-size:13px;color:var(--text-muted)">${esc(String(v.created_at || '').slice(0, 19).replace('T', ' '))}</td>
+                  <td style="white-space:nowrap">
+                    <button type="button" class="btn btn-sm" data-toggle-active="${v.id}" data-active="${v.is_active ? '1' : '0'}" style="width:auto;padding:6px 10px;font-size:12px;margin:0 4px 0 0">
+                      ${v.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button type="button" class="btn btn-sm" data-delete-id="${v.id}" style="width:auto;padding:6px 10px;font-size:12px;margin:0;background:#dc2626">Delete</button>
+                  </td>
+                </tr>`
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      document.getElementById('selectAllVouchers')?.addEventListener('change', (e) => {
+        document.querySelectorAll('.voucher-select').forEach((cb) => {
+          cb.checked = e.target.checked;
+        });
+      });
+
+      host.querySelectorAll('[data-toggle-active]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-toggle-active');
+          const next = btn.getAttribute('data-active') !== '1';
+          try {
+            await callApi('/admin/vouchers/' + id, {
+              method: 'PATCH',
+              body: JSON.stringify({ is_active: next }),
+            });
+            showMessage(next ? 'Voucher activated.' : 'Voucher deactivated.');
+            loadVouchers();
+          } catch (err) {
+            showMessage(err.message || 'Update failed.', true);
+          }
+        });
+      });
+
+      host.querySelectorAll('[data-delete-id]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete this voucher permanently?')) return;
+          try {
+            await callApi('/admin/vouchers/' + btn.getAttribute('data-delete-id'), { method: 'DELETE' });
+            showMessage('Voucher deleted.');
+            loadVouchers();
+          } catch (err) {
+            showMessage(err.message || 'Delete failed.', true);
+          }
+        });
+      });
+    }
+
+    async function loadVouchers() {
+      const status = document.getElementById('statusFilter').value;
+      try {
+        const qs = status && status !== 'all' ? '?status=' + encodeURIComponent(status) : '';
+        const data = await callApi('/admin/vouchers' + qs);
+        renderVouchers(data.vouchers || []);
+      } catch (err) {
+        document.getElementById('vouchersList').innerHTML =
+          '<p style="color:#b91c1c">' + esc(err.message || 'Failed to load vouchers') + '</p>';
+      }
+    }
+
+    function downloadText(filename, text) {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById('createVoucherForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('createVoucherBtn');
+      btn.disabled = true;
+      const prev = btn.textContent;
+      btn.textContent = 'Creating…';
+      try {
+        const body = {
+          discount_percent: document.getElementById('discountPercent').value,
+          expires_at: document.getElementById('expiresAt').value || null,
+          quantity: document.getElementById('quantity').value || 1,
+          label: document.getElementById('voucherLabel').value || null,
+          code: document.getElementById('customCode').value || null,
+        };
+        const data = await callApi('/admin/vouchers', { method: 'POST', body: JSON.stringify(body) });
+        const count = data.count || (data.vouchers || []).length;
+        showMessage(`Created ${count} voucher${count === 1 ? '' : 's'}.`);
+        document.getElementById('customCode').value = '';
+        await loadVouchers();
+      } catch (err) {
+        showMessage(err.message || 'Could not create vouchers.', true);
+      }
+      btn.disabled = false;
+      btn.textContent = prev;
+    });
+
+    document.getElementById('exportSelectedBtn').addEventListener('click', async () => {
+      const ids = selectedIds();
+      if (!ids.length) {
+        showMessage('Select at least one voucher to export.', true);
+        return;
+      }
+      try {
+        const data = await callApi('/admin/vouchers/export', {
+          method: 'POST',
+          body: JSON.stringify({ ids }),
+        });
+        const stamp = new Date().toISOString().slice(0, 10);
+        downloadText(`discount-vouchers-${stamp}.txt`, data.text || '');
+        showMessage(`Exported ${data.count} voucher${data.count === 1 ? '' : 's'} to text.`);
+      } catch (err) {
+        showMessage(err.message || 'Export failed.', true);
+      }
+    });
+
+    document.getElementById('statusFilter').addEventListener('change', loadVouchers);
+    document.getElementById('refreshVouchersBtn').addEventListener('click', loadVouchers);
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadVouchers();
+    });
+  </script>
+</body>
+</html>

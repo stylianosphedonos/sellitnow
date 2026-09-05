@@ -187,6 +187,16 @@ CREATE TABLE IF NOT EXISTS brand_settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS discount_vouchers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  discount_percent REAL NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
+  expires_at TEXT,
+  label TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS order_email_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -215,3 +225,5 @@ CREATE INDEX IF NOT EXISTS idx_order_email_logs_order_id ON order_email_logs(ord
 CREATE INDEX IF NOT EXISTS idx_cart_user_id ON cart(user_id);
 CREATE INDEX IF NOT EXISTS idx_cart_session_id ON cart(session_id);
 CREATE INDEX IF NOT EXISTS idx_pickup_stores_active_order ON pickup_stores(active, display_order, city);
+CREATE INDEX IF NOT EXISTS idx_discount_vouchers_code ON discount_vouchers(code);
+CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active);

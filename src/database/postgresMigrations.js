@@ -140,6 +140,22 @@ async function runPostgresMigrations(pool) {
     'CREATE INDEX IF NOT EXISTS idx_pickup_stores_provider ON pickup_stores(provider)'
   );
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS discount_vouchers (
+      id SERIAL PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      discount_percent DOUBLE PRECISION NOT NULL CHECK (discount_percent > 0 AND discount_percent <= 100),
+      expires_at TEXT,
+      label TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_discount_vouchers_code ON discount_vouchers(code)');
+  await pool.query(
+    'CREATE INDEX IF NOT EXISTS idx_discount_vouchers_active ON discount_vouchers(is_active)'
+  );
+
   await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS title_el TEXT');
   await pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS description_el TEXT');
   await pool.query('ALTER TABLE categories ADD COLUMN IF NOT EXISTS name_el TEXT');

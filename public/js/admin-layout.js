@@ -74,6 +74,24 @@
       else storeLinks.push(pickupLink);
     }
 
+    var hasVouchersNav = storeLinks.some(function (a) {
+      return (a.getAttribute('href') || '').indexOf('/admin/vouchers') !== -1;
+    });
+    if (!hasVouchersNav) {
+      var vouchersLink = document.createElement('a');
+      vouchersLink.href = '/admin/vouchers.html';
+      vouchersLink.textContent = 'Discount Vouchers';
+      var insertAfter = -1;
+      for (var j = 0; j < storeLinks.length; j++) {
+        var href = storeLinks[j].getAttribute('href') || '';
+        if (href.indexOf('/admin/pickup-stores') !== -1 || href.indexOf('/admin/orders') !== -1) {
+          insertAfter = j;
+        }
+      }
+      if (insertAfter >= 0) storeLinks.splice(insertAfter + 1, 0, vouchersLink);
+      else storeLinks.push(vouchersLink);
+    }
+
     var brand = document.createElement('div');
     brand.className = 'admin-sidebar__brand';
     brand.innerHTML =
