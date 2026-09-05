@@ -482,17 +482,26 @@
         return returnUrl + (q.toString() ? '?' + q.toString() : '');
       }
 
+      let paymentInFlight = false;
+      const setPayBtnBusy = (busy) => {
+        paymentInFlight = busy;
+        payBtn.disabled = busy;
+        payBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
+        payBtn.textContent = busy ? tr('checkout.paying') : tr('checkout.payNow');
+      };
+
       paymentForm.onsubmit = async (e) => {
         e.preventDefault();
+        if (paymentInFlight || payBtn.disabled) return;
         messageEl.style.display = 'none';
         messageEl.textContent = '';
-        payBtn.disabled = true;
+        setPayBtnBusy(true);
 
         const { error: submitError } = await elements.submit();
         if (submitError) {
           messageEl.textContent = submitError.message || tr('checkout.checkDetails');
           messageEl.style.display = 'block';
-          payBtn.disabled = false;
+          setPayBtnBusy(false);
           return;
         }
 
@@ -505,7 +514,7 @@
         if (error) {
           messageEl.textContent = error.message || tr('checkout.paymentFailed');
           messageEl.style.display = 'block';
-          payBtn.disabled = false;
+          setPayBtnBusy(false);
           return;
         }
 
@@ -522,7 +531,7 @@
             messageEl.textContent =
               syncErr.message || 'Payment received but order could not be finalized. Contact support.';
             messageEl.style.display = 'block';
-            payBtn.disabled = false;
+            setPayBtnBusy(false);
             return;
           }
         }

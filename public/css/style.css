@@ -1374,8 +1374,14 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   font-family: inherit;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   background: var(--primary-dark);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-secondary {
