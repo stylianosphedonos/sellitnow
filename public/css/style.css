@@ -264,6 +264,7 @@ body {
   align-items: center;
   gap: 8px;
   align-self: center;
+  margin-left: auto;
 }
 
 .nav-link {
@@ -3652,6 +3653,17 @@ a.bundle-includes__item:hover .bundle-includes__photo {
     align-items: center;
   }
 
+  .site-body,
+  .site-zone--bar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .site-body .hero__frame {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   .logo {
     font-size: var(--fs-2xl);
     flex: 1 1 auto;
@@ -4301,20 +4313,38 @@ a.bundle-includes__item:hover .bundle-includes__photo {
   }
 }
 
-/* Website placement zones */
+/* Website placement zones — same column as .header-inner */
 .site-body {
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  max-width: 1240px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 16px;
+  padding: 0 20px;
+}
+
+/* Match header column: parent owns the horizontal gutter */
+.site-body .main {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.site-body .hero__frame {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .site-body__center {
   flex: 1;
   min-width: 0;
   position: relative;
+}
+
+/* Author display rules override UA [hidden]; force empty zones out of layout */
+.site-zone[hidden] {
+  display: none !important;
 }
 
 .site-zone--side {
@@ -4327,9 +4357,9 @@ a.bundle-includes__item:hover .bundle-includes__photo {
 }
 
 .site-zone--bar {
-  max-width: 1240px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 8px 16px;
+  padding: 8px 20px;
 }
 
 .site-zone--bar-row {
@@ -4524,7 +4554,7 @@ body.request-modal-open {
 @media (max-width: 640px) {
   .site-body {
     display: block;
-    padding: 0;
+    padding: 0 16px;
     max-width: none;
   }
 
